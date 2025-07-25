@@ -33,6 +33,9 @@ dependencies = [
     "magicgui",
     "qtpy",
     "scikit-image",
+    "bioio",
+    "bioio-ome-tiff",
+    "bioio-ome-zarr",
 ]
 
 [project.optional-dependencies]
@@ -40,7 +43,7 @@ dependencies = [
 # (including Qt backend) using ndevio[all].
 all = ["napari[all]"]
 testing = [
-    "tox",
+    "tox-uv",
     "pytest",  # https://docs.pytest.org/en/latest/contents.html
     "pytest-cov",  # https://pytest-cov.readthedocs.io/en/latest/
     "pytest-qt",  # https://pytest-qt.readthedocs.io/en/latest/
@@ -57,7 +60,7 @@ ndevio = "ndevio:napari.yaml"
 "User Support" = "https://github.com/ndev-kit/ndevio/issues"
 
 [build-system]
-requires = ["setuptools>=42.0.0", "wheel", "setuptools_scm"]
+requires = ["setuptools>=42.0.0", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
@@ -72,6 +75,15 @@ where = ["src"]
 [tool.setuptools_scm]
 write_to = "src/ndevio/_version.py"
 fallback_version = "0.0.1+nogit"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
+xfail_strict = true
+# filterwarnings = ["error"] # recommended by PP309
+log_cli_level = "INFO"
+testpaths = ["tests"]
+
 
 [tool.black]
 line-length = 79
@@ -118,6 +130,4 @@ exclude = [
     "*vendored*",
     "*_vendor*",
 ]
-
-target-version = "py310"
 fix = true
