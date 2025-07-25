@@ -1,0 +1,50 @@
+name: ndevio
+display_name: ndevio
+# use 'hidden' to remove plugin from napari hub search results
+visibility: public
+# see https://napari.org/stable/plugins/technical_references/manifest.html#fields for valid categories
+# categories: []
+contributions:
+  commands:
+    - id: ndevio.get_reader
+      python_name: ndevio._reader:napari_get_reader
+      title: Open data with ndevio
+    - id: ndevio.write_multiple
+      python_name: ndevio._writer:write_multiple
+      title: Save multi-layer data with ndevio
+    - id: ndevio.write_single_image
+      python_name: ndevio._writer:write_single_image
+      title: Save image data with ndevio
+    - id: ndevio.make_container_widget
+      python_name: ndevio:ImageThreshold
+      title: Make threshold Container widget
+    - id: ndevio.make_magic_widget
+      python_name: ndevio:threshold_magic_widget
+      title: Make threshold magic widget
+    - id: ndevio.make_function_widget
+      python_name: ndevio:threshold_autogenerate_widget
+      title: Make threshold function widget
+    - id: ndevio.make_qwidget
+      python_name: ndevio:ExampleQWidget
+      title: Make example QWidget
+  readers:
+    - command: ndevio.get_reader
+      accepts_directories: false
+      filename_patterns: ['*.npy']
+  writers:
+    - command: ndevio.write_multiple
+      layer_types: ['image*','labels*']
+      filename_extensions: []
+    - command: ndevio.write_single_image
+      layer_types: ['image']
+      filename_extensions: ['.npy']
+  widgets:
+    - command: ndevio.make_container_widget
+      display_name: Container Threshold
+    - command: ndevio.make_magic_widget
+      display_name: Magic Threshold
+    - command: ndevio.make_function_widget
+      autogenerate: true
+      display_name: Autogenerate Threshold
+    - command: ndevio.make_qwidget
+      display_name: Example QWidget
