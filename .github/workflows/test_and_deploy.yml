@@ -52,8 +52,7 @@ jobs:
       # and
       # tox-conda: https://github.com/tox-dev/tox-conda
       - name: Install dependencies
-        run: |
-          uv pip install hatch tox-uv tox-gh-actions
+        run: uv pip install hatch tox-uv tox-gh-actions
 
       # this runs the platform-specific tests declared in tox.ini
       - name: Test with tox
