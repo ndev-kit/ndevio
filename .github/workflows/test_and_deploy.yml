@@ -31,9 +31,7 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         uses: astral-sh/setup-uv@v6
         with:
-          python-version: ${{ matrix.python-version }}
           enable-cache: true
-          cache-dependency-glob: "**/pyproject.toml"
 
       # these libraries enable testing on Qt on linux
       - uses: tlambert03/setup-qt-libs@v1
@@ -50,7 +48,9 @@ jobs:
       # and
       # tox-conda: https://github.com/tox-dev/tox-conda
       - name: Install dependencies
-        run: uv pip install -e ".[all,dev]"
+        run: |
+          uv venv --python ${{ matrix.python-version }}
+          uv pip install -e ".[all,dev]"
 
       # this runs the platform-specific tests declared in tox.ini
       - name: Run tests
