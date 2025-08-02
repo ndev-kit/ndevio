@@ -15,6 +15,9 @@ on:
       - npe2
   workflow_dispatch:
 
+env:
+  UV_SYSTEM_PYTHON: 1  # https://docs.astral.sh/uv/guides/integration/github/#using-uv-pip
+
 jobs:
   test:
     name: ${{ matrix.platform }} py${{ matrix.python-version }}
@@ -31,6 +34,7 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         uses: astral-sh/setup-uv@v6
         with:
+          python-version: ${{ matrix.python-version }}
           enable-cache: true
 
       # these libraries enable testing on Qt on linux
@@ -49,7 +53,6 @@ jobs:
       # tox-conda: https://github.com/tox-dev/tox-conda
       - name: Install dependencies
         run: |
-          uv pip install --upgrade pip
           uv pip install hatch tox-uv tox-gh-actions
 
       # this runs the platform-specific tests declared in tox.ini
@@ -75,7 +78,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.x"
       - name: Build package
