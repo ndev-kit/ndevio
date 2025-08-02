@@ -50,13 +50,13 @@ jobs:
       # and
       # tox-conda: https://github.com/tox-dev/tox-conda
       - name: Install dependencies
-        run: uv sync --all-extras --dev
+        run: uv sync --dev
 
       # this runs the platform-specific tests declared in tox.ini
       - name: Run tests
         uses: aganders3/headless-gui@v2
         with:
-          run: uv run pytest tests -v --color=yes --cov=ndevio --cov-report=xml
+          run: uv run pytest -v --color=yes --cov=ndevio --cov-report=xml
         env:
           PLATFORM: ${{ matrix.platform }}
 
