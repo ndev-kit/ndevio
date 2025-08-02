@@ -49,14 +49,14 @@ jobs:
       # tox-conda: https://github.com/tox-dev/tox-conda
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install hatch tox-uv tox-gh-actions
+          uv pip install --upgrade pip
+          uv pip install hatch tox-uv tox-gh-actions
 
       # this runs the platform-specific tests declared in tox.ini
       - name: Test with tox
         uses: aganders3/headless-gui@v2
         with:
-          run: python -m tox
+          run: uv run tox
         env:
           PLATFORM: ${{ matrix.platform }}
 
@@ -80,8 +80,7 @@ jobs:
           python-version: "3.x"
       - name: Build package
         run: |
-          python -m pip install --upgrade pip
-          pip install hatch
+          uv pip install hatch
           git tag
           hatch build
       - name: Publish to PyPI
