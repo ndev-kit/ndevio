@@ -50,7 +50,7 @@ jobs:
       # and
       # tox-conda: https://github.com/tox-dev/tox-conda
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv pip install -e ".[all,dev]"
 
       # this runs the platform-specific tests declared in tox.ini
       - name: Run tests
