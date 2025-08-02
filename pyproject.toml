@@ -42,8 +42,9 @@ dependencies = [
 # Allow easily installation with the full, default napari installation
 # (including Qt backend) using ndevio[all].
 all = ["napari[all]"]
-testing = [
-    "tox-uv",
+
+[dependency-groups]
+dev = [
     "pytest",  # https://docs.pytest.org/en/latest/contents.html
     "pytest-cov",  # https://pytest-cov.readthedocs.io/en/latest/
     "pytest-qt",  # https://pytest-qt.readthedocs.io/en/latest/
@@ -66,6 +67,23 @@ build-backend = "hatchling.build"
 [tool.hatch.version]
 source = "vcs"
 fallback_version = "0.0.1+nogit"
+
+[tool.hatch.envs.test]
+dependencies = [
+    "pytest",
+    "pytest-cov",
+    "pytest-qt",
+    "napari[qt]",
+    "hatch-uv",
+    "tox-uv",
+    "tox-gh-actions",
+]
+
+[tool.hatch.envs.test.scripts]
+run = "pytest -v --color=yes --cov=ndevio --cov-report=xml"
+
+[[tool.hatch.envs.test.matrix]]
+python = ["3.10", "3.11", "3.12", "3.13"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
