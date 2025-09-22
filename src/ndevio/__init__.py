@@ -6,4 +6,3 @@ except ImportError:
 from .nimage import nImage
 
 __all__ = ["__version__", "nImage"]
-

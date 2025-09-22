@@ -20,21 +20,25 @@ logger = logging.getLogger(__name__)
 
 DELIM = " :: "
 
+
 def _apply_zarr_compat_patch():
     """Apply zarr compatibility patch for zarr>=3.0 with BioIO."""
-    zarr_version = tuple(int(x) for x in zarr.__version__.split('.')[:2])
-    if zarr_version >= (3, 0) and not hasattr(zarr.storage, 'FSStore'):
+    zarr_version = tuple(int(x) for x in zarr.__version__.split(".")[:2])
+    if zarr_version >= (3, 0) and not hasattr(zarr.storage, "FSStore"):
+
         class FSStoreShim:
             def __new__(cls, *args, **kwargs):
                 return zarr.storage.directory.DirectoryStore(*args, **kwargs)
+
         # patch zarr.storage.FSStore to FFStoreShim
         zarr.storage.FSStore = FSStoreShim
 
+
 _apply_zarr_compat_patch()
 
+
 def get_preferred_reader(
-    image: ImageLike,
-    preferred_reader: str | None = None
+    image: ImageLike, preferred_reader: str | None = None
 ) -> Reader:
     """
     Get the preferred reader for a given image based on settings.
@@ -59,20 +63,21 @@ def get_preferred_reader(
     settings = get_settings()
 
     preferred_reader = (
-        preferred_reader
-        or settings.ndevio_Reader.preferred_reader
+        preferred_reader or settings.ndevio_Reader.preferred_reader
     )
 
     from bioio import plugin_feasibility_report as pfr
+
     fr = pfr(image)
 
     if preferred_reader in fr and fr[preferred_reader].supported:
         reader_module = importlib.import_module(
-            preferred_reader.replace('-', '_')
+            preferred_reader.replace("-", "_")
         )
         return reader_module.Reader
 
     return nImage.determine_plugin(image).metadata.get_reader()
+
 
 class nImage(BioImage):
     """
@@ -99,11 +104,7 @@ class nImage(BioImage):
 
     """
 
-    def __init__(
-        self,
-        image: ImageLike,
-        reader: Reader | None = None
-    ) -> None:
+    def __init__(self, image: ImageLike, reader: Reader | None = None) -> None:
         """
         Initialize an nImage with an image, and optionally a reader.
 
@@ -133,7 +134,7 @@ class nImage(BioImage):
         self,
         path=None,
         max_in_mem_bytes: int = 4e9,
-        max_in_mem_percent: int = 0.3
+        max_in_mem_percent: int = 0.3,
     ) -> bool:
         """
         Determine whether the image should be loaded into memory or not.
@@ -173,7 +174,9 @@ class nImage(BioImage):
             and filesize < max_in_mem_percent * available_mem
         )
 
-    def get_napari_image_data(self, in_memory: bool | None = None) -> xr.DataArray:
+    def get_napari_image_data(
+        self, in_memory: bool | None = None
+    ) -> xr.DataArray:
         """
         Get the image data as a xarray DataArray.
 
@@ -201,7 +204,9 @@ class nImage(BioImage):
                 if in_memory:
                     self.napari_data = self.reader.mosaic_xarray_data.squeeze()
                 else:
-                    self.napari_data = self.reader.mosaic_xarray_dask_data.squeeze()
+                    self.napari_data = (
+                        self.reader.mosaic_xarray_dask_data.squeeze()
+                    )
 
             except NotImplementedError:
                 logger.warning(
@@ -235,7 +240,7 @@ class nImage(BioImage):
 
         """
         if self.napari_data is None:
-            self.get_napari_image_data() # this also sets self.path
+            self.get_napari_image_data()  # this also sets self.path
         # override the nImage path only if provided
         path = self.path if path is None else path
 
@@ -243,9 +248,13 @@ class nImage(BioImage):
         meta = {}
         scene = self.current_scene
         scene_idx = self.current_scene_index
-        path_stem = Path(self.path).stem if self.path is not None else 'unknown path'
+        path_stem = (
+            Path(self.path).stem if self.path is not None else "unknown path"
+        )
 
-        NO_SCENE = len(self.scenes) == 1 and self.current_scene == 'Image:0' # Image:0 is the default scene name, suggesting there is no information
+        NO_SCENE = (
+            len(self.scenes) == 1 and self.current_scene == "Image:0"
+        )  # Image:0 is the default scene name, suggesting there is no information
         CHANNEL_DIM = DimensionNames.Channel
         IS_MULTICHANNEL = CHANNEL_DIM in self.napari_data.dims
 
@@ -255,52 +264,56 @@ class nImage(BioImage):
             channel_names = self.napari_data.coords[CHANNEL_DIM].data.tolist()
 
             if self.settings.ndevio_Reader.unpack_channels_as_layers:
-                meta['channel_axis'] = self.napari_data.dims.index(CHANNEL_DIM)
+                meta["channel_axis"] = self.napari_data.dims.index(CHANNEL_DIM)
 
                 if NO_SCENE:
-                    meta['name'] = [
-                        f'{C}{DELIM}{path_stem}'
-                        for C in channel_names
+                    meta["name"] = [
+                        f"{C}{DELIM}{path_stem}" for C in channel_names
                     ]
                 else:
-                    meta['name'] = [
-                        f'{C}{DELIM}{scene_idx}{DELIM}{scene}{DELIM}{path_stem}'
+                    meta["name"] = [
+                        f"{C}{DELIM}{scene_idx}{DELIM}{scene}{DELIM}{path_stem}"
                         for C in channel_names
                     ]
 
             if not self.settings.ndevio_Reader.unpack_channels_as_layers:
-                meta['name'] = (
-                    f'{DELIM}'.join(channel_names) +
-                    f'{DELIM}{scene_idx}{DELIM}{scene}{DELIM}{path_stem}'
+                meta["name"] = (
+                    f"{DELIM}".join(channel_names)
+                    + f"{DELIM}{scene_idx}{DELIM}{scene}{DELIM}{path_stem}"
                 )
 
         if not IS_MULTICHANNEL:
             if NO_SCENE:
-                meta['name'] = path_stem
+                meta["name"] = path_stem
             else:
-                meta['name'] = f'{scene_idx}{DELIM}{scene}{DELIM}{path_stem}'
+                meta["name"] = f"{scene_idx}{DELIM}{scene}{DELIM}{path_stem}"
 
         # Handle if RGB
         if DimensionNames.Samples in self.reader.dims.order:
-            meta['rgb'] = True
+            meta["rgb"] = True
 
         # Handle scales
         scale = [
             getattr(self.physical_pixel_sizes, dim)
             for dim in self.napari_data.dims
-            if dim in {DimensionNames.SpatialX, DimensionNames.SpatialY, DimensionNames.SpatialZ}
+            if dim
+            in {
+                DimensionNames.SpatialX,
+                DimensionNames.SpatialY,
+                DimensionNames.SpatialZ,
+            }
             and getattr(self.physical_pixel_sizes, dim) is not None
         ]
 
         if scale:
-            meta['scale'] = tuple(scale)
+            meta["scale"] = tuple(scale)
 
         # get all other metadata
-        img_meta = {'bioimage': self, 'raw_image_metadata': self.metadata}
+        img_meta = {"bioimage": self, "raw_image_metadata": self.metadata}
 
         with contextlib.suppress(NotImplementedError):
-            img_meta['metadata'] = self.ome_metadata
+            img_meta["metadata"] = self.ome_metadata
 
-        meta['metadata'] = img_meta
+        meta["metadata"] = img_meta
         self.napari_metadata = meta
         return self.napari_metadata

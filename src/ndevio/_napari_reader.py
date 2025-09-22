@@ -9,7 +9,7 @@ from bioio_base.exceptions import UnsupportedFileFormatError
 from magicgui.widgets import Container, Select
 from ndev_settings import get_settings
 
-from .nimage import nImage, get_preferred_reader
+from .nimage import get_preferred_reader, nImage
 
 if TYPE_CHECKING:
     import napari
@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 DELIMITER = " :: "
+
 
 def napari_get_reader(
     path: PathLike,
@@ -50,9 +51,13 @@ def napari_get_reader(
     """
     settings = get_settings()
     if open_first_scene_only is None:
-        open_first_scene_only = settings.ndevio_Reader.scene_handling == "View First Scene Only"
+        open_first_scene_only = (
+            settings.ndevio_Reader.scene_handling == "View First Scene Only"
+        )
     if open_all_scenes is None:
-        open_all_scenes = settings.ndevio_Reader.scene_handling == "View All Scenes"
+        open_all_scenes = (
+            settings.ndevio_Reader.scene_handling == "View All Scenes"
+        )
 
     if isinstance(path, list):
         logger.info("Bioio: Expected a single path, got a list of paths.")
@@ -75,13 +80,14 @@ def napari_get_reader(
         logger.warning(e)
         return None
 
+
 def napari_reader_function(
     path: PathLike,
     reader: Callable,
     in_memory: bool | None = None,
     open_first_scene_only: bool = False,
     open_all_scenes: bool = False,
-    layer_type: str = 'image'
+    layer_type: str = "image",
 ) -> list[LayerData] | None:
     """
     Read a file using the given reader function.
@@ -114,10 +120,11 @@ def napari_reader_function(
         return None
 
     img = nImage(path, reader=reader)
-    in_memory = img._determine_in_memory(path) if in_memory is None else in_memory
+    in_memory = (
+        img._determine_in_memory(path) if in_memory is None else in_memory
+    )
     # TODO: Guess layer type here (check channel names for labels?)
-    logger.info('Bioio: Reading in-memory: %s', in_memory)
-
+    logger.info("Bioio: Reading in-memory: %s", in_memory)
 
     # open first scene only
     if len(img.scenes) == 1 or open_first_scene_only:
@@ -145,7 +152,10 @@ def napari_reader_function(
     logger.warning("Bioio: Error reading file")
     return [(None,)]
 
-def _open_scene_container(path: PathLike, img: nImage, in_memory: bool) -> None:
+
+def _open_scene_container(
+    path: PathLike, img: nImage, in_memory: bool
+) -> None:
     from pathlib import Path
 
     import napari
@@ -153,9 +163,11 @@ def _open_scene_container(path: PathLike, img: nImage, in_memory: bool) -> None:
     viewer = napari.current_viewer()
     viewer.window.add_dock_widget(
         nImageSceneWidget(viewer, path, img, in_memory),
-        area='right',
-        name=f'{Path(path).stem}{DELIMITER}Scenes',
+        area="right",
+        name=f"{Path(path).stem}{DELIMITER}Scenes",
     )
+
+
 class nImageSceneWidget(Container):
     """
     Widget to select a scene from a multi-scene file.
@@ -225,7 +237,7 @@ class nImageSceneWidget(Container):
         self.in_memory = in_memory
         self.settings = get_settings()
         self.scenes = [
-            f'{idx}{DELIMITER}{scene}'
+            f"{idx}{DELIMITER}{scene}"
             for idx, scene in enumerate(self.img.scenes)
         ]
 
@@ -233,11 +245,10 @@ class nImageSceneWidget(Container):
         self._connect_events()
 
     def _init_widgets(self):
-
         self._scene_list_widget = Select(
-            value = None,
-            nullable = True,
-            choices = self.scenes,
+            value=None,
+            nullable=True,
+            choices=self.scenes,
         )
         self.append(self._scene_list_widget)
 
