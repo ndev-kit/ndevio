@@ -29,13 +29,13 @@ requires-python = ">=3.10"
 # or any other Qt bindings directly (e.g. PyQt5, PySide2).
 # See best practices: https://napari.org/stable/plugins/building_a_plugin/best_practices.html
 dependencies = [
-    "numpy",
-    "magicgui",
-    "qtpy",
-    "scikit-image",
+    "ndev-settings",
+    "xarray",
+    "bioio-base",
     "bioio",
     "bioio-ome-tiff",
     "bioio-ome-zarr",
+    "bioio-bioformats",
 ]
 
 [project.optional-dependencies]
@@ -50,8 +50,20 @@ testing = [
     "napari[qt]",  # test with napari's default Qt bindings
 ]
 
+[dependency-groups]
+dev = [
+    "tox-uv",
+    "pytest",  # https://docs.pytest.org/en/latest/contents.html
+    "pytest-cov",  # https://pytest-cov.readthedocs.io/en/latest/
+    "pytest-qt",  # https://pytest-qt.readthedocs.io/en/latest/
+    "napari[qt]",  # test with napari's default Qt bindings
+]
+
 [project.entry-points."napari.manifest"]
 ndevio = "ndevio:napari.yaml"
+
+[project.entry-points."ndev_settings.manifest"]
+ndevio = "ndevio:ndev_settings.yaml"
 
 [project.urls]
 "Bug Tracker" = "https://github.com/ndev-kit/ndevio/issues"

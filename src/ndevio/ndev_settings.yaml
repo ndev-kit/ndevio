@@ -1,0 +1,24 @@
+ndevio_Reader:
+  preferred_reader:
+    default: bioio-ome-tiff
+    dynamic_choices:
+      fallback_message: No readers found
+      provider: bioio.readers
+    tooltip: Preferred reader to use when opening images
+    value: bioio-ome-tiff
+  scene_handling:
+    choices:
+    - Open Scene Widget
+    - View All Scenes
+    - View First Scene Only
+    default: Open Scene Widget
+    tooltip: How to handle files with multiple scenes
+    value: View First Scene Only
+  unpack_channels_as_layers:
+    default: True
+    tooltip: Whether to unpack multi-channel images as separate layers
+    value: True
+  clear_layers_on_new_scene:
+    default: false
+    tooltip: Whether to clear the viewer when selecting a new scene
+    value: false
