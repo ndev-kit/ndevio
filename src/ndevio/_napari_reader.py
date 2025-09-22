@@ -9,8 +9,7 @@ from bioio_base.exceptions import UnsupportedFileFormatError
 from magicgui.widgets import Container, Select
 from ndev_settings import get_settings
 
-from . import nImage
-from .nimage import get_preferred_reader
+from .nimage import nImage, get_preferred_reader
 
 if TYPE_CHECKING:
     import napari
