@@ -33,9 +33,10 @@ dependencies = [
     "xarray",
     "bioio-base",
     "bioio",
+    # "bioio-bioformats",  # currently causing crashes, debug later
+    "bioio-imageio",
     "bioio-ome-tiff",
     "bioio-ome-zarr",
-    "bioio-bioformats",
 ]
 
 [project.optional-dependencies]
