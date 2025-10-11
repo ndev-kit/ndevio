@@ -27,16 +27,11 @@ BIOIO_PLUGINS = {
     },
     "bioio-imageio": {
         "extensions": [
+            ".bmp",
+            ".gif",
             ".jpg",
             ".jpeg",
             ".png",
-            ".bmp",
-            ".gif",
-            ".tif",
-            ".tiff",
-            ".webp",
-            ".avif",
-            ".svg",
         ],
         "description": "Generic image formats (PNG, JPG, etc.)",
         "repository": "https://github.com/bioio-devs/bioio-imageio",
