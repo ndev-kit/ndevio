@@ -5,10 +5,12 @@ from collections.abc import Callable
 from functools import partial
 from typing import TYPE_CHECKING
 
+import bioio
 from bioio_base.exceptions import UnsupportedFileFormatError
 from magicgui.widgets import Container, Select
 from ndev_settings import get_settings
 
+from ._reader_utils import get_missing_plugins_message
 from .nimage import get_preferred_reader, nImage
 
 if TYPE_CHECKING:
@@ -73,11 +75,30 @@ def napari_get_reader(
             open_all_scenes=open_all_scenes,
         )
     except UnsupportedFileFormatError:
-        logger.warning("Bioio: Unsupported file format")
-        return None
+        # Get helpful suggestion for missing plugins
+        try:
+            feasibility_report = bioio.plugin_feasibility_report(path)
+            message = get_missing_plugins_message(path, feasibility_report)
+            logger.error("ndevio: Unsupported file format\n%s", message)
+            # Re-raise with helpful message instead of returning None
+            raise UnsupportedFileFormatError(
+                reader_name="ndevio",
+                path=str(path),
+                msg_extra=message,
+            ) from None
+        except UnsupportedFileFormatError:
+            # Re-raise our enhanced error
+            raise
+        except Exception:  # noqa: BLE001
+            # If we can't generate a helpful message, raise original error
+            logger.warning("ndevio: Unsupported file format for %s", path)
+            raise UnsupportedFileFormatError(
+                reader_name="ndevio",
+                path=str(path),
+                msg_extra="The file format may not be supported by installed bioio plugins.",
+            ) from None
     except Exception as e:  # noqa: BLE001
-        logger.warning("Bioio: Error reading file")
-        logger.warning(e)
+        logger.warning("ndevio: Error reading file: %s", e)
         return None
 
 
