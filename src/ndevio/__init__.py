@@ -3,6 +3,7 @@ try:  # noqa: D104
 except ImportError:
     __version__ = "unknown"
 
+from ._napari_reader import napari_get_reader
 from .nimage import nImage
 
-__all__ = ["__version__", "nImage"]
+__all__ = ["__version__", "nImage", "napari_get_reader"]
