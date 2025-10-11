@@ -35,6 +35,7 @@ dependencies = [
     "bioio",
     # "bioio-bioformats",  # currently causing crashes, debug later
     "bioio-imageio",
+    "bioio-tifffile",  # Required for reading TIFF files that aren't OME-TIFF
     "bioio-ome-tiff",
     "bioio-ome-zarr",
 ]
