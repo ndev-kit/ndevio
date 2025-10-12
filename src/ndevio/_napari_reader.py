@@ -78,7 +78,7 @@ def napari_get_reader(
             open_all_scenes=open_all_scenes,
         )
     except UnsupportedFileFormatError:
-        # get_preferred_reader() already enhanced the error message
+        # determine_reader_plugin() already enhanced the error message
         # Just log and re-raise for napari to handle
         logger.error("ndevio: Unsupported file format: %s", path)
         raise

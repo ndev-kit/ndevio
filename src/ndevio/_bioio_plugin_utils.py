@@ -1,20 +1,23 @@
-"""Bioio plugin compatibility checking and installation suggestions.
+"""Bioio plugin installation suggestions for unsupported file formats.
 
-This module analyzes which bioio plugins can read a file and generates
-helpful error messages with installation instructions when files can't be read.
+This module suggests missing bioio plugins to install when a file can't be read.
+The suggestions are based on file extensions and installed plugin detection.
 
 Public API:
-    get_missing_plugins_message() - Generate error message with plugin suggestions
+    get_missing_plugins_message() - Generate installation message for missing plugins
     BIOIO_PLUGINS - Dict of all bioio plugins and their file extensions
 
 Example:
-    >>> from bioio import plugin_feasibility_report
     >>> from ndevio._bioio_plugin_utils import get_missing_plugins_message
     >>>
-    >>> path = "image.czi"
-    >>> report = plugin_feasibility_report(path)
-    >>> message = get_missing_plugins_message(path, report)
+    >>> # Simple usage - just provide the path
+    >>> message = get_missing_plugins_message("image.czi")
     >>> print(message)
+    >>>
+    >>> # With feasibility report to detect what's already installed
+    >>> from bioio import plugin_feasibility_report
+    >>> report = plugin_feasibility_report("image.czi")
+    >>> message = get_missing_plugins_message("image.czi", report)
 """
 
 from __future__ import annotations
@@ -107,27 +110,70 @@ for plugin_name, info in BIOIO_PLUGINS.items():
         _EXTENSION_TO_PLUGIN[ext].append(plugin_name)
 
 
-def _analyze_feasibility_report(
-    feasibility_report: dict[str, PluginSupport],
-) -> dict:
-    """Analyze bioio feasibility report to find supported readers."""
-    available_readers = []
-    errors = {}
+def get_missing_plugins_message(
+    path: Path | str,
+    feasibility_report: dict[str, PluginSupport] | None = None,
+) -> str:
+    """Generate installation message for missing bioio plugins.
 
-    for reader_name, support in feasibility_report.items():
-        if reader_name == "ArrayLike":
-            continue
+    This function suggests which plugins to install based on file extension.
+    If a feasibility report is provided, it will filter out already-installed
+    plugins from the suggestions.
 
-        if support.supported:
-            available_readers.append(reader_name)
-        elif support.error:
-            errors[reader_name] = support.error
+    Parameters
+    ----------
+    path : Path or str
+        File path that couldn't be read
+    feasibility_report : dict, optional
+        Report from bioio.plugin_feasibility_report() showing installed plugins
 
-    return {
-        "supported": len(available_readers) > 0,
-        "available_readers": available_readers,
-        "errors": errors,
-    }
+    Returns
+    -------
+    str
+        Installation instructions for missing plugins
+    """
+    from pathlib import Path
+
+    path = Path(path)
+
+    # Get all plugins that support this file extension
+    suggested_plugins = _suggest_plugins_for_path(path)
+
+    if feasibility_report:
+        # Find plugins that claim to support the file (are installed)
+        installed_plugins = {
+            name
+            for name, support in feasibility_report.items()
+            if name != "ArrayLike" and support.supported
+        }
+
+        if installed_plugins:
+            # Filter out plugins that are already installed
+            missing_plugins = [
+                p
+                for p in suggested_plugins
+                if p["name"] not in installed_plugins
+            ]
+
+            if missing_plugins:
+                # Some plugins installed but failed, suggest others
+                msg = (
+                    f"Installed plugin(s) {', '.join(sorted(installed_plugins))} "
+                    f"failed to read '{path.name}'.\n"
+                    "Try installing:\n"
+                )
+                msg += _format_installation_message(missing_plugins, path.name)
+                return msg
+            else:
+                # All suggested plugins already installed but still failed
+                return (
+                    f"File supported by: {', '.join(sorted(installed_plugins))}\n"
+                    f"But failed to read '{path.name}'.\n"
+                    "This may indicate a corrupt file or incompatible format variant."
+                )
+
+    # No feasibility report or no installed plugins - suggest all
+    return _format_installation_message(suggested_plugins, path.name)
 
 
 def _suggest_plugins_for_extension(file_ext: str) -> list[dict[str, str]]:
@@ -145,7 +191,7 @@ def _suggest_plugins_for_extension(file_ext: str) -> list[dict[str, str]]:
 
 
 def _suggest_plugins_for_path(path: Path | str) -> list[dict[str, str]]:
-    """Suggest bioio plugins for a file path, handling compound extensions."""
+    """Suggest bioio plugins based on file path (handles compound extensions)."""
     from pathlib import Path
 
     path = Path(path)
@@ -154,6 +200,7 @@ def _suggest_plugins_for_path(path: Path | str) -> list[dict[str, str]]:
     # Check compound extensions first (.ome.tiff, .tiles.ome.tif, etc.)
     for plugin_name, info in BIOIO_PLUGINS.items():
         for ext in info["extensions"]:
+            # Compound extension: multiple dots and matches filename
             if (
                 ext.startswith(".")
                 and len(ext.split(".")) > 2
@@ -163,103 +210,37 @@ def _suggest_plugins_for_path(path: Path | str) -> list[dict[str, str]]:
                 result["name"] = plugin_name
                 return [result]
 
+    # Fall back to simple extension matching
     return _suggest_plugins_for_extension(path.suffix)
 
 
-def _format_plugin_suggestion(
-    plugins: list[dict[str, str]], context: str = "this file"
+def _format_installation_message(
+    plugins: list[dict[str, str]], file_name: str
 ) -> str:
-    """Format installation message for suggested plugins."""
+    """Format installation instructions for missing plugins."""
     if not plugins:
         return (
-            f"No bioio plugins found for {context}.\n"
+            f"No bioio plugins found for '{file_name}'.\n"
             "See https://github.com/bioio-devs/bioio for available plugins."
         )
 
-    # Filter out core plugins (already installed)
+    # Filter out core plugins (already installed with ndevio)
     non_core = [p for p in plugins if not p.get("core", False)]
 
     if not non_core:
         return (
-            f"The required plugins for {context} should already be installed.\n"
-            "If you're still having issues, check your installation.\n"
-            "Otherwise, open an issue at https://github.com/ndev-kit/ndevio."
+            f"Required plugins for '{file_name}' should already be installed.\n"
+            "If you're still having issues, check your installation or "
+            "open an issue at https://github.com/ndev-kit/ndevio."
         )
 
-    msg = [f"To read {context}, you may need to install:\n"]
+    msg = [f"To read '{file_name}', install:\n"]
 
     for plugin in non_core:
-        msg.append(f"\n  {plugin['name']}")
-        msg.append(f"  {plugin['description']}")
+        msg.append(f"\n  {plugin['name']} - {plugin['description']}")
         if plugin.get("note"):
             msg.append(f"  Note: {plugin['note']}")
-        msg.append(f"\n  pip install {plugin['name']}")
-        msg.append(f"  or: uv pip install {plugin['name']}")
+        msg.append(f"  pip install {plugin['name']}")
 
     msg.append("\n\nRestart napari/Python after installing.")
     return "\n".join(msg)
-
-
-def get_missing_plugins_message(
-    path: Path | str,
-    feasibility_report: dict[str, PluginSupport] | None = None,
-) -> str:
-    """Generate helpful error message when a file cannot be read.
-
-    Parameters
-    ----------
-    path : Path or str
-        File path that couldn't be read
-    feasibility_report : dict, optional
-        Report from bioio.plugin_feasibility_report()
-
-    Returns
-    -------
-    str
-        Human-readable error message with installation suggestions
-    """
-    from pathlib import Path
-
-    path = Path(path)
-    suggested_plugins = _suggest_plugins_for_path(path)
-
-    if feasibility_report:
-        analysis = _analyze_feasibility_report(feasibility_report)
-
-        if analysis["supported"]:
-            available_readers = analysis["available_readers"]
-            assert isinstance(available_readers, list)
-            installed_readers = set(available_readers)
-
-            # Find suggested plugins that aren't installed
-            missing_plugins = [
-                p
-                for p in suggested_plugins
-                if p["name"] not in installed_readers
-            ]
-
-            if missing_plugins:
-                msg = (
-                    f"Installed plugin(s) {', '.join(sorted(installed_readers))} "
-                    f"failed to read the file.\n"
-                    "Try installing:\n"
-                )
-                msg += _format_plugin_suggestion(
-                    missing_plugins, f"'{path.name}'"
-                )
-                return msg
-            else:
-                return (
-                    f"File supported by: {', '.join(sorted(installed_readers))}\n"
-                    "But the installed plugin(s) failed to read it.\n"
-                    "Check the error logs for details."
-                )
-
-    # No installed plugins support this file
-    if suggested_plugins:
-        return _format_plugin_suggestion(suggested_plugins, f"'{path.name}'")
-    else:
-        return (
-            f"No bioio plugins found for extension '{path.suffix}'.\n"
-            "See https://github.com/bioio-devs/bioio for available plugins."
-        )
