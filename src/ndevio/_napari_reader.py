@@ -9,7 +9,7 @@ from bioio_base.exceptions import UnsupportedFileFormatError
 from magicgui.widgets import Container, Select
 from ndev_settings import get_settings
 
-from .nimage import get_preferred_reader, nImage
+from .nimage import determine_reader_plugin, nImage
 
 if TYPE_CHECKING:
     import napari
@@ -69,7 +69,7 @@ def napari_get_reader(
         return None
 
     try:
-        reader = get_preferred_reader(path)
+        reader = determine_reader_plugin(path)
         return partial(
             napari_reader_function,
             reader=reader,  # type: ignore

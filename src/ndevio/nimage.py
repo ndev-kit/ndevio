@@ -37,11 +37,15 @@ def _apply_zarr_compat_patch():
 _apply_zarr_compat_patch()
 
 
-def get_preferred_reader(
+def determine_reader_plugin(
     image: ImageLike, preferred_reader: str | None = None
 ) -> Reader:
     """
-    Get the preferred reader for a given image based on settings.
+    Determine the reader for the plugin to be used to load the image.
+    In order of priority:
+        1. If preferred_reader from settings is suitable, use that.
+        2. Otherwise, use bioio.BioImage.determine_plugin() to find a suitable reader.
+        3. If all else fails, raise an error with suggestions for missing plugins.
 
     Parameters
     ----------
@@ -152,7 +156,7 @@ class nImage(BioImage):
         self.settings = get_settings()
 
         if reader is None:
-            reader = get_preferred_reader(image)
+            reader = determine_reader_plugin(image)
 
         super().__init__(image=image, reader=reader)  # type: ignore
         self.napari_data = None
