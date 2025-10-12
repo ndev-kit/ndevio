@@ -1,19 +1,21 @@
 """Widget for installing missing bioio reader plugins.
 
-This widget appears when a file cannot be read due to missing reader plugins.
-It allows users to interactively install the necessary plugins using
-napari-plugin-manager's InstallerQueue.
+This widget can be used in two modes:
+1. Standalone: Open from napari menu to browse and install any bioio plugin
+2. Error-triggered: Automatically opens when a file can't be read, with
+   suggested plugin pre-selected
 """
 
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from magicgui.widgets import ComboBox, Container, Label, PushButton
 
+from .._bioio_plugin_utils import BIOIO_PLUGINS
+
 if TYPE_CHECKING:
-    import napari
     from napari.types import PathLike
 
 logger = logging.getLogger(__name__)
@@ -22,52 +24,59 @@ logger = logging.getLogger(__name__)
 class PluginInstallerWidget(Container):
     """Widget to install missing bioio reader plugins.
 
-    This widget displays when a file cannot be read, showing:
-    - The file path that failed
-    - Dropdown of available plugins that could read it
-    - Install button to install the selected plugin
-    - Status messages and installation progress
+    Can be used standalone or triggered by file read errors.
+
+    The widget always shows all available bioio plugins from BIOIO_PLUGINS.
+
+    In standalone mode:
+    - First plugin in alphabetical order is pre-selected
+    - No file path shown
+
+    In error mode:
+    - First suggested plugin is pre-selected (if provided)
+    - Shows the file path that failed to read
+    - User can still select any other plugin from the full list
 
     Parameters
     ----------
-    viewer : napari.viewer.Viewer
-        The napari viewer instance
-    path : PathLike
-        Path to the file that couldn't be read
-    installable_plugins : list of dict
-        List of plugin info dicts from get_installable_plugins()
+    path : PathLike, optional
+        Path to the file that couldn't be read. If None, runs in standalone mode.
+    suggested_plugins : list of dict, optional
+        List of plugin info dicts from get_installable_plugins().
+        If provided, the first plugin will be pre-selected.
 
     Attributes
     ----------
-    viewer : napari.viewer.Viewer
-        The napari viewer instance
-    path : PathLike
-        Path to the file
+    path : PathLike or None
+        Path to the file (None in standalone mode)
+    suggested_plugins : list of dict or None
+        Suggested plugins for error mode
     plugins : list of dict
-        Available plugins to install
+        All available plugins from BIOIO_PLUGINS
     """
 
     def __init__(
         self,
-        viewer: napari.viewer.Viewer,
-        path: PathLike,
-        installable_plugins: list[dict],
+        path: PathLike | None = None,
+        suggested_plugins: list[dict[str, Any]] | None = None,
     ):
         """Initialize the PluginInstallerWidget.
 
         Parameters
         ----------
-        viewer : napari.viewer.Viewer
-            The napari viewer instance
-        path : PathLike
-            Path to the file that couldn't be read
-        installable_plugins : list of dict
-            List of plugin info dicts
+        path : PathLike, optional
+            Path to the file that couldn't be read. If None, runs in standalone mode.
+        suggested_plugins : list of dict, optional
+            List of suggested plugin info dicts. In error mode, the first
+            suggested plugin will be pre-selected in the dropdown.
         """
         super().__init__(labels=False)
-        self.viewer = viewer
+
         self.path = path
-        self.plugins = installable_plugins
+        self.suggested_plugins = suggested_plugins
+
+        # Always get all plugins
+        self.plugins = list(BIOIO_PLUGINS.keys())
 
         self._init_widgets()
         self._connect_events()
@@ -76,34 +85,32 @@ class PluginInstallerWidget(Container):
         """Initialize all widget components."""
         from pathlib import Path
 
-        # Title
-        self._title_label = Label(
-            value=f"<b>Cannot read file:</b> {Path(self.path).name}"
-        )
+        # Title - conditional based on mode
+        if self.path is not None:
+            # Error mode: show file that failed
+            file_name = Path(self.path).name
+            self._title_label = Label(
+                value=f"<b>Cannot read file:</b> {file_name}"
+            )
+        else:
+            # Standalone mode: general title
+            self._title_label = Label(
+                value="<b>Install BioIO Reader Plugin</b>"
+            )
         self.append(self._title_label)
 
-        # Info message
-        if not self.plugins:
-            self._info_label = Label(
-                value="No installable plugins found for this file type."
-            )
-            self.append(self._info_label)
-            return
-
-        self._info_label = Label(
-            value="Install a reader plugin to open this file:"
-        )
+        self._info_label = Label(value="Select a plugin to install:")
         self.append(self._info_label)
-
-        # Plugin dropdown (ComboBox for single selection)
-        plugin_choices = [p["name"] for p in self.plugins]
 
         self._plugin_select = ComboBox(
             label="Plugin",
-            choices=plugin_choices,
-            value=plugin_choices[0] if plugin_choices else None,
-            nullable=False,
+            choices=self.plugins,
+            value=None,
+            nullable=True,
         )
+        # If suggested plugins provided, pre-select the first one
+        if self.suggested_plugins and len(self.suggested_plugins) > 0:
+            self._plugin_select.value = self.suggested_plugins[0]["name"]
         self.append(self._plugin_select)
 
         # Install button
@@ -116,13 +123,10 @@ class PluginInstallerWidget(Container):
 
     def _connect_events(self):
         """Connect widget events to handlers."""
-        if hasattr(self, "_install_button"):
-            self._install_button.clicked.connect(self._on_install_clicked)
+        self._install_button.clicked.connect(self._on_install_clicked)
 
     def _on_install_clicked(self):
         """Handle install button click."""
-        # Disable button during installation
-        self._install_button.enabled = False
         self._status_label.value = "Installing..."
 
         # Get selected plugin name
@@ -130,7 +134,6 @@ class PluginInstallerWidget(Container):
 
         if not plugin_name:
             self._status_label.value = "No plugin selected"
-            self._install_button.enabled = True
             return
 
         logger.info("User requested install of: %s", plugin_name)
@@ -166,8 +169,6 @@ class PluginInstallerWidget(Container):
                     "Check the console for details."
                 )
                 logger.error("Plugin installation failed: %s", plugin_name)
-                # Re-enable button to allow retry
-                self._install_button.enabled = True
                 # Disconnect after failure
                 queue.processFinished.disconnect(on_process_finished)
 

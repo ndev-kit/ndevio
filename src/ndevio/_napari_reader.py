@@ -191,7 +191,6 @@ def _open_plugin_installer(
     error : UnsupportedFileFormatError
         The error that was raised
     """
-    from pathlib import Path
 
     import napari
     from bioio import plugin_feasibility_report
@@ -216,11 +215,13 @@ def _open_plugin_installer(
     installable_plugins = get_installable_plugins(path, feasibility_report)
 
     # Create and show the widget
-    widget = PluginInstallerWidget(viewer, path, installable_plugins)
+    widget = PluginInstallerWidget(
+        path=path, suggested_plugins=installable_plugins
+    )
     viewer.window.add_dock_widget(
         widget,
         area="right",
-        name=f"Install Plugin: {Path(path).suffix}",
+        name="Install BioIO Plugin",
     )
 
 
