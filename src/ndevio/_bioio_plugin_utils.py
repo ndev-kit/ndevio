@@ -139,6 +139,12 @@ def get_missing_plugins_message(
     # Get all plugins that support this file extension
     suggested_plugins = _suggest_plugins_for_path(path)
 
+    if not suggested_plugins:
+        return (
+            f"\nNo bioio plugins found for '{path.name}' (extension: {path.suffix}).\n"
+            "See https://github.com/bioio-devs/bioio for available plugins."
+        )
+
     if feasibility_report:
         # Find plugins that claim to support the file (are installed)
         installed_plugins = {
@@ -158,26 +164,47 @@ def get_missing_plugins_message(
             if missing_plugins:
                 # Some plugins installed but failed, suggest others
                 installed_str = ", ".join(sorted(installed_plugins))
-                msg_parts = [
-                    f"\nInstalled plugin '{installed_str}' failed to read '{path.name}'.",
-                    "Try one of these alternatives:\n",
-                ]
-                msg_parts.append(
-                    _format_installation_message(missing_plugins, path.name)
+                plugin_list = _format_plugin_list(missing_plugins)
+
+                if not plugin_list:
+                    # All alternatives are core plugins (already installed)
+                    return (
+                        f"\nInstalled plugin '{installed_str}' failed to read '{path.name}'.\n"
+                        "All alternative plugins should already be installed.\n"
+                        "Check your installation or open an issue at https://github.com/ndev-kit/ndevio."
+                    )
+
+                return (
+                    f"\nInstalled plugin '{installed_str}' failed to read '{path.name}'.\n"
+                    "Try one of these alternatives:\n\n"
+                    f"{plugin_list}"
+                    "\nRestart napari/Python after installing."
                 )
-                msg_parts.append("Restart napari/Python after installing.")
-                return "\n".join(msg_parts)
             else:
                 # All suggested plugins already installed but still failed
                 installed_str = ", ".join(sorted(installed_plugins))
                 return (
-                    f"File '{path.name}' is supported by: {installed_str}\n"
-                    f"However, the plugin failed to read it.\n"
+                    f"\nFile '{path.name}' is supported by: {installed_str}\n"
+                    "However, the plugin failed to read it.\n"
                     "This may indicate a corrupt file or incompatible format variant."
                 )
 
     # No feasibility report or no installed plugins - suggest all
-    return _format_installation_message(suggested_plugins, path.name)
+    plugin_list = _format_plugin_list(suggested_plugins)
+
+    if not plugin_list:
+        # All suggested plugins are core (already installed)
+        return (
+            f"\nRequired plugins for '{path.name}' should already be installed.\n"
+            "If you're still having issues, check your installation or "
+            "open an issue at https://github.com/ndev-kit/ndevio."
+        )
+
+    return (
+        f"\nTo read '{path.name}', install one of:\n\n"
+        f"{plugin_list}"
+        "Restart napari/Python after installing."
+    )
 
 
 def _suggest_plugins_for_extension(file_ext: str) -> list[dict[str, str]]:
@@ -218,33 +245,20 @@ def _suggest_plugins_for_path(path: Path | str) -> list[dict[str, str]]:
     return _suggest_plugins_for_extension(path.suffix)
 
 
-def _format_installation_message(
-    plugins: list[dict[str, str]], file_name: str
-) -> str:
-    """Format installation instructions for missing plugins."""
-    if not plugins:
-        return (
-            f"No bioio plugins found for '{file_name}'.\n"
-            "See https://github.com/bioio-devs/bioio for available plugins."
-        )
-
+def _format_plugin_list(plugins: list[dict[str, str]]) -> str:
+    """Format a list of plugins with installation instructions."""
     # Filter out core plugins (already installed with ndevio)
     non_core = [p for p in plugins if not p.get("core", False)]
 
     if not non_core:
-        return (
-            f"Required plugins for '{file_name}' should already be installed.\n"
-            "If you're still having issues, check your installation or "
-            "open an issue at https://github.com/ndev-kit/ndevio."
-        )
+        return ""
 
-    msg = []
-
+    lines = []
     for plugin in non_core:
-        msg.append(f"  • {plugin['name']}")
-        msg.append(f"    {plugin['description']}")
+        lines.append(f"  • {plugin['name']}")
+        lines.append(f"    {plugin['description']}")
         if plugin.get("note"):
-            msg.append(f"    Note: {plugin['note']}")
-        msg.append(f"    Install: pip install {plugin['name']}\n")
+            lines.append(f"    Note: {plugin['note']}")
+        lines.append(f"    Install: pip install {plugin['name']}\n")
 
-    return "\n".join(msg)
+    return "\n".join(lines)
