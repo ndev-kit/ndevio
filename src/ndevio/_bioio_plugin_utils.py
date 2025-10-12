@@ -135,75 +135,65 @@ def get_missing_plugins_message(
     from pathlib import Path
 
     path = Path(path)
-
-    # Get all plugins that support this file extension
     suggested_plugins = _suggest_plugins_for_path(path)
 
+    # No plugins found for this extension
     if not suggested_plugins:
         return (
-            f"\nNo bioio plugins found for '{path.name}' (extension: {path.suffix}).\n"
+            f"\n\nNo bioio plugins found for '{path.name}' (extension: {path.suffix}).\n"
             "See https://github.com/bioio-devs/bioio for available plugins."
         )
 
+    # Determine which plugins are already installed
+    installed_plugins = set()
     if feasibility_report:
-        # Find plugins that claim to support the file (are installed)
         installed_plugins = {
             name
             for name, support in feasibility_report.items()
             if name != "ArrayLike" and support.supported
         }
 
-        if installed_plugins:
-            # Filter out plugins that are already installed
-            missing_plugins = [
-                p
-                for p in suggested_plugins
-                if p["name"] not in installed_plugins
-            ]
+    # Filter to get plugins that aren't installed
+    missing_plugins = [
+        p for p in suggested_plugins if p["name"] not in installed_plugins
+    ]
 
-            if missing_plugins:
-                # Some plugins installed but failed, suggest others
-                installed_str = ", ".join(sorted(installed_plugins))
-                plugin_list = _format_plugin_list(missing_plugins)
+    # Format the plugin list (filters out core plugins)
+    plugin_list = _format_plugin_list(missing_plugins)
 
-                if not plugin_list:
-                    # All alternatives are core plugins (already installed)
-                    return (
-                        f"\nInstalled plugin '{installed_str}' failed to read '{path.name}'.\n"
-                        "All alternative plugins should already be installed.\n"
-                        "Check your installation or open an issue at https://github.com/ndev-kit/ndevio."
-                    )
-
-                return (
-                    f"\nInstalled plugin '{installed_str}' failed to read '{path.name}'.\n"
-                    "Try one of these alternatives:\n\n"
-                    f"{plugin_list}"
-                    "\nRestart napari/Python after installing."
-                )
-            else:
-                # All suggested plugins already installed but still failed
-                installed_str = ", ".join(sorted(installed_plugins))
-                return (
-                    f"\nFile '{path.name}' is supported by: {installed_str}\n"
-                    "However, the plugin failed to read it.\n"
-                    "This may indicate a corrupt file or incompatible format variant."
-                )
-
-    # No feasibility report or no installed plugins - suggest all
-    plugin_list = _format_plugin_list(suggested_plugins)
-
-    if not plugin_list:
-        # All suggested plugins are core (already installed)
+    # Build appropriate message based on what's installed/missing
+    if installed_plugins and missing_plugins and plugin_list:
+        # Case 1: Some plugins installed but failed, suggest alternatives
+        installed_str = ", ".join(sorted(installed_plugins))
         return (
-            f"\nRequired plugins for '{path.name}' should already be installed.\n"
-            "If you're still having issues, check your installation or "
-            "open an issue at https://github.com/ndev-kit/ndevio."
+            f"\n\nInstalled plugin '{installed_str}' failed to read '{path.name}'.\n"
+            "Try one of these alternatives:\n\n"
+            f"{plugin_list}"
+            "\nRestart napari/Python after installing."
         )
 
+    if installed_plugins and not missing_plugins:
+        # Case 2: All suggested plugins already installed but still failed
+        installed_str = ", ".join(sorted(installed_plugins))
+        return (
+            f"\nFile '{path.name}' is supported by: {installed_str}\n"
+            "However, the plugin failed to read it.\n"
+            "This may indicate a corrupt file or incompatible format variant."
+        )
+
+    if plugin_list:
+        # Case 3: No installed plugins, suggest installing
+        return (
+            f"\n\nTo read '{path.name}', install one of:\n\n"
+            f"{plugin_list}"
+            "\nRestart napari/Python after installing."
+        )
+
+    # Case 4: All suggested plugins are core plugins (already should be installed)
     return (
-        f"\nTo read '{path.name}', install one of:\n\n"
-        f"{plugin_list}"
-        "Restart napari/Python after installing."
+        f"\n\nRequired plugins for '{path.name}' should already be installed.\n"
+        "If you're still having issues, check your installation or "
+        "open an issue at https://github.com/ndev-kit/ndevio."
     )
 
 
