@@ -96,9 +96,7 @@ class PluginInstallerWidget(Container):
         self.append(self._info_label)
 
         # Plugin dropdown (ComboBox for single selection)
-        plugin_choices = [
-            f"{p['name']} - {p['description']}" for p in self.plugins
-        ]
+        plugin_choices = [p["name"] for p in self.plugins]
 
         self._plugin_select = ComboBox(
             label="Plugin",
@@ -127,15 +125,13 @@ class PluginInstallerWidget(Container):
         self._install_button.enabled = False
         self._status_label.value = "Installing..."
 
-        # Get selected plugin name (extract from "name - description" format)
-        selected = self._plugin_select.value
+        # Get selected plugin name
+        plugin_name = self._plugin_select.value
 
-        if not selected:
+        if not plugin_name:
             self._status_label.value = "No plugin selected"
             self._install_button.enabled = True
             return
-
-        plugin_name = selected.split(" - ")[0]
 
         logger.info("User requested install of: %s", plugin_name)
 
@@ -158,7 +154,7 @@ class PluginInstallerWidget(Container):
             if exit_code == 0:
                 self._status_label.value = (
                     f"✓ Successfully installed {plugin_name}!\n\n"
-                    "⚠ Please restart napari for changes to take effect."
+                    "⚠ It is recommended to restart napari."
                 )
                 logger.info("Plugin installed successfully: %s", plugin_name)
                 # Disconnect after success
