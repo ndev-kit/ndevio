@@ -9,6 +9,7 @@ from bioio_base.exceptions import UnsupportedFileFormatError
 from magicgui.widgets import Container, Select
 from ndev_settings import get_settings
 
+from ._plugin_installer import get_installable_plugins
 from .nimage import determine_reader_plugin, nImage
 
 if TYPE_CHECKING:
@@ -77,10 +78,14 @@ def napari_get_reader(
             open_first_scene_only=open_first_scene_only,
             open_all_scenes=open_all_scenes,
         )
-    except UnsupportedFileFormatError:
+    except UnsupportedFileFormatError as e:
         # determine_reader_plugin() already enhanced the error message
-        # Just log and re-raise for napari to handle
         logger.error("ndevio: Unsupported file format: %s", path)
+
+        # Show plugin installer widget if enabled in settings
+        if settings.ndevio_Reader.suggest_reader_plugins:  # type: ignore
+            _open_plugin_installer(path, e)
+
         raise
     except Exception as e:  # noqa: BLE001
         logger.warning("ndevio: Error reading file: %s", e)
@@ -171,6 +176,51 @@ def _open_scene_container(
         nImageSceneWidget(viewer, path, img, in_memory),
         area="right",
         name=f"{Path(path).stem}{DELIMITER}Scenes",
+    )
+
+
+def _open_plugin_installer(
+    path: PathLike, error: UnsupportedFileFormatError
+) -> None:
+    """Open the plugin installer widget for an unsupported file.
+
+    Parameters
+    ----------
+    path : PathLike
+        Path to the file that couldn't be read
+    error : UnsupportedFileFormatError
+        The error that was raised
+    """
+    from pathlib import Path
+
+    import napari
+    from bioio import plugin_feasibility_report
+
+    from .widgets import PluginInstallerWidget
+
+    try:
+        viewer = napari.current_viewer()
+    except RuntimeError:
+        # No viewer available, can't show widget
+        logger.debug("No napari viewer available for plugin installer widget")
+        return
+
+    # Get feasibility report to determine what's already installed
+    try:
+        feasibility_report = plugin_feasibility_report(path)
+    except Exception as e:  # noqa: BLE001
+        logger.debug("Could not get feasibility report: %s", e)
+        feasibility_report = None
+
+    # Get installable plugins
+    installable_plugins = get_installable_plugins(path, feasibility_report)
+
+    # Create and show the widget
+    widget = PluginInstallerWidget(viewer, path, installable_plugins)
+    viewer.window.add_dock_widget(
+        widget,
+        area="right",
+        name=f"Install Plugin: {Path(path).suffix}",
     )
 
 
