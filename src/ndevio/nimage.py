@@ -37,11 +37,15 @@ def _apply_zarr_compat_patch():
 _apply_zarr_compat_patch()
 
 
-def get_preferred_reader(
+def determine_reader_plugin(
     image: ImageLike, preferred_reader: str | None = None
 ) -> Reader:
     """
-    Get the preferred reader for a given image based on settings.
+    Determine the reader for the plugin to be used to load the image.
+    In order of priority:
+        1. If preferred_reader from settings is suitable, use that.
+        2. Otherwise, use bioio.BioImage.determine_plugin() to find a suitable reader.
+        3. If all else fails, raise an error with suggestions for missing plugins.
 
     Parameters
     ----------
@@ -59,14 +63,23 @@ def get_preferred_reader(
     Reader
         Reader to be used to load the image.
 
+    Raises
+    ------
+    UnsupportedFileFormatError
+        If no suitable reader can be found. Error message includes
+        installation suggestions for missing plugins.
+
     """
+    from bioio import plugin_feasibility_report as pfr
+    from bioio_base.exceptions import UnsupportedFileFormatError
+
+    from ._bioio_plugin_utils import get_missing_plugins_message
+
     settings = get_settings()
 
     preferred_reader = (
-        preferred_reader or settings.ndevio_Reader.preferred_reader
+        preferred_reader or settings.ndevio_Reader.preferred_reader  # type: ignore
     )
-
-    from bioio import plugin_feasibility_report as pfr
 
     fr = pfr(image)
 
@@ -76,7 +89,24 @@ def get_preferred_reader(
         )
         return reader_module.Reader
 
-    return nImage.determine_plugin(image).metadata.get_reader()
+    try:
+        return nImage.determine_plugin(image).metadata.get_reader()
+    except UnsupportedFileFormatError:
+        # Generate helpful error message with plugin installation suggestions
+        # Only provide suggestions for file paths, not arrays
+        if (
+            isinstance(image, str | Path)
+            and settings.ndevio_Reader.suggest_reader_plugins  # type: ignore
+        ):
+            helpful_message = get_missing_plugins_message(image, fr)
+            raise UnsupportedFileFormatError(
+                reader_name="ndevio",
+                path=str(image),
+                msg_extra=helpful_message,
+            ) from None
+        else:
+            # Re-raise original error if not a path or suggestions disabled
+            raise
 
 
 class nImage(BioImage):
@@ -109,8 +139,8 @@ class nImage(BioImage):
         Initialize an nImage with an image, and optionally a reader.
 
         If a reader is not provided, a reader will be determined by bioio.
-        However, if the image is supported by bioio-ome-tiff, the reader
-        will be set to bioio_ome_tiff.Reader to override the softer decision
+        However, if the image is supported by the preferred reader, the reader
+        will be set to preferred_reader.Reader to override the softer decision
         made by bioio.BioImage.determine_plugin().
 
         Note: The issue here is that bioio.BioImage.determine_plugin() will
@@ -119,16 +149,19 @@ class nImage(BioImage):
         can take precedence over bioio-ome-tiff, even if the image was saved
         as an OME-TIFF via bioio.writers.OmeTiffWriter (which is the case
         for napari-ndev).
+
+        Note: If no suitable reader can be found, an UnsupportedFileFormatError
+        will be raised, with installation suggestions for missing plugins.
         """
         self.settings = get_settings()
 
         if reader is None:
-            reader = get_preferred_reader(image)
+            reader = determine_reader_plugin(image)
 
-        super().__init__(image, reader)
+        super().__init__(image=image, reader=reader)  # type: ignore
         self.napari_data = None
         self.napari_metadata = {}
-        self.path = image if isinstance(image, (str, Path)) else None
+        self.path = image if isinstance(image, str | Path) else None
 
     def _determine_in_memory(
         self,

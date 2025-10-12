@@ -9,7 +9,7 @@ from bioio_base.exceptions import UnsupportedFileFormatError
 from magicgui.widgets import Container, Select
 from ndev_settings import get_settings
 
-from .nimage import get_preferred_reader, nImage
+from .nimage import determine_reader_plugin, nImage
 
 if TYPE_CHECKING:
     import napari
@@ -37,9 +37,10 @@ def napari_get_reader(
         Whether to read the file in memory, by default None
     open_first_scene_only : bool, optional
         Whether to ignore multi-scene files and just open the first scene,
-        by default False
+        by default None, which uses the setting
     open_all_scenes : bool, optional
-        Whether to open all scenes in a multi-scene file, by default False
+        Whether to open all scenes in a multi-scene file, by default None
+        which uses the setting
         Ignored if open_first_scene_only is True
 
 
@@ -50,34 +51,39 @@ def napari_get_reader(
 
     """
     settings = get_settings()
-    if open_first_scene_only is None:
-        open_first_scene_only = (
-            settings.ndevio_Reader.scene_handling == "View First Scene Only"
-        )
-    if open_all_scenes is None:
-        open_all_scenes = (
-            settings.ndevio_Reader.scene_handling == "View All Scenes"
-        )
+
+    open_first_scene_only = (
+        open_first_scene_only
+        if open_first_scene_only is not None
+        else settings.ndevio_Reader.scene_handling == "View First Scene Only"  # type: ignore
+    ) or False
+
+    open_all_scenes = (
+        open_all_scenes
+        if open_all_scenes is not None
+        else settings.ndevio_Reader.scene_handling == "View All Scenes"  # type: ignore
+    ) or False
 
     if isinstance(path, list):
         logger.info("Bioio: Expected a single path, got a list of paths.")
         return None
 
     try:
-        reader = get_preferred_reader(path)
+        reader = determine_reader_plugin(path)
         return partial(
             napari_reader_function,
-            reader=reader,
+            reader=reader,  # type: ignore
             in_memory=in_memory,
             open_first_scene_only=open_first_scene_only,
             open_all_scenes=open_all_scenes,
         )
     except UnsupportedFileFormatError:
-        logger.warning("Bioio: Unsupported file format")
-        return None
+        # determine_reader_plugin() already enhanced the error message
+        # Just log and re-raise for napari to handle
+        logger.error("ndevio: Unsupported file format: %s", path)
+        raise
     except Exception as e:  # noqa: BLE001
-        logger.warning("Bioio: Error reading file")
-        logger.warning(e)
+        logger.warning("ndevio: Error reading file: %s", e)
         return None
 
 
