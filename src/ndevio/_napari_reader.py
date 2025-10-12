@@ -9,7 +9,6 @@ from bioio_base.exceptions import UnsupportedFileFormatError
 from magicgui.widgets import Container, Select
 from ndev_settings import get_settings
 
-from ._plugin_installer import get_installable_plugins
 from .nimage import determine_reader_plugin, nImage
 
 if TYPE_CHECKING:
@@ -193,30 +192,18 @@ def _open_plugin_installer(
     """
 
     import napari
-    from bioio import plugin_feasibility_report
 
+    from ._bioio_plugin_utils import suggest_plugins_for_path
     from .widgets import PluginInstallerWidget
 
-    try:
-        viewer = napari.current_viewer()
-    except RuntimeError:
-        # No viewer available, can't show widget
-        logger.debug("No napari viewer available for plugin installer widget")
-        return
+    viewer = napari.current_viewer()
 
-    # Get feasibility report to determine what's already installed
-    try:
-        feasibility_report = plugin_feasibility_report(path)
-    except Exception as e:  # noqa: BLE001
-        logger.debug("Could not get feasibility report: %s", e)
-        feasibility_report = None
-
-    # Get installable plugins
-    installable_plugins = get_installable_plugins(path, feasibility_report)
+    # Get suggested plugins for this file
+    suggested_plugins = suggest_plugins_for_path(path)
 
     # Create and show the widget
     widget = PluginInstallerWidget(
-        path=path, suggested_plugins=installable_plugins
+        path=path, suggested_plugins=suggested_plugins
     )
     viewer.window.add_dock_widget(
         widget,

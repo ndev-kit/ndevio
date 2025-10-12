@@ -5,6 +5,7 @@ The suggestions are based on file extensions and installed plugin detection.
 
 Public API:
     get_missing_plugins_message() - Generate installation message for missing plugins
+    suggest_plugins_for_path() - Get list of suggested plugins for a file
     BIOIO_PLUGINS - Dict of all bioio plugins and their file extensions
 
 Example:
@@ -18,6 +19,12 @@ Example:
     >>> from bioio import plugin_feasibility_report
     >>> report = plugin_feasibility_report("image.czi")
     >>> message = get_missing_plugins_message("image.czi", report)
+    >>>
+    >>> # Get structured plugin list for widget
+    >>> from ndevio._bioio_plugin_utils import suggest_plugins_for_path
+    >>> plugins = suggest_plugins_for_path("image.czi")
+    >>> for plugin in plugins:
+    ...     print(plugin["name"], plugin["description"])
 """
 
 from __future__ import annotations
@@ -135,7 +142,7 @@ def get_missing_plugins_message(
     from pathlib import Path
 
     path = Path(path)
-    suggested_plugins = _suggest_plugins_for_path(path)
+    suggested_plugins = suggest_plugins_for_path(path)
 
     # No plugins found for this extension
     if not suggested_plugins:
@@ -199,20 +206,33 @@ def get_missing_plugins_message(
 
 def _suggest_plugins_for_extension(file_ext: str) -> list[dict[str, str]]:
     """Suggest bioio plugins based on file extension."""
-    file_ext = file_ext.lower()
-    suggestions = []
-
-    if file_ext in _EXTENSION_TO_PLUGIN:
-        for plugin_name in _EXTENSION_TO_PLUGIN[file_ext]:
-            info = BIOIO_PLUGINS[plugin_name].copy()
-            info["name"] = plugin_name
-            suggestions.append(info)
-
-    return suggestions
 
 
-def _suggest_plugins_for_path(path: Path | str) -> list[dict[str, str]]:
-    """Suggest bioio plugins based on file path (handles compound extensions)."""
+def suggest_plugins_for_path(path: Path | str) -> list[dict[str, str]]:
+    """Get list of bioio plugins that could read the given file.
+
+    Returns all plugins that support the file's extension, regardless of
+    whether they're installed or core plugins.
+
+    Parameters
+    ----------
+    path : Path or str
+        File path to check
+
+    Returns
+    -------
+    list of dict
+        List of plugin info dicts with keys: name, description, repository,
+        extensions, and optionally 'core' and 'note'.
+        Each dict represents a bioio plugin that could read this file.
+
+    Examples
+    --------
+    >>> from ndevio._bioio_plugin_utils import suggest_plugins_for_path
+    >>> plugins = suggest_plugins_for_path("image.czi")
+    >>> print(plugins[0]["name"])
+    'bioio-czi'
+    """
     from pathlib import Path
 
     path = Path(path)
@@ -232,7 +252,16 @@ def _suggest_plugins_for_path(path: Path | str) -> list[dict[str, str]]:
                 return [result]
 
     # Fall back to simple extension matching
-    return _suggest_plugins_for_extension(path.suffix)
+    file_ext = path.suffix.lower()
+    suggestions = []
+
+    if file_ext in _EXTENSION_TO_PLUGIN:
+        for plugin_name in _EXTENSION_TO_PLUGIN[file_ext]:
+            info = BIOIO_PLUGINS[plugin_name].copy()
+            info["name"] = plugin_name
+            suggestions.append(info)
+
+    return suggestions
 
 
 def _format_plugin_list(plugins: list[dict[str, str]]) -> str:
