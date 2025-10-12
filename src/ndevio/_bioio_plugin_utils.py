@@ -157,18 +157,22 @@ def get_missing_plugins_message(
 
             if missing_plugins:
                 # Some plugins installed but failed, suggest others
-                msg = (
-                    f"Installed plugin(s) {', '.join(sorted(installed_plugins))} "
-                    f"failed to read '{path.name}'.\n"
-                    "Try installing:\n"
+                installed_str = ", ".join(sorted(installed_plugins))
+                msg_parts = [
+                    f"\nInstalled plugin '{installed_str}' failed to read '{path.name}'.",
+                    "Try one of these alternatives:\n",
+                ]
+                msg_parts.append(
+                    _format_installation_message(missing_plugins, path.name)
                 )
-                msg += _format_installation_message(missing_plugins, path.name)
-                return msg
+                msg_parts.append("Restart napari/Python after installing.")
+                return "\n".join(msg_parts)
             else:
                 # All suggested plugins already installed but still failed
+                installed_str = ", ".join(sorted(installed_plugins))
                 return (
-                    f"File supported by: {', '.join(sorted(installed_plugins))}\n"
-                    f"But failed to read '{path.name}'.\n"
+                    f"File '{path.name}' is supported by: {installed_str}\n"
+                    f"However, the plugin failed to read it.\n"
                     "This may indicate a corrupt file or incompatible format variant."
                 )
 
@@ -234,13 +238,13 @@ def _format_installation_message(
             "open an issue at https://github.com/ndev-kit/ndevio."
         )
 
-    msg = [f"To read '{file_name}', install:\n"]
+    msg = []
 
     for plugin in non_core:
-        msg.append(f"\n  {plugin['name']} - {plugin['description']}")
+        msg.append(f"  • {plugin['name']}")
+        msg.append(f"    {plugin['description']}")
         if plugin.get("note"):
-            msg.append(f"  Note: {plugin['note']}")
-        msg.append(f"  pip install {plugin['name']}")
+            msg.append(f"    Note: {plugin['note']}")
+        msg.append(f"    Install: pip install {plugin['name']}\n")
 
-    msg.append("\n\nRestart napari/Python after installing.")
     return "\n".join(msg)
