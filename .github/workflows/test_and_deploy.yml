@@ -85,7 +85,7 @@ jobs:
           python-version: "3.13"
       - name: Build package
         run: |
-          uv venv --python 3.x
+          uv venv --python 3.13
           uv pip install hatch
           git tag
           hatch build
