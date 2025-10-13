@@ -21,6 +21,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Module-level singleton for the installer queue
+_installer_queue = None
+
 
 def install_plugin(plugin_name: str) -> int:
     """Install a bioio plugin using napari-plugin-manager.
@@ -82,9 +85,8 @@ def get_installer_queue():
         NapariInstallerQueue,
     )
 
-    # Use a global queue instance (similar to napari's plugin manager)
     global _installer_queue
-    if "_installer_queue" not in globals():
+    if _installer_queue is None:
         _installer_queue = NapariInstallerQueue()
 
     return _installer_queue

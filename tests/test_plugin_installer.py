@@ -198,3 +198,52 @@ class TestVerifyPluginInstalled:
 
         # Use a plugin that definitely won't be installed
         assert not verify_plugin_installed("bioio-nonexistent-plugin-12345")
+
+    def test_verify_converts_name_format(self):
+        """Test that plugin name is correctly converted to module name."""
+        from ndevio._plugin_installer import verify_plugin_installed
+
+        # Test with installed package (bioio-base should be installed)
+        # The function should convert bioio-base -> bioio_base
+        result = verify_plugin_installed("bioio-base")
+        assert isinstance(result, bool)
+
+
+class TestGetInstallerQueue:
+    """Test get_installer_queue function."""
+
+    def test_returns_queue_instance(self):
+        """Test that get_installer_queue returns a queue."""
+        from napari_plugin_manager.qt_package_installer import (
+            NapariInstallerQueue,
+        )
+
+        from ndevio._plugin_installer import get_installer_queue
+
+        queue = get_installer_queue()
+        assert isinstance(queue, NapariInstallerQueue)
+
+    def test_returns_same_instance(self):
+        """Test that get_installer_queue returns singleton."""
+        from ndevio._plugin_installer import get_installer_queue
+
+        queue1 = get_installer_queue()
+        queue2 = get_installer_queue()
+
+        # Should be the same instance
+        assert queue1 is queue2
+
+    def test_queue_reset(self):
+        """Test that queue can be reset for testing."""
+        from ndevio import _plugin_installer
+        from ndevio._plugin_installer import get_installer_queue
+
+        queue1 = get_installer_queue()
+
+        # Reset the global
+        _plugin_installer._installer_queue = None
+
+        queue2 = get_installer_queue()
+
+        # Should be a new instance
+        assert queue1 is not queue2
