@@ -80,7 +80,6 @@ def napari_get_reader(
     except UnsupportedFileFormatError as e:
         # determine_reader_plugin() already enhanced the error message
         logger.error("ndevio: Unsupported file format: %s", path)
-
         # Show plugin installer widget if enabled in settings
         if settings.ndevio_Reader.suggest_reader_plugins:  # type: ignore
             _open_plugin_installer(path, e)
@@ -192,18 +191,25 @@ def _open_plugin_installer(
     """
 
     import napari
+    from bioio import plugin_feasibility_report
 
-    from ._bioio_plugin_utils import suggest_plugins_for_path
+    from ._bioio_plugin_utils import (
+        filter_installed_plugins,
+        suggest_plugins_for_path,
+    )
     from .widgets import PluginInstallerWidget
 
     viewer = napari.current_viewer()
 
-    # Get suggested plugins for this file
+    # Get plugin suggestions for this file
     suggested_plugins = suggest_plugins_for_path(path)
+    print(f"suggested_plugins: {suggested_plugins}")
+    report = plugin_feasibility_report(path)
+    uninstalled_plugins = filter_installed_plugins(suggested_plugins, report)
+    print(f"uninstalled_plugins: {uninstalled_plugins}")
 
-    # Create and show the widget
     widget = PluginInstallerWidget(
-        path=path, suggested_plugins=suggested_plugins
+        path=path, suggested_plugins=uninstalled_plugins
     )
     viewer.window.add_dock_widget(
         widget,
