@@ -203,10 +203,8 @@ def _open_plugin_installer(
 
     # Get plugin suggestions for this file
     suggested_plugins = suggest_plugins_for_path(path)
-    print(f"suggested_plugins: {suggested_plugins}")
     report = plugin_feasibility_report(path)
     uninstalled_plugins = filter_installed_plugins(suggested_plugins, report)
-    print(f"uninstalled_plugins: {uninstalled_plugins}")
 
     widget = PluginInstallerWidget(
         path=path, suggested_plugins=uninstalled_plugins
