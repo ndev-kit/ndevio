@@ -7,6 +7,7 @@ Public API:
     get_missing_plugins_message() - Generate installation message for missing plugins
     suggest_plugins_for_path() - Get list of suggested plugins for a file
     filter_installed_plugins() - Filter out already-installed plugins from suggestions
+    get_installable_plugins() - Get non-core, uninstalled plugins for a file
     BIOIO_PLUGINS - Dict of all bioio plugins and their file extensions
 
 Example:
@@ -327,6 +328,69 @@ def filter_installed_plugins(
 
     # Filter to get plugins that aren't installed
     return [p for p in suggested_plugins if p["name"] not in installed_plugins]
+
+
+def get_installable_plugins(
+    path: Path | str,
+    feasibility_report: dict[str, PluginSupport] | None = None,
+    exclude_core: bool = True,
+) -> list[dict[str, str]]:
+    """Get structured list of bioio plugins that could read this file.
+
+    By default, returns only non-core plugins that aren't already installed.
+    This is useful for suggesting plugins to install.
+
+    Parameters
+    ----------
+    path : Path or str
+        File path that couldn't be read
+    feasibility_report : dict, optional
+        Report from bioio.plugin_feasibility_report() showing installed plugins.
+        If None, all suggested plugins (minus core if exclude_core=True) are returned.
+    exclude_core : bool, optional
+        If True (default), exclude core plugins from results.
+        Core plugins are bundled with bioio and shouldn't need installation.
+
+    Returns
+    -------
+    list of dict
+        List of plugin info dicts with keys: name, description, repository, extensions
+        Empty list if no installable plugins found
+
+    Examples
+    --------
+    >>> from ndevio._bioio_plugin_utils import get_installable_plugins
+    >>>
+    >>> # Get plugins that need to be installed for a CZI file
+    >>> plugins = get_installable_plugins("image.czi")
+    >>> for p in plugins:
+    ...     print(f"Install: pip install {p['name']}")
+    >>>
+    >>> # With feasibility report to filter out already installed
+    >>> from bioio import plugin_feasibility_report
+    >>> report = plugin_feasibility_report("image.czi")
+    >>> plugins = get_installable_plugins("image.czi", report)
+    """
+    from pathlib import Path
+
+    path = Path(path)
+    suggested_plugins = suggest_plugins_for_path(path)
+
+    # Filter out installed plugins
+    if feasibility_report:
+        uninstalled = filter_installed_plugins(
+            suggested_plugins, feasibility_report
+        )
+    else:
+        uninstalled = suggested_plugins
+
+    # Optionally filter out core plugins
+    if exclude_core:
+        installable = [p for p in uninstalled if not p.get("core", False)]
+    else:
+        installable = uninstalled
+
+    return installable
 
 
 def _format_plugin_list(plugins: list[dict[str, str]]) -> str:

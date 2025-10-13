@@ -8,65 +8,18 @@ supporting both pip and conda backends.
 
 Public API:
     install_plugin() - Install a bioio plugin using napari-plugin-manager
-    get_installable_plugins() - Get structured list of plugins for a file
+    get_installer_queue() - Get the global InstallerQueue instance
+    verify_plugin_installed() - Check if a plugin is installed
+
+Note:
+    For plugin discovery and suggestions, see _bioio_plugin_utils module.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 logger = logging.getLogger(__name__)
-
-
-def get_installable_plugins(
-    path: Path | str,
-    feasibility_report: dict | None = None,
-) -> list[dict[str, str]]:
-    """Get structured list of bioio plugins that could read this file.
-
-    Returns only non-core plugins that aren't already installed.
-
-    Parameters
-    ----------
-    path : Path or str
-        File path that couldn't be read
-    feasibility_report : dict, optional
-        Report from bioio.plugin_feasibility_report() showing installed plugins
-
-    Returns
-    -------
-    list of dict
-        List of plugin info dicts with keys: name, description, repository, extensions
-        Empty list if no installable plugins found
-    """
-    from pathlib import Path
-
-    from ._bioio_plugin_utils import _suggest_plugins_for_path
-
-    path = Path(path)
-    suggested_plugins = _suggest_plugins_for_path(path)
-
-    # Determine which plugins are already installed
-    installed_plugins = set()
-    if feasibility_report:
-        installed_plugins = {
-            name
-            for name, support in feasibility_report.items()
-            if name != "ArrayLike" and support.supported
-        }
-
-    # Filter to get plugins that aren't installed and aren't core
-    installable = [
-        p
-        for p in suggested_plugins
-        if p["name"] not in installed_plugins and not p.get("core", False)
-    ]
-
-    return installable
 
 
 def install_plugin(plugin_name: str) -> int:

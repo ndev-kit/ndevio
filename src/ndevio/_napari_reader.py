@@ -199,11 +199,15 @@ def _open_plugin_installer(
     )
     from .widgets import PluginInstallerWidget
 
+    # Get viewer, handle case where no viewer available
     viewer = napari.current_viewer()
 
     # Get plugin suggestions for this file
     suggested_plugins = suggest_plugins_for_path(path)
+
     report = plugin_feasibility_report(path)
+
+    # Filter out already-installed plugins
     uninstalled_plugins = filter_installed_plugins(suggested_plugins, report)
 
     widget = PluginInstallerWidget(

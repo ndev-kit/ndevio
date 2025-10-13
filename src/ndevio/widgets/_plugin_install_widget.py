@@ -75,8 +75,10 @@ class PluginInstallerWidget(Container):
         self.path = path
         self.suggested_plugins = suggested_plugins
 
-        # Always get all plugins
-        self.plugins = list(BIOIO_PLUGINS.keys())
+        # Convert BIOIO_PLUGINS dict to list of plugin info dicts
+        self.plugins = [
+            {"name": name, **info} for name, info in BIOIO_PLUGINS.items()
+        ]
 
         self._init_widgets()
         self._connect_events()
@@ -102,9 +104,12 @@ class PluginInstallerWidget(Container):
         self._info_label = Label(value="Select a plugin to install:")
         self.append(self._info_label)
 
+        # Create list of plugin names for ComboBox
+        plugin_names = [p["name"] for p in self.plugins]
+
         self._plugin_select = ComboBox(
             label="Plugin",
-            choices=self.plugins,
+            choices=plugin_names,
             value=None,
             nullable=True,
         )
