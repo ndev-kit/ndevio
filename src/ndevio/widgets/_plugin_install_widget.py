@@ -9,14 +9,12 @@ This widget can be used in two modes:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from magicgui.widgets import ComboBox, Container, Label, PushButton
 
-from .._bioio_plugin_utils import BIOIO_PLUGINS
-
 if TYPE_CHECKING:
-    from napari.types import PathLike
+    from .._plugin_manager import ReaderPluginManager
 
 logger = logging.getLogger(__name__)
 
@@ -26,74 +24,62 @@ class PluginInstallerWidget(Container):
 
     Can be used standalone or triggered by file read errors.
 
-    The widget always shows all available bioio plugins from BIOIO_PLUGINS.
+    The widget always shows all available bioio plugins.
 
     In standalone mode:
+    - Create without a plugin_manager or with one without a path
     - First plugin in alphabetical order is pre-selected
     - No file path shown
 
     In error mode:
-    - First suggested plugin is pre-selected (if provided)
+    - Provide a plugin_manager initialized with the file path
+    - First installable plugin is pre-selected (if any)
     - Shows the file path that failed to read
     - User can still select any other plugin from the full list
 
     Parameters
     ----------
-    path : PathLike, optional
-        Path to the file that couldn't be read. If None, runs in standalone mode.
-    suggested_plugins : list of dict, optional
-        List of plugin info dicts from get_installable_plugins().
-        If provided, the first plugin will be pre-selected.
+    plugin_manager : ReaderPluginManager, optional
+        Plugin manager instance. If None, creates a new one in standalone mode.
 
     Attributes
     ----------
-    path : PathLike or None
-        Path to the file (None in standalone mode)
-    suggested_plugins : list of dict or None
-        Suggested plugins for error mode
-    plugins : list of dict
-        All available plugins from BIOIO_PLUGINS
+    manager : ReaderPluginManager
+        Plugin manager for detection and recommendations
     """
 
     def __init__(
         self,
-        path: PathLike | None = None,
-        suggested_plugins: list[dict[str, Any]] | None = None,
+        plugin_manager: ReaderPluginManager | None = None,
     ):
         """Initialize the PluginInstallerWidget.
 
         Parameters
         ----------
-        path : PathLike, optional
-            Path to the file that couldn't be read. If None, runs in standalone mode.
-        suggested_plugins : list of dict, optional
-            List of suggested plugin info dicts. In error mode, the first
-            suggested plugin will be pre-selected in the dropdown.
+        plugin_manager : ReaderPluginManager, optional
+            Plugin manager instance. If None, creates a new one in standalone mode
+            (no file path, just shows all available plugins).
         """
         super().__init__(labels=False)
 
-        self.path = path
-        self.suggested_plugins = suggested_plugins
+        # Import here to avoid circular imports
+        from .._plugin_manager import ReaderPluginManager
+
+        # Create or use provided manager
+        self.manager = plugin_manager or ReaderPluginManager()
 
         # Store connection for cleanup
         self._queue_connection = None
-
-        # Convert BIOIO_PLUGINS dict to list of plugin info dicts
-        self.plugins = [
-            {"name": name, **info} for name, info in BIOIO_PLUGINS.items()
-        ]
 
         self._init_widgets()
         self._connect_events()
 
     def _init_widgets(self):
         """Initialize all widget components."""
-        from pathlib import Path
-
         # Title - conditional based on mode
-        if self.path is not None:
+        if self.manager.path is not None:
             # Error mode: show file that failed
-            file_name = Path(self.path).name
+            file_name = self.manager.path.name
             self._title_label = Label(
                 value=f"<b>Cannot read file:</b> {file_name}"
             )
@@ -107,8 +93,8 @@ class PluginInstallerWidget(Container):
         self._info_label = Label(value="Select a plugin to install:")
         self.append(self._info_label)
 
-        # Create list of plugin names for ComboBox
-        plugin_names = [p["name"] for p in self.plugins]
+        # Get all available plugins from manager
+        plugin_names = [p["name"] for p in self.manager.available_plugins]
 
         self._plugin_select = ComboBox(
             label="Plugin",
@@ -116,9 +102,12 @@ class PluginInstallerWidget(Container):
             value=None,
             nullable=True,
         )
-        # If suggested plugins provided, pre-select the first one
-        if self.suggested_plugins and len(self.suggested_plugins) > 0:
-            self._plugin_select.value = self.suggested_plugins[0]["name"]
+
+        # If there are installable plugins, pre-select the first one
+        installable = self.manager.installable_plugins
+        if installable:
+            self._plugin_select.value = installable[0]["name"]
+
         self.append(self._plugin_select)
 
         # Install button

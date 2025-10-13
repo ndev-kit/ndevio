@@ -44,71 +44,88 @@ class TestSuggestPluginsForPath:
         assert len(plugins) == 0
 
 
-class TestFilterInstalledPlugins:
-    """Test filter_installed_plugins function."""
+class TestReaderPluginManager:
+    """Test ReaderPluginManager class."""
 
-    def test_filters_out_installed_plugins(self):
-        """Test that installed plugins are filtered from suggestions."""
-        from ndevio._bioio_plugin_utils import filter_installed_plugins
+    def test_manager_filters_installed_plugins(self):
+        """Test that manager correctly identifies installable plugins."""
+        from unittest.mock import Mock, patch
 
-        suggested = [
-            {"name": "bioio-czi", "description": "Zeiss CZI files"},
-            {"name": "bioio-lif", "description": "Leica LIF files"},
-        ]
+        from ndevio import ReaderPluginManager
 
         # Mock feasibility report showing bioio-czi as installed
-        # (presence in report means it's installed, regardless of 'supported')
-        mock_report = {
-            "bioio-czi": type("MockSupport", (), {"supported": False})(),
-            "ArrayLike": type("MockSupport", (), {"supported": True})(),
-        }
+        with patch("bioio.plugin_feasibility_report") as mock_report:
+            mock_report.return_value = {
+                "bioio-czi": Mock(supported=False),
+                "ArrayLike": Mock(supported=False),
+            }
 
-        filtered = filter_installed_plugins(suggested, mock_report)
+            manager = ReaderPluginManager("test.czi")
 
-        # bioio-czi should be filtered out, bioio-lif should remain
-        assert len(filtered) == 1
-        assert filtered[0]["name"] == "bioio-lif"
+            # bioio-czi should be in installed_plugins
+            assert "bioio-czi" in manager.installed_plugins
 
-    def test_no_feasibility_report(self):
-        """Test that None feasibility report returns all suggestions."""
-        from ndevio._bioio_plugin_utils import filter_installed_plugins
+            # bioio-czi should NOT be in installable_plugins (already installed)
+            installable_names = [
+                p["name"] for p in manager.installable_plugins
+            ]
+            assert "bioio-czi" not in installable_names
 
-        suggested = [
-            {"name": "bioio-czi", "description": "Zeiss CZI files"},
-            {"name": "bioio-lif", "description": "Leica LIF files"},
-        ]
+    def test_manager_suggests_uninstalled_plugins(self):
+        """Test that manager suggests uninstalled plugins."""
+        from unittest.mock import Mock, patch
 
-        # None report should return everything
-        filtered = filter_installed_plugins(suggested, None)
+        from ndevio import ReaderPluginManager
 
-        assert len(filtered) == 2
+        # Mock feasibility report with no bioio-lif installed
+        with patch("bioio.plugin_feasibility_report") as mock_report:
+            mock_report.return_value = {
+                "bioio-ome-tiff": Mock(supported=False),
+                "ArrayLike": Mock(supported=False),
+            }
 
-    def test_core_plugins_in_report(self):
-        """Test that core plugins appearing in report are filtered correctly."""
-        from ndevio._bioio_plugin_utils import filter_installed_plugins
+            manager = ReaderPluginManager("test.lif")
 
-        suggested = [
-            {
-                "name": "bioio-ome-tiff",
-                "description": "OME-TIFF",
-                "core": True,
-            },
-            {"name": "bioio-tifffile", "description": "TIFF files"},
-        ]
+            # bioio-lif should be in suggested_plugins
+            suggested_names = [p["name"] for p in manager.suggested_plugins]
+            assert "bioio-lif" in suggested_names
 
-        # bioio-ome-tiff is in the report (installed) even though it
-        # couldn't read this particular file
-        mock_report = {
-            "bioio-ome-tiff": type("MockSupport", (), {"supported": False})(),
-            "ArrayLike": type("MockSupport", (), {"supported": True})(),
-        }
+            # bioio-lif should also be in installable_plugins
+            installable_names = [
+                p["name"] for p in manager.installable_plugins
+            ]
+            assert "bioio-lif" in installable_names
 
-        filtered = filter_installed_plugins(suggested, mock_report)
+    def test_manager_excludes_core_plugins_from_installable(self):
+        """Test that core plugins are excluded from installable list."""
+        from unittest.mock import Mock, patch
 
-        # bioio-ome-tiff should be filtered out (it's installed)
-        # bioio-tifffile should remain
-        assert len(filtered) == 1
-        assert filtered[0]["name"] == "bioio-tifffile"
+        from ndevio import ReaderPluginManager
+
+        # Mock report showing no plugins installed
+        with patch("bioio.plugin_feasibility_report") as mock_report:
+            mock_report.return_value = {
+                "ArrayLike": Mock(supported=False),
+            }
+
+            manager = ReaderPluginManager("test.tiff")
+
+            # Core plugins (like bioio-ome-tiff) should not be in installable
+            installable_names = [
+                p["name"] for p in manager.installable_plugins
+            ]
+
+            # bioio-ome-tiff is a core plugin, shouldn't need installation
+            core_plugins = [
+                "bioio-ome-tiff",
+                "bioio-imageio",
+                "bioio-ome-zarr",
+            ]
+            for core in core_plugins:
+                assert core not in installable_names
+
+            # bioio-tifffile is not core, should be installable
+            assert "bioio-tifffile" in installable_names
 
 
 class TestGetMissingPluginsMessage:

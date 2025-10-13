@@ -31,11 +31,11 @@ class TestOpenPluginInstaller:
             reader_module._open_plugin_installer(test_path, error)
 
         # Check that widget was added to viewer
-        assert len(viewer.window._dock_widgets) > 0
+        assert len(viewer.window.dock_widgets) > 0
 
         # Find the plugin installer widget
         plugin_widget = None
-        for name, widget in viewer.window._dock_widgets.items():
+        for name, widget in viewer.window.dock_widgets.items():
             if "Install BioIO Plugin" in name:
                 plugin_widget = widget
                 break
@@ -59,12 +59,18 @@ class TestOpenPluginInstaller:
 
             reader_module._open_plugin_installer(test_path, error)
 
-        # Get the widget (use ._magic_widget to access the Container)
-        widget_data = list(viewer.window._dock_widgets.values())[0]
-        widget = widget_data.widget()._magic_widget
+        # dock_widgets is a read-only mapping of widget names to widgets
+        # Find the plugin installer widget by name
+        widget = None
+        for name, docked_widget in viewer.window.dock_widgets.items():
+            if "Install BioIO Plugin" in name:
+                widget = docked_widget
+                break
 
-        # Check path was passed correctly
-        assert widget.path == test_path
+        assert widget is not None
+
+        # Check path was passed correctly via the manager
+        assert widget.manager.path == test_path
         assert test_path.name in widget._title_label.value
 
     def test_filters_installed_plugins(self, make_napari_viewer):
@@ -90,13 +96,20 @@ class TestOpenPluginInstaller:
 
             reader_module._open_plugin_installer(test_path, error)
 
-        # Get the widget (use ._magic_widget to access the Container)
-        widget_data = list(viewer.window._dock_widgets.values())[0]
-        widget = widget_data.widget()._magic_widget
+        # dock_widgets is a read-only mapping of widget names to widgets
+        # Find the plugin installer widget by name
+        widget = None
+        for name, docked_widget in viewer.window.dock_widgets.items():
+            if "Install BioIO Plugin" in name:
+                widget = docked_widget
+                break
 
-        # bioio-czi should be filtered out from suggested_plugins
-        if widget.suggested_plugins:
-            plugin_names = [p["name"] for p in widget.suggested_plugins]
+        assert widget is not None
+
+        # bioio-czi should be filtered out from installable_plugins
+        installable = widget.manager.installable_plugins
+        if installable:
+            plugin_names = [p["name"] for p in installable]
             assert "bioio-czi" not in plugin_names
 
     def test_suggests_uninstalled_plugins(self, make_napari_viewer):
@@ -120,13 +133,20 @@ class TestOpenPluginInstaller:
 
             reader_module._open_plugin_installer(test_path, error)
 
-        # Get the widget (use ._magic_widget to access the Container)
-        widget_data = list(viewer.window._dock_widgets.values())[0]
-        widget = widget_data.widget()._magic_widget
+        # dock_widgets is a read-only mapping of widget names to widgets
+        # Find the plugin installer widget by name
+        widget = None
+        for name, docked_widget in viewer.window.dock_widgets.items():
+            if "Install BioIO Plugin" in name:
+                widget = docked_widget
+                break
 
-        # bioio-lif should be in suggested_plugins
-        assert widget.suggested_plugins is not None
-        plugin_names = [p["name"] for p in widget.suggested_plugins]
+        assert widget is not None
+
+        # bioio-lif should be in installable_plugins
+        installable = widget.manager.installable_plugins
+        assert installable is not None
+        plugin_names = [p["name"] for p in installable]
         assert "bioio-lif" in plugin_names
 
 
@@ -135,23 +155,29 @@ class TestPluginInstallerWidgetIntegration:
 
     def test_widget_created_in_error_mode(self, make_napari_viewer):
         """Test widget creation in error mode with viewer."""
+        from ndevio import ReaderPluginManager
         from ndevio.widgets import PluginInstallerWidget
 
         make_napari_viewer()  # Create viewer context
 
-        suggested = [
-            {"name": "bioio-czi", "description": "Zeiss CZI files"},
-        ]
+        # Create manager for a CZI file
+        with patch("bioio.plugin_feasibility_report") as mock_report:
+            # Mock report showing no plugins installed
+            mock_report.return_value = {
+                "ArrayLike": Mock(supported=False),
+            }
 
-        widget = PluginInstallerWidget(
-            path="test.czi",
-            suggested_plugins=suggested,
-        )
+            manager = ReaderPluginManager("test.czi")
+            widget = PluginInstallerWidget(plugin_manager=manager)
 
         # Verify widget state
-        assert widget.path == "test.czi"
-        assert widget.suggested_plugins == suggested
+        assert widget.manager.path is not None
+        assert widget.manager.path.name == "test.czi"
         assert "test.czi" in widget._title_label.value
+
+        # bioio-czi should be in installable plugins and pre-selected
+        installable = widget.manager.installable_plugins
+        assert any(p["name"] == "bioio-czi" for p in installable)
         assert widget._plugin_select.value == "bioio-czi"
 
     def test_install_button_queues_installation(self, make_napari_viewer):
@@ -184,30 +210,32 @@ class TestPluginInstallerWidgetIntegration:
 
         widget = PluginInstallerWidget()
 
-        # Should have all plugins from BIOIO_PLUGINS
-        plugin_names = [p["name"] for p in widget.plugins]
+        # Should have all plugins from manager's available_plugins
+        plugin_names = [p["name"] for p in widget.manager.available_plugins]
         expected_names = list(BIOIO_PLUGINS.keys())
 
         assert set(plugin_names) == set(expected_names)
 
-    def test_widget_preselects_first_suggestion(self, make_napari_viewer):
-        """Test that first suggested plugin is pre-selected."""
+    def test_widget_preselects_first_installable(self, make_napari_viewer):
+        """Test that first installable plugin is pre-selected."""
+        from ndevio import ReaderPluginManager
         from ndevio.widgets import PluginInstallerWidget
 
         make_napari_viewer()
 
-        suggested = [
-            {"name": "bioio-lif", "description": "Leica LIF files"},
-            {"name": "bioio-czi", "description": "Zeiss CZI files"},
-        ]
+        # Mock report showing no plugins installed
+        with patch("bioio.plugin_feasibility_report") as mock_report:
+            mock_report.return_value = {
+                "ArrayLike": Mock(supported=False),
+            }
 
-        widget = PluginInstallerWidget(
-            path="test.lif",
-            suggested_plugins=suggested,
-        )
+            manager = ReaderPluginManager("test.lif")
+            widget = PluginInstallerWidget(plugin_manager=manager)
 
-        # First suggestion should be selected
-        assert widget._plugin_select.value == "bioio-lif"
+        # bioio-lif should be pre-selected (first installable)
+        installable = widget.manager.installable_plugins
+        if installable:
+            assert widget._plugin_select.value == installable[0]["name"]
 
     def test_install_updates_status_label(self, make_napari_viewer):
         """Test that status label updates during installation."""

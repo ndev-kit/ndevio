@@ -1,37 +1,28 @@
-"""Bioio plugin installation suggestions for unsupported file formats.
+"""Bioio plugin utilities and metadata.
 
-This module suggests missing bioio plugins to install when a file can't be read.
-The suggestions are based on file extensions and installed plugin detection.
+This module provides low-level utilities for bioio plugin discovery and messaging.
+Most users should use ReaderPluginManager for a higher-level API.
 
 Public API:
-    get_missing_plugins_message() - Generate installation message for missing plugins
-    suggest_plugins_for_path() - Get list of suggested plugins for a file
-    filter_installed_plugins() - Filter out already-installed plugins from suggestions
-    get_installable_plugins() - Get non-core, uninstalled plugins for a file
     BIOIO_PLUGINS - Dict of all bioio plugins and their file extensions
+    suggest_plugins_for_path() - Get list of suggested plugins for a file (low-level)
+    get_missing_plugins_message() - Generate installation message (used internally)
+
+Note:
+    For plugin detection, installation recommendations, and reader selection,
+    use ReaderPluginManager from ndevio._plugin_manager instead of calling
+    these functions directly.
 
 Example:
-    >>> from ndevio._bioio_plugin_utils import get_missing_plugins_message
+    >>> # Recommended: Use ReaderPluginManager
+    >>> from ndevio._plugin_manager import ReaderPluginManager
+    >>> manager = ReaderPluginManager("image.czi")
+    >>> print(manager.installable_plugins)
+    >>> print(manager.get_installation_message())
     >>>
-    >>> # Simple usage - just provide the path
-    >>> message = get_missing_plugins_message("image.czi")
-    >>> print(message)
-    >>>
-    >>> # With feasibility report to detect what's already installed
-    >>> from bioio import plugin_feasibility_report
-    >>> report = plugin_feasibility_report("image.czi")
-    >>> message = get_missing_plugins_message("image.czi", report)
-    >>>
-    >>> # Get structured plugin list for widget (filtering out installed)
-    >>> from ndevio._bioio_plugin_utils import (
-    ...     suggest_plugins_for_path,
-    ...     filter_installed_plugins,
-    ... )
-    >>> all_plugins = suggest_plugins_for_path("image.czi")
-    >>> report = plugin_feasibility_report("image.czi")
-    >>> uninstalled = filter_installed_plugins(all_plugins, report)
-    >>> for plugin in uninstalled:
-    ...     print(plugin["name"], plugin["description"])
+    >>> # Low-level: Direct use of utilities (not recommended)
+    >>> from ndevio._bioio_plugin_utils import suggest_plugins_for_path
+    >>> plugins = suggest_plugins_for_path("image.czi")
 """
 
 from __future__ import annotations
@@ -163,7 +154,7 @@ def get_missing_plugins_message(
 
     # Filter to get only plugins that aren't installed
     if feasibility_report:
-        missing_plugins = filter_installed_plugins(
+        missing_plugins = _filter_installed_plugins(
             suggested_plugins, feasibility_report
         )
     else:
@@ -283,6 +274,11 @@ def _get_installed_plugins(
     -------
     set of str
         Set of installed plugin names (excludes "ArrayLike")
+
+    Notes
+    -----
+    This is a helper function used internally by get_missing_plugins_message().
+    For plugin detection, use ReaderPluginManager.installed_plugins instead.
     """
     if not feasibility_report:
         return set()
@@ -291,7 +287,7 @@ def _get_installed_plugins(
     return {name for name in feasibility_report if name != "ArrayLike"}
 
 
-def filter_installed_plugins(
+def _filter_installed_plugins(
     suggested_plugins: list[dict[str, str]],
     feasibility_report: dict[str, PluginSupport] | None = None,
 ) -> list[dict[str, str]]:
@@ -310,14 +306,10 @@ def filter_installed_plugins(
     list of dict
         List of plugins that are not already installed
 
-    Examples
-    --------
-    >>> from bioio import plugin_feasibility_report
-    >>> from ndevio._bioio_plugin_utils import suggest_plugins_for_path, filter_installed_plugins
-    >>>
-    >>> suggested = suggest_plugins_for_path("image.czi")
-    >>> report = plugin_feasibility_report("image.czi")
-    >>> uninstalled = filter_installed_plugins(suggested, report)
+    Notes
+    -----
+    This is a helper function used internally by get_missing_plugins_message().
+    For plugin detection, use ReaderPluginManager.installable_plugins instead.
     """
     if not feasibility_report:
         # No feasibility report, can't filter - return all
@@ -328,69 +320,6 @@ def filter_installed_plugins(
 
     # Filter to get plugins that aren't installed
     return [p for p in suggested_plugins if p["name"] not in installed_plugins]
-
-
-def get_installable_plugins(
-    path: Path | str,
-    feasibility_report: dict[str, PluginSupport] | None = None,
-    exclude_core: bool = True,
-) -> list[dict[str, str]]:
-    """Get structured list of bioio plugins that could read this file.
-
-    By default, returns only non-core plugins that aren't already installed.
-    This is useful for suggesting plugins to install.
-
-    Parameters
-    ----------
-    path : Path or str
-        File path that couldn't be read
-    feasibility_report : dict, optional
-        Report from bioio.plugin_feasibility_report() showing installed plugins.
-        If None, all suggested plugins (minus core if exclude_core=True) are returned.
-    exclude_core : bool, optional
-        If True (default), exclude core plugins from results.
-        Core plugins are bundled with bioio and shouldn't need installation.
-
-    Returns
-    -------
-    list of dict
-        List of plugin info dicts with keys: name, description, repository, extensions
-        Empty list if no installable plugins found
-
-    Examples
-    --------
-    >>> from ndevio._bioio_plugin_utils import get_installable_plugins
-    >>>
-    >>> # Get plugins that need to be installed for a CZI file
-    >>> plugins = get_installable_plugins("image.czi")
-    >>> for p in plugins:
-    ...     print(f"Install: pip install {p['name']}")
-    >>>
-    >>> # With feasibility report to filter out already installed
-    >>> from bioio import plugin_feasibility_report
-    >>> report = plugin_feasibility_report("image.czi")
-    >>> plugins = get_installable_plugins("image.czi", report)
-    """
-    from pathlib import Path
-
-    path = Path(path)
-    suggested_plugins = suggest_plugins_for_path(path)
-
-    # Filter out installed plugins
-    if feasibility_report:
-        uninstalled = filter_installed_plugins(
-            suggested_plugins, feasibility_report
-        )
-    else:
-        uninstalled = suggested_plugins
-
-    # Optionally filter out core plugins
-    if exclude_core:
-        installable = [p for p in uninstalled if not p.get("core", False)]
-    else:
-        installable = uninstalled
-
-    return installable
 
 
 def _format_plugin_list(plugins: list[dict[str, str]]) -> str:
