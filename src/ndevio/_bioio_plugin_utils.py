@@ -5,6 +5,9 @@ The suggestions are based on file extensions and installed plugin detection.
 
 Public API:
     get_missing_plugins_message() - Generate installation message for missing plugins
+    suggest_plugins_for_path() - Get list of suggested plugins for a file
+    filter_installed_plugins() - Filter out already-installed plugins from suggestions
+    get_installable_plugins() - Get non-core, uninstalled plugins for a file
     BIOIO_PLUGINS - Dict of all bioio plugins and their file extensions
 
 Example:
@@ -18,6 +21,17 @@ Example:
     >>> from bioio import plugin_feasibility_report
     >>> report = plugin_feasibility_report("image.czi")
     >>> message = get_missing_plugins_message("image.czi", report)
+    >>>
+    >>> # Get structured plugin list for widget (filtering out installed)
+    >>> from ndevio._bioio_plugin_utils import (
+    ...     suggest_plugins_for_path,
+    ...     filter_installed_plugins,
+    ... )
+    >>> all_plugins = suggest_plugins_for_path("image.czi")
+    >>> report = plugin_feasibility_report("image.czi")
+    >>> uninstalled = filter_installed_plugins(all_plugins, report)
+    >>> for plugin in uninstalled:
+    ...     print(plugin["name"], plugin["description"])
 """
 
 from __future__ import annotations
@@ -135,7 +149,7 @@ def get_missing_plugins_message(
     from pathlib import Path
 
     path = Path(path)
-    suggested_plugins = _suggest_plugins_for_path(path)
+    suggested_plugins = suggest_plugins_for_path(path)
 
     # No plugins found for this extension
     if not suggested_plugins:
@@ -145,18 +159,15 @@ def get_missing_plugins_message(
         )
 
     # Determine which plugins are already installed
-    installed_plugins = set()
-    if feasibility_report:
-        installed_plugins = {
-            name
-            for name, support in feasibility_report.items()
-            if name != "ArrayLike" and support.supported
-        }
+    installed_plugins = _get_installed_plugins(feasibility_report)
 
-    # Filter to get plugins that aren't installed
-    missing_plugins = [
-        p for p in suggested_plugins if p["name"] not in installed_plugins
-    ]
+    # Filter to get only plugins that aren't installed
+    if feasibility_report:
+        missing_plugins = filter_installed_plugins(
+            suggested_plugins, feasibility_report
+        )
+    else:
+        missing_plugins = suggested_plugins
 
     # Format the plugin list (filters out core plugins)
     plugin_list = _format_plugin_list(missing_plugins)
@@ -197,22 +208,31 @@ def get_missing_plugins_message(
     )
 
 
-def _suggest_plugins_for_extension(file_ext: str) -> list[dict[str, str]]:
-    """Suggest bioio plugins based on file extension."""
-    file_ext = file_ext.lower()
-    suggestions = []
+def suggest_plugins_for_path(path: Path | str) -> list[dict[str, str]]:
+    """Get list of bioio plugins that could read the given file.
 
-    if file_ext in _EXTENSION_TO_PLUGIN:
-        for plugin_name in _EXTENSION_TO_PLUGIN[file_ext]:
-            info = BIOIO_PLUGINS[plugin_name].copy()
-            info["name"] = plugin_name
-            suggestions.append(info)
+    Returns all plugins that support the file's extension, regardless of
+    whether they're installed or core plugins.
 
-    return suggestions
+    Parameters
+    ----------
+    path : Path or str
+        File path to check
 
+    Returns
+    -------
+    list of dict
+        List of plugin info dicts with keys: name, description, repository,
+        extensions, and optionally 'core' and 'note'.
+        Each dict represents a bioio plugin that could read this file.
 
-def _suggest_plugins_for_path(path: Path | str) -> list[dict[str, str]]:
-    """Suggest bioio plugins based on file path (handles compound extensions)."""
+    Examples
+    --------
+    >>> from ndevio._bioio_plugin_utils import suggest_plugins_for_path
+    >>> plugins = suggest_plugins_for_path("image.czi")
+    >>> print(plugins[0]["name"])
+    'bioio-czi'
+    """
     from pathlib import Path
 
     path = Path(path)
@@ -232,7 +252,145 @@ def _suggest_plugins_for_path(path: Path | str) -> list[dict[str, str]]:
                 return [result]
 
     # Fall back to simple extension matching
-    return _suggest_plugins_for_extension(path.suffix)
+    file_ext = path.suffix.lower()
+    suggestions = []
+
+    if file_ext in _EXTENSION_TO_PLUGIN:
+        for plugin_name in _EXTENSION_TO_PLUGIN[file_ext]:
+            info = BIOIO_PLUGINS[plugin_name].copy()
+            info["name"] = plugin_name
+            suggestions.append(info)
+
+    return suggestions
+
+
+def _get_installed_plugins(
+    feasibility_report: dict[str, PluginSupport] | None,
+) -> set[str]:
+    """Extract installed plugin names from feasibility report.
+
+    The feasibility report from bioio.plugin_feasibility_report() includes
+    all installed plugins. The 'supported' field indicates whether each
+    plugin can read the specific file, but the presence of a plugin in the
+    report means it's installed.
+
+    Parameters
+    ----------
+    feasibility_report : dict, optional
+        Report from bioio.plugin_feasibility_report()
+
+    Returns
+    -------
+    set of str
+        Set of installed plugin names (excludes "ArrayLike")
+    """
+    if not feasibility_report:
+        return set()
+
+    # If a plugin appears in the report, it's installed
+    return {name for name in feasibility_report if name != "ArrayLike"}
+
+
+def filter_installed_plugins(
+    suggested_plugins: list[dict[str, str]],
+    feasibility_report: dict[str, PluginSupport] | None = None,
+) -> list[dict[str, str]]:
+    """Filter out already-installed plugins from a list of suggested plugins.
+
+    Parameters
+    ----------
+    suggested_plugins : list of dict
+        List of plugin info dicts from suggest_plugins_for_path()
+    feasibility_report : dict, optional
+        Report from bioio.plugin_feasibility_report() showing installed plugins.
+        If None, returns all suggested plugins unchanged.
+
+    Returns
+    -------
+    list of dict
+        List of plugins that are not already installed
+
+    Examples
+    --------
+    >>> from bioio import plugin_feasibility_report
+    >>> from ndevio._bioio_plugin_utils import suggest_plugins_for_path, filter_installed_plugins
+    >>>
+    >>> suggested = suggest_plugins_for_path("image.czi")
+    >>> report = plugin_feasibility_report("image.czi")
+    >>> uninstalled = filter_installed_plugins(suggested, report)
+    """
+    if not feasibility_report:
+        # No feasibility report, can't filter - return all
+        return suggested_plugins
+
+    # Determine which plugins are already installed
+    installed_plugins = _get_installed_plugins(feasibility_report)
+
+    # Filter to get plugins that aren't installed
+    return [p for p in suggested_plugins if p["name"] not in installed_plugins]
+
+
+def get_installable_plugins(
+    path: Path | str,
+    feasibility_report: dict[str, PluginSupport] | None = None,
+    exclude_core: bool = True,
+) -> list[dict[str, str]]:
+    """Get structured list of bioio plugins that could read this file.
+
+    By default, returns only non-core plugins that aren't already installed.
+    This is useful for suggesting plugins to install.
+
+    Parameters
+    ----------
+    path : Path or str
+        File path that couldn't be read
+    feasibility_report : dict, optional
+        Report from bioio.plugin_feasibility_report() showing installed plugins.
+        If None, all suggested plugins (minus core if exclude_core=True) are returned.
+    exclude_core : bool, optional
+        If True (default), exclude core plugins from results.
+        Core plugins are bundled with bioio and shouldn't need installation.
+
+    Returns
+    -------
+    list of dict
+        List of plugin info dicts with keys: name, description, repository, extensions
+        Empty list if no installable plugins found
+
+    Examples
+    --------
+    >>> from ndevio._bioio_plugin_utils import get_installable_plugins
+    >>>
+    >>> # Get plugins that need to be installed for a CZI file
+    >>> plugins = get_installable_plugins("image.czi")
+    >>> for p in plugins:
+    ...     print(f"Install: pip install {p['name']}")
+    >>>
+    >>> # With feasibility report to filter out already installed
+    >>> from bioio import plugin_feasibility_report
+    >>> report = plugin_feasibility_report("image.czi")
+    >>> plugins = get_installable_plugins("image.czi", report)
+    """
+    from pathlib import Path
+
+    path = Path(path)
+    suggested_plugins = suggest_plugins_for_path(path)
+
+    # Filter out installed plugins
+    if feasibility_report:
+        uninstalled = filter_installed_plugins(
+            suggested_plugins, feasibility_report
+        )
+    else:
+        uninstalled = suggested_plugins
+
+    # Optionally filter out core plugins
+    if exclude_core:
+        installable = [p for p in uninstalled if not p.get("core", False)]
+    else:
+        installable = uninstalled
+
+    return installable
 
 
 def _format_plugin_list(plugins: list[dict[str, str]]) -> str:

@@ -36,6 +36,7 @@ dependencies = [
     "bioio-imageio",
     "bioio-ome-tiff",
     "bioio-ome-zarr",
+    "napari-plugin-manager",  # For plugin installation widget
 ]
 
 [project.optional-dependencies]

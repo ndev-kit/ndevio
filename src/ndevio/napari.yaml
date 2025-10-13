@@ -15,6 +15,9 @@ contributions:
     - id: ndevio.write_single_image
       python_name: ndevio._writer:write_single_image
       title: Save image data with ndevio
+    - id: ndevio.make_plugin_installer_widget
+      python_name: ndevio.widgets:PluginInstallerWidget
+      title: Install BioIO Reader Plugins
   readers:
     - command: ndevio.get_reader
       accepts_directories: false
@@ -60,3 +63,6 @@ contributions:
     - command: ndevio.write_single_image
       layer_types: ['image']
       filename_extensions: ['.npy']
+  widgets:
+    - command: ndevio.make_plugin_installer_widget
+      display_name: Install BioIO Reader Plugins

@@ -77,10 +77,13 @@ def napari_get_reader(
             open_first_scene_only=open_first_scene_only,
             open_all_scenes=open_all_scenes,
         )
-    except UnsupportedFileFormatError:
+    except UnsupportedFileFormatError as e:
         # determine_reader_plugin() already enhanced the error message
-        # Just log and re-raise for napari to handle
         logger.error("ndevio: Unsupported file format: %s", path)
+        # Show plugin installer widget if enabled in settings
+        if settings.ndevio_Reader.suggest_reader_plugins:  # type: ignore
+            _open_plugin_installer(path, e)
+
         raise
     except Exception as e:  # noqa: BLE001
         logger.warning("ndevio: Error reading file: %s", e)
@@ -171,6 +174,49 @@ def _open_scene_container(
         nImageSceneWidget(viewer, path, img, in_memory),
         area="right",
         name=f"{Path(path).stem}{DELIMITER}Scenes",
+    )
+
+
+def _open_plugin_installer(
+    path: PathLike, error: UnsupportedFileFormatError
+) -> None:
+    """Open the plugin installer widget for an unsupported file.
+
+    Parameters
+    ----------
+    path : PathLike
+        Path to the file that couldn't be read
+    error : UnsupportedFileFormatError
+        The error that was raised
+    """
+
+    import napari
+    from bioio import plugin_feasibility_report
+
+    from ._bioio_plugin_utils import (
+        filter_installed_plugins,
+        suggest_plugins_for_path,
+    )
+    from .widgets import PluginInstallerWidget
+
+    # Get viewer, handle case where no viewer available
+    viewer = napari.current_viewer()
+
+    # Get plugin suggestions for this file
+    suggested_plugins = suggest_plugins_for_path(path)
+
+    report = plugin_feasibility_report(path)
+
+    # Filter out already-installed plugins
+    uninstalled_plugins = filter_installed_plugins(suggested_plugins, report)
+
+    widget = PluginInstallerWidget(
+        path=path, suggested_plugins=uninstalled_plugins
+    )
+    viewer.window.add_dock_widget(
+        widget,
+        area="right",
+        name="Install BioIO Plugin",
     )
 
 
