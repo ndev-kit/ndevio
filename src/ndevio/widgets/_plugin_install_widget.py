@@ -75,6 +75,9 @@ class PluginInstallerWidget(Container):
         self.path = path
         self.suggested_plugins = suggested_plugins
 
+        # Store connection for cleanup
+        self._queue_connection = None
+
         # Convert BIOIO_PLUGINS dict to list of plugin info dicts
         self.plugins = [
             {"name": name, **info} for name, info in BIOIO_PLUGINS.items()
@@ -165,8 +168,6 @@ class PluginInstallerWidget(Container):
                     "⚠ It is recommended to restart napari."
                 )
                 logger.info("Plugin installed successfully: %s", plugin_name)
-                # Disconnect after success
-                queue.processFinished.disconnect(on_process_finished)
             else:
                 self._status_label.value = (
                     f"✗ Installation failed for {plugin_name}\n"
@@ -174,28 +175,20 @@ class PluginInstallerWidget(Container):
                     "Check the console for details."
                 )
                 logger.error("Plugin installation failed: %s", plugin_name)
-                # Disconnect after failure
-                queue.processFinished.disconnect(on_process_finished)
 
-        # Connect to the signal
-        queue.processFinished.connect(on_process_finished)
+            # Disconnect after completion (success or failure)
+            if self._queue_connection is not None:
+                try:
+                    queue.processFinished.disconnect(self._queue_connection)
+                    self._queue_connection = None
+                except (RuntimeError, TypeError):
+                    # Already disconnected
+                    pass
+
+        # Store the connection so we can disconnect it later
+        self._queue_connection = on_process_finished
+        queue.processFinished.connect(self._queue_connection)
 
         # Queue the installation (returns job ID)
         job_id = install_plugin(plugin_name)
         logger.info("Installation job %s queued for %s", job_id, plugin_name)
-
-    def close(self):
-        """Clean up resources when widget is closed."""
-        # Disconnect from installer queue if connected
-        from .._plugin_installer import get_installer_queue
-
-        try:
-            queue = get_installer_queue()
-            # Try to disconnect all our connections
-            # (will silently fail if not connected, which is fine)
-            queue.processFinished.disconnect()
-        except (RuntimeError, TypeError):
-            # Already disconnected or queue doesn't exist
-            pass
-
-        super().close()
