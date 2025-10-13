@@ -20,10 +20,8 @@ class TestOpenPluginInstaller:
             reader_name="test", path=test_path, msg_extra=""
         )
 
-        # Mock plugin_feasibility_report to avoid needing real file
-        with patch(
-            "ndevio._napari_reader.plugin_feasibility_report"
-        ) as mock_report:
+        # Mock plugin_feasibility_report from bioio (not ndevio)
+        with patch("bioio.plugin_feasibility_report") as mock_report:
             mock_report.return_value = {
                 "bioio-ome-tiff": Mock(supported=False),
                 "ArrayLike": Mock(supported=False),
@@ -56,18 +54,14 @@ class TestOpenPluginInstaller:
             reader_name="test", path=str(test_path), msg_extra=""
         )
 
-        with patch(
-            "ndevio._napari_reader.plugin_feasibility_report"
-        ) as mock_report:
+        with patch("bioio.plugin_feasibility_report") as mock_report:
             mock_report.return_value = {}
 
             reader_module._open_plugin_installer(test_path, error)
 
-        # Get the widget
+        # Get the widget (use ._magic_widget to access the Container)
         widget_data = list(viewer.window._dock_widgets.values())[0]
-        widget = (
-            widget_data.widget()._widget
-        )  # Get the actual Container widget
+        widget = widget_data.widget()._magic_widget
 
         # Check path was passed correctly
         assert widget.path == test_path
@@ -86,9 +80,7 @@ class TestOpenPluginInstaller:
         )
 
         # Mock feasibility report showing bioio-czi as installed
-        with patch(
-            "ndevio._napari_reader.plugin_feasibility_report"
-        ) as mock_report:
+        with patch("bioio.plugin_feasibility_report") as mock_report:
             mock_report.return_value = {
                 "bioio-czi": Mock(
                     supported=False
@@ -98,9 +90,9 @@ class TestOpenPluginInstaller:
 
             reader_module._open_plugin_installer(test_path, error)
 
-        # Get the widget
+        # Get the widget (use ._magic_widget to access the Container)
         widget_data = list(viewer.window._dock_widgets.values())[0]
-        widget = widget_data.widget()._widget
+        widget = widget_data.widget()._magic_widget
 
         # bioio-czi should be filtered out from suggested_plugins
         if widget.suggested_plugins:
@@ -120,9 +112,7 @@ class TestOpenPluginInstaller:
         )
 
         # Mock feasibility report with no bioio-lif installed
-        with patch(
-            "ndevio._napari_reader.plugin_feasibility_report"
-        ) as mock_report:
+        with patch("bioio.plugin_feasibility_report") as mock_report:
             mock_report.return_value = {
                 "bioio-ome-tiff": Mock(supported=False),
                 "ArrayLike": Mock(supported=False),
@@ -130,9 +120,9 @@ class TestOpenPluginInstaller:
 
             reader_module._open_plugin_installer(test_path, error)
 
-        # Get the widget
+        # Get the widget (use ._magic_widget to access the Container)
         widget_data = list(viewer.window._dock_widgets.values())[0]
-        widget = widget_data.widget()._widget
+        widget = widget_data.widget()._magic_widget
 
         # bioio-lif should be in suggested_plugins
         assert widget.suggested_plugins is not None
