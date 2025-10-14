@@ -1,17 +1,19 @@
-"""Bioio plugin utilities and metadata.
+"""Bioio plugin metadata and extension mapping.
 
-This module provides low-level utilities for bioio plugin discovery and messaging.
-Most users should use ReaderPluginManager for a higher-level API.
+This module contains the BIOIO_PLUGINS registry and low-level utilities for
+plugin discovery. The ReaderPluginManager uses these utilities internally.
 
 Public API:
     BIOIO_PLUGINS - Dict of all bioio plugins and their file extensions
-    suggest_plugins_for_path() - Get list of suggested plugins for a file (low-level)
-    get_missing_plugins_message() - Generate installation message (used internally)
+    suggest_plugins_for_path() - Get list of suggested plugins by file extension
+
+Internal API (used by ReaderPluginManager):
+    format_plugin_installation_message() - Generate installation message
 
 Note:
     For plugin detection, installation recommendations, and reader selection,
-    use ReaderPluginManager from ndevio._plugin_manager instead of calling
-    these functions directly.
+    use ReaderPluginManager from ndevio._plugin_manager. Don't call these
+    utilities directly unless you're implementing low-level plugin logic.
 
 Example:
     >>> # Recommended: Use ReaderPluginManager
@@ -19,10 +21,6 @@ Example:
     >>> manager = ReaderPluginManager("image.czi")
     >>> print(manager.installable_plugins)
     >>> print(manager.get_installation_message())
-    >>>
-    >>> # Low-level: Direct use of utilities (not recommended)
-    >>> from ndevio._bioio_plugin_utils import suggest_plugins_for_path
-    >>> plugins = suggest_plugins_for_path("image.czi")
 """
 
 from __future__ import annotations
@@ -32,8 +30,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    from bioio.plugins import PluginSupport
 
 logger = logging.getLogger(__name__)
 
@@ -115,70 +111,64 @@ for plugin_name, info in BIOIO_PLUGINS.items():
         _EXTENSION_TO_PLUGIN[ext].append(plugin_name)
 
 
-def get_missing_plugins_message(
-    path: Path | str,
-    feasibility_report: dict[str, PluginSupport] | None = None,
+def format_plugin_installation_message(
+    filename: str,
+    suggested_plugins: list[dict[str, str]],
+    installed_plugins: set[str],
+    installable_plugins: list[dict[str, str]],
 ) -> str:
-    """Generate installation message for missing bioio plugins.
+    """Generate installation message for bioio plugins.
 
-    This function suggests which plugins to install based on file extension.
-    If a feasibility report is provided, it will filter out already-installed
-    plugins from the suggestions.
+    This function formats a helpful error message based on the plugin state.
+    Used internally by ReaderPluginManager.get_installation_message().
 
     Parameters
     ----------
-    path : Path or str
-        File path that couldn't be read
-    feasibility_report : dict, optional
-        Report from bioio.plugin_feasibility_report() showing installed plugins
+    filename : str
+        Name of the file that couldn't be read
+    suggested_plugins : list of dict
+        All plugins that could read this file type
+    installed_plugins : set of str
+        Names of plugins that are already installed
+    installable_plugins : list of dict
+        Non-core plugins that aren't installed but could read the file
 
     Returns
     -------
     str
-        Installation instructions for missing plugins
+        Formatted installation instructions
+
+    Notes
+    -----
+    This is a helper function used by ReaderPluginManager. Use the manager's
+    get_installation_message() method instead of calling this directly.
     """
-    from pathlib import Path
-
-    path = Path(path)
-    suggested_plugins = suggest_plugins_for_path(path)
-
     # No plugins found for this extension
     if not suggested_plugins:
         return (
-            f"\n\nNo bioio plugins found for '{path.name}' (extension: {path.suffix}).\n"
+            f"\n\nNo bioio plugins found for '{filename}'.\n"
             "See https://github.com/bioio-devs/bioio for available plugins."
         )
 
-    # Determine which plugins are already installed
-    installed_plugins = _get_installed_plugins(feasibility_report)
-
-    # Filter to get only plugins that aren't installed
-    if feasibility_report:
-        missing_plugins = _filter_installed_plugins(
-            suggested_plugins, feasibility_report
-        )
-    else:
-        missing_plugins = suggested_plugins
-
-    # Format the plugin list (filters out core plugins)
-    plugin_list = _format_plugin_list(missing_plugins)
+    # Format the plugin list (filters out core plugins automatically)
+    plugin_list = _format_plugin_list(installable_plugins)
 
     # Build appropriate message based on what's installed/missing
-    if installed_plugins and missing_plugins and plugin_list:
+    if installed_plugins and installable_plugins and plugin_list:
         # Case 1: Some plugins installed but failed, suggest alternatives
         installed_str = ", ".join(sorted(installed_plugins))
         return (
-            f"\n\nInstalled plugin '{installed_str}' failed to read '{path.name}'.\n"
+            f"\n\nInstalled plugin '{installed_str}' failed to read '{filename}'.\n"
             "Try one of these alternatives:\n\n"
             f"{plugin_list}"
             "\nRestart napari/Python after installing."
         )
 
-    if installed_plugins and not missing_plugins:
+    if installed_plugins and not installable_plugins:
         # Case 2: All suggested plugins already installed but still failed
         installed_str = ", ".join(sorted(installed_plugins))
         return (
-            f"\nFile '{path.name}' is supported by: {installed_str}\n"
+            f"\nFile '{filename}' is supported by: {installed_str}\n"
             "However, the plugin failed to read it.\n"
             "This may indicate a corrupt file or incompatible format variant."
         )
@@ -186,14 +176,14 @@ def get_missing_plugins_message(
     if plugin_list:
         # Case 3: No installed plugins, suggest installing
         return (
-            f"\n\nTo read '{path.name}', install one of:\n\n"
+            f"\n\nTo read '{filename}', install one of:\n\n"
             f"{plugin_list}"
             "\nRestart napari/Python after installing."
         )
 
     # Case 4: All suggested plugins are core plugins (already should be installed)
     return (
-        f"\n\nRequired plugins for '{path.name}' should already be installed.\n"
+        f"\n\nRequired plugins for '{filename}' should already be installed.\n"
         "If you're still having issues, check your installation or "
         "open an issue at https://github.com/ndev-kit/ndevio."
     )
@@ -253,73 +243,6 @@ def suggest_plugins_for_path(path: Path | str) -> list[dict[str, str]]:
             suggestions.append(info)
 
     return suggestions
-
-
-def _get_installed_plugins(
-    feasibility_report: dict[str, PluginSupport] | None,
-) -> set[str]:
-    """Extract installed plugin names from feasibility report.
-
-    The feasibility report from bioio.plugin_feasibility_report() includes
-    all installed plugins. The 'supported' field indicates whether each
-    plugin can read the specific file, but the presence of a plugin in the
-    report means it's installed.
-
-    Parameters
-    ----------
-    feasibility_report : dict, optional
-        Report from bioio.plugin_feasibility_report()
-
-    Returns
-    -------
-    set of str
-        Set of installed plugin names (excludes "ArrayLike")
-
-    Notes
-    -----
-    This is a helper function used internally by get_missing_plugins_message().
-    For plugin detection, use ReaderPluginManager.installed_plugins instead.
-    """
-    if not feasibility_report:
-        return set()
-
-    # If a plugin appears in the report, it's installed
-    return {name for name in feasibility_report if name != "ArrayLike"}
-
-
-def _filter_installed_plugins(
-    suggested_plugins: list[dict[str, str]],
-    feasibility_report: dict[str, PluginSupport] | None = None,
-) -> list[dict[str, str]]:
-    """Filter out already-installed plugins from a list of suggested plugins.
-
-    Parameters
-    ----------
-    suggested_plugins : list of dict
-        List of plugin info dicts from suggest_plugins_for_path()
-    feasibility_report : dict, optional
-        Report from bioio.plugin_feasibility_report() showing installed plugins.
-        If None, returns all suggested plugins unchanged.
-
-    Returns
-    -------
-    list of dict
-        List of plugins that are not already installed
-
-    Notes
-    -----
-    This is a helper function used internally by get_missing_plugins_message().
-    For plugin detection, use ReaderPluginManager.installable_plugins instead.
-    """
-    if not feasibility_report:
-        # No feasibility report, can't filter - return all
-        return suggested_plugins
-
-    # Determine which plugins are already installed
-    installed_plugins = _get_installed_plugins(feasibility_report)
-
-    # Filter to get plugins that aren't installed
-    return [p for p in suggested_plugins if p["name"] not in installed_plugins]
 
 
 def _format_plugin_list(plugins: list[dict[str, str]]) -> str:

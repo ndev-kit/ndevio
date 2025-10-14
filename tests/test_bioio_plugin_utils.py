@@ -128,22 +128,38 @@ class TestReaderPluginManager:
             assert "bioio-tifffile" in installable_names
 
 
-class TestGetMissingPluginsMessage:
-    """Test get_missing_plugins_message function."""
+class TestFormatPluginInstallationMessage:
+    """Test format_plugin_installation_message function."""
 
-    def test_czi_message_no_report(self):
-        """Test message generation for CZI without feasibility report."""
-        from ndevio._bioio_plugin_utils import get_missing_plugins_message
+    def test_czi_message_basic(self):
+        """Test message generation for CZI file."""
+        from ndevio._bioio_plugin_utils import (
+            format_plugin_installation_message,
+            suggest_plugins_for_path,
+        )
 
-        message = get_missing_plugins_message("test.czi")
+        suggested = suggest_plugins_for_path("test.czi")
+        message = format_plugin_installation_message(
+            filename="test.czi",
+            suggested_plugins=suggested,
+            installed_plugins=set(),
+            installable_plugins=suggested,
+        )
 
         assert "bioio-czi" in message
         assert "pip install" in message or "conda install" in message
 
     def test_unsupported_extension_message(self):
         """Test message for completely unsupported extension."""
-        from ndevio._bioio_plugin_utils import get_missing_plugins_message
+        from ndevio._bioio_plugin_utils import (
+            format_plugin_installation_message,
+        )
 
-        message = get_missing_plugins_message("test.xyz")
+        message = format_plugin_installation_message(
+            filename="test.xyz",
+            suggested_plugins=[],
+            installed_plugins=set(),
+            installable_plugins=[],
+        )
 
         assert "No bioio plugins found" in message or ".xyz" in message
