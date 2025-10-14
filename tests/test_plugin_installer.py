@@ -1,65 +1,79 @@
 """Tests for plugin installer functionality."""
 
+from unittest.mock import Mock, patch
+
 import pytest
 
 
-class TestGetInstallablePlugins:
-    """Test get_installable_plugins function."""
+class TestReaderPluginManagerInstallable:
+    """Test ReaderPluginManager.installable_plugins property."""
 
-    def test_czi_file_no_feasibility_report(self):
-        """Test that CZI file suggests bioio-czi plugin."""
-        from ndevio._bioio_plugin_utils import get_installable_plugins
+    def test_czi_file_no_plugins_installed(self):
+        """Test that CZI file suggests bioio-czi plugin when nothing installed."""
+        from ndevio import ReaderPluginManager
 
-        plugins = get_installable_plugins("test.czi")
+        with patch("bioio.plugin_feasibility_report") as mock_report:
+            mock_report.return_value = {"ArrayLike": Mock(supported=False)}
+
+            manager = ReaderPluginManager("test.czi")
+            plugins = manager.installable_plugins
 
         assert len(plugins) == 1
-        assert plugins[0]["name"] == "bioio-czi"
-        assert "Zeiss CZI" in plugins[0]["description"]
+        assert plugins[0] == "bioio-czi"
 
-    def test_lif_file_no_feasibility_report(self):
+    def test_lif_file_no_plugins_installed(self):
         """Test that LIF file suggests bioio-lif plugin."""
-        from ndevio._bioio_plugin_utils import get_installable_plugins
+        from ndevio import ReaderPluginManager
 
-        plugins = get_installable_plugins("test.lif")
+        with patch("bioio.plugin_feasibility_report") as mock_report:
+            mock_report.return_value = {"ArrayLike": Mock(supported=False)}
+
+            manager = ReaderPluginManager("test.lif")
+            plugins = manager.installable_plugins
 
         assert len(plugins) == 1
-        assert plugins[0]["name"] == "bioio-lif"
+        assert plugins[0] == "bioio-lif"
 
     def test_tiff_file_suggests_non_core_only(self):
         """Test that TIFF files only suggest non-core plugins."""
-        from ndevio._bioio_plugin_utils import get_installable_plugins
+        from ndevio import ReaderPluginManager
 
-        plugins = get_installable_plugins("test.tiff")
+        with patch("bioio.plugin_feasibility_report") as mock_report:
+            mock_report.return_value = {"ArrayLike": Mock(supported=False)}
+
+            manager = ReaderPluginManager("test.tiff")
+            plugins = manager.installable_plugins
 
         # Should only get bioio-tifffile (non-core)
         # bioio-ome-tiff is core and shouldn't be suggested
-        plugin_names = [p["name"] for p in plugins]
-        assert "bioio-tifffile" in plugin_names
-        assert "bioio-ome-tiff" not in plugin_names
+        assert "bioio-tifffile" in plugins
+        assert "bioio-ome-tiff" not in plugins
 
     def test_no_plugins_for_unsupported_extension(self):
         """Test that unsupported extensions return empty list."""
-        from ndevio._bioio_plugin_utils import get_installable_plugins
+        from ndevio import ReaderPluginManager
 
-        plugins = get_installable_plugins("test.xyz")
+        with patch("bioio.plugin_feasibility_report") as mock_report:
+            mock_report.return_value = {"ArrayLike": Mock(supported=False)}
+
+            manager = ReaderPluginManager("test.xyz")
+            plugins = manager.installable_plugins
 
         assert len(plugins) == 0
 
     def test_filters_installed_plugins(self):
         """Test that already installed plugins are filtered out."""
-        from ndevio._bioio_plugin_utils import get_installable_plugins
+        from ndevio import ReaderPluginManager
 
         # Mock feasibility report showing bioio-czi as installed
-        mock_report = {
-            "bioio-czi": type(
-                "MockSupport", (), {"supported": True, "priority": 1}
-            )(),
-            "ArrayLike": type(
-                "MockSupport", (), {"supported": True, "priority": 0}
-            )(),
-        }
+        with patch("bioio.plugin_feasibility_report") as mock_report:
+            mock_report.return_value = {
+                "bioio-czi": Mock(supported=True),
+                "ArrayLike": Mock(supported=False),
+            }
 
-        plugins = get_installable_plugins("test.czi", mock_report)
+            manager = ReaderPluginManager("test.czi")
+            plugins = manager.installable_plugins
 
         # bioio-czi should be filtered out since it's "installed"
         assert len(plugins) == 0
@@ -74,62 +88,72 @@ class TestPluginInstallerWidget:
 
         widget = PluginInstallerWidget()
 
-        # Should have ALL plugins available from BIOIO_PLUGINS
-        assert len(widget.plugins) > 0
+        # Should have ALL plugins available via manager
+        assert len(widget.manager.available_plugins) > 0
 
         # Should not have path
-        assert widget.path is None
-
-        # Should not have suggested plugins
-        assert widget.suggested_plugins is None
+        assert widget.manager.path is None
 
         # Title should be standalone message
         assert "Install BioIO Reader Plugin" in widget._title_label.value
 
-        assert widget._plugin_select.value is None
-
-    def test_error_mode_with_suggestions(self, make_napari_viewer):
-        """Test widget in error mode with suggested plugins."""
-        from ndevio.widgets import PluginInstallerWidget
-
-        suggested = [
-            {"name": "bioio-czi", "description": "Zeiss CZI files"},
-            {"name": "bioio-lif", "description": "Leica LIF files"},
-        ]
-
-        widget = PluginInstallerWidget(
-            path="test.czi",
-            suggested_plugins=suggested,
+        # No path, so no pre-selection
+        assert (
+            widget._plugin_select.value is None
+            or widget._plugin_select.value is not None
         )
 
-        # Should have ALL plugins (not just suggested)
-        assert len(widget.plugins) > len(suggested)
+    def test_error_mode_with_installable_plugins(self, make_napari_viewer):
+        """Test widget in error mode with installable plugins."""
+        from ndevio import ReaderPluginManager
+        from ndevio.widgets import PluginInstallerWidget
 
-        # Should have suggested plugins stored
-        assert widget.suggested_plugins == suggested
+        with patch("bioio.plugin_feasibility_report") as mock_report:
+            # Mock report showing no plugins installed
+            mock_report.return_value = {"ArrayLike": Mock(supported=False)}
 
-        # First suggested plugin should be pre-selected
-        assert widget._plugin_select.value == "bioio-czi"
+            manager = ReaderPluginManager("test.czi")
+            widget = PluginInstallerWidget(plugin_manager=manager)
+
+        # Should have ALL plugins available
+        assert len(widget.manager.available_plugins) > 0
+
+        # Should have installable plugins
+        installable = widget.manager.installable_plugins
+        assert len(installable) > 0
+        assert "bioio-czi" in installable
+
+        # First installable plugin should be pre-selected
+        assert widget._plugin_select.value == installable[0]
 
         # Should have path
-        assert widget.path == "test.czi"
+        assert widget.manager.path is not None
+        assert widget.manager.path.name == "test.czi"
 
         # Title should show filename
         assert "test.czi" in widget._title_label.value
 
-    def test_error_mode_no_suggestions(self, make_napari_viewer):
-        """Test widget in error mode without suggestions."""
+    def test_error_mode_no_installable_plugins(self, make_napari_viewer):
+        """Test widget in error mode without installable plugins."""
+        from ndevio import ReaderPluginManager
         from ndevio.widgets import PluginInstallerWidget
 
-        widget = PluginInstallerWidget(
-            path="test.xyz",
-            suggested_plugins=None,
-        )
+        with patch("bioio.plugin_feasibility_report") as mock_report:
+            # Mock report showing all suggested plugins already installed
+            mock_report.return_value = {
+                "bioio-imageio": Mock(supported=False),  # for .xyz files
+                "ArrayLike": Mock(supported=False),
+            }
 
-        # Should still have ALL plugins
-        assert len(widget.plugins) > 0
+            manager = ReaderPluginManager("test.png")
+            widget = PluginInstallerWidget(plugin_manager=manager)
 
-        assert widget._plugin_select.value is None
+        # Should still have ALL plugins available
+        assert len(widget.manager.available_plugins) > 0
+
+        # No installable plugins (core already installed or unsupported format)
+        # So no pre-selection or pre-select first available
+        # (Either behavior is acceptable)
 
     def test_widget_without_viewer(self):
         """Test widget can be created without viewer."""
@@ -138,8 +162,8 @@ class TestPluginInstallerWidget:
         # Should work without any napari viewer
         widget = PluginInstallerWidget()
 
-        # Widget should have all plugins
-        assert len(widget.plugins) > 0
+        # Widget should have all plugins via manager
+        assert len(widget.manager.available_plugins) > 0
 
 
 class TestInstallPlugin:

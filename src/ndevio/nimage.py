@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import contextlib
-import importlib
 import logging
 from pathlib import Path
 
@@ -70,10 +69,9 @@ def determine_reader_plugin(
         installation suggestions for missing plugins.
 
     """
-    from bioio import plugin_feasibility_report as pfr
     from bioio_base.exceptions import UnsupportedFileFormatError
 
-    from ._bioio_plugin_utils import get_missing_plugins_message
+    from ._plugin_manager import ReaderPluginManager
 
     settings = get_settings()
 
@@ -81,31 +79,33 @@ def determine_reader_plugin(
         preferred_reader or settings.ndevio_Reader.preferred_reader  # type: ignore
     )
 
-    fr = pfr(image)
+    # Only use ReaderPluginManager for file paths, not arrays
+    if isinstance(image, str | Path):
+        manager = ReaderPluginManager(image)
+        reader = manager.get_working_reader(preferred_reader)
 
-    if preferred_reader in fr and fr[preferred_reader].supported:
-        reader_module = importlib.import_module(
-            preferred_reader.replace("-", "_")
-        )
-        return reader_module.Reader
+        if reader:
+            return reader
 
-    try:
-        return nImage.determine_plugin(image).metadata.get_reader()
-    except UnsupportedFileFormatError:
-        # Generate helpful error message with plugin installation suggestions
-        # Only provide suggestions for file paths, not arrays
-        if (
-            isinstance(image, str | Path)
-            and settings.ndevio_Reader.suggest_reader_plugins  # type: ignore
-        ):
-            helpful_message = get_missing_plugins_message(image, fr)
+        # No reader found - raise with helpful message if enabled
+        if settings.ndevio_Reader.suggest_reader_plugins:  # type: ignore
             raise UnsupportedFileFormatError(
                 reader_name="ndevio",
                 path=str(image),
-                msg_extra=helpful_message,
-            ) from None
+                msg_extra=manager.get_installation_message(),
+            )
         else:
-            # Re-raise original error if not a path or suggestions disabled
+            # Re-raise without suggestions
+            raise UnsupportedFileFormatError(
+                reader_name="ndevio",
+                path=str(image),
+            )
+    else:
+        # For arrays, use bioio's built-in plugin determination
+        try:
+            return nImage.determine_plugin(image).metadata.get_reader()
+        except UnsupportedFileFormatError:
+            # Re-raise for non-file inputs
             raise
 
 

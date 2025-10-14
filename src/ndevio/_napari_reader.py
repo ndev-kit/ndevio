@@ -189,28 +189,17 @@ def _open_plugin_installer(
     """
 
     import napari
-    from bioio import plugin_feasibility_report
 
-    from ._bioio_plugin_utils import (
-        filter_installed_plugins,
-        suggest_plugins_for_path,
-    )
+    from ._plugin_manager import ReaderPluginManager
     from .widgets import PluginInstallerWidget
 
     # Get viewer, handle case where no viewer available
     viewer = napari.current_viewer()
 
-    # Get plugin suggestions for this file
-    suggested_plugins = suggest_plugins_for_path(path)
+    # Create plugin manager for this file
+    manager = ReaderPluginManager(path)
 
-    report = plugin_feasibility_report(path)
-
-    # Filter out already-installed plugins
-    uninstalled_plugins = filter_installed_plugins(suggested_plugins, report)
-
-    widget = PluginInstallerWidget(
-        path=path, suggested_plugins=uninstalled_plugins
-    )
+    widget = PluginInstallerWidget(plugin_manager=manager)
     viewer.window.add_dock_widget(
         widget,
         area="right",

@@ -11,8 +11,7 @@ class TestSuggestPluginsForPath:
         plugins = suggest_plugins_for_path("test.czi")
 
         assert len(plugins) == 1
-        assert plugins[0]["name"] == "bioio-czi"
-        assert "Zeiss CZI" in plugins[0]["description"]
+        assert plugins[0] == "bioio-czi"
 
     def test_lif_file(self):
         """Test that LIF file suggests bioio-lif."""
@@ -21,7 +20,7 @@ class TestSuggestPluginsForPath:
         plugins = suggest_plugins_for_path("test.lif")
 
         assert len(plugins) == 1
-        assert plugins[0]["name"] == "bioio-lif"
+        assert plugins[0] == "bioio-lif"
 
     def test_tiff_file_suggests_all(self):
         """Test that TIFF files suggest all TIFF-compatible plugins."""
@@ -30,10 +29,9 @@ class TestSuggestPluginsForPath:
         plugins = suggest_plugins_for_path("test.tiff")
 
         # Should get bioio-ome-tiff, bioio-tifffile, bioio-tiff-glob
-        plugin_names = [p["name"] for p in plugins]
-        assert "bioio-ome-tiff" in plugin_names
-        assert "bioio-tifffile" in plugin_names
-        assert "bioio-tiff-glob" in plugin_names
+        assert "bioio-ome-tiff" in plugins
+        assert "bioio-tifffile" in plugins
+        assert "bioio-tiff-glob" in plugins
 
     def test_unsupported_extension(self):
         """Test that unsupported extensions return empty list."""
@@ -44,89 +42,113 @@ class TestSuggestPluginsForPath:
         assert len(plugins) == 0
 
 
-class TestFilterInstalledPlugins:
-    """Test filter_installed_plugins function."""
+class TestReaderPluginManager:
+    """Test ReaderPluginManager class."""
 
-    def test_filters_out_installed_plugins(self):
-        """Test that installed plugins are filtered from suggestions."""
-        from ndevio._bioio_plugin_utils import filter_installed_plugins
+    def test_manager_filters_installed_plugins(self):
+        """Test that manager correctly identifies installable plugins."""
+        from unittest.mock import Mock, patch
 
-        suggested = [
-            {"name": "bioio-czi", "description": "Zeiss CZI files"},
-            {"name": "bioio-lif", "description": "Leica LIF files"},
-        ]
+        from ndevio import ReaderPluginManager
 
         # Mock feasibility report showing bioio-czi as installed
-        # (presence in report means it's installed, regardless of 'supported')
-        mock_report = {
-            "bioio-czi": type("MockSupport", (), {"supported": False})(),
-            "ArrayLike": type("MockSupport", (), {"supported": True})(),
-        }
+        with patch("bioio.plugin_feasibility_report") as mock_report:
+            mock_report.return_value = {
+                "bioio-czi": Mock(supported=False),
+                "ArrayLike": Mock(supported=False),
+            }
 
-        filtered = filter_installed_plugins(suggested, mock_report)
+            manager = ReaderPluginManager("test.czi")
 
-        # bioio-czi should be filtered out, bioio-lif should remain
-        assert len(filtered) == 1
-        assert filtered[0]["name"] == "bioio-lif"
+            # bioio-czi should be in installed_plugins
+            assert "bioio-czi" in manager.installed_plugins
 
-    def test_no_feasibility_report(self):
-        """Test that None feasibility report returns all suggestions."""
-        from ndevio._bioio_plugin_utils import filter_installed_plugins
+            # bioio-czi should NOT be in installable_plugins (already installed)
+            assert "bioio-czi" not in manager.installable_plugins
 
-        suggested = [
-            {"name": "bioio-czi", "description": "Zeiss CZI files"},
-            {"name": "bioio-lif", "description": "Leica LIF files"},
-        ]
+    def test_manager_suggests_uninstalled_plugins(self):
+        """Test that manager suggests uninstalled plugins."""
+        from unittest.mock import Mock, patch
 
-        # None report should return everything
-        filtered = filter_installed_plugins(suggested, None)
+        from ndevio import ReaderPluginManager
 
-        assert len(filtered) == 2
+        # Mock feasibility report with no bioio-lif installed
+        with patch("bioio.plugin_feasibility_report") as mock_report:
+            mock_report.return_value = {
+                "bioio-ome-tiff": Mock(supported=False),
+                "ArrayLike": Mock(supported=False),
+            }
 
-    def test_core_plugins_in_report(self):
-        """Test that core plugins appearing in report are filtered correctly."""
-        from ndevio._bioio_plugin_utils import filter_installed_plugins
+            manager = ReaderPluginManager("test.lif")
 
-        suggested = [
-            {
-                "name": "bioio-ome-tiff",
-                "description": "OME-TIFF",
-                "core": True,
-            },
-            {"name": "bioio-tifffile", "description": "TIFF files"},
-        ]
+            # bioio-lif should be in suggested_plugins
+            assert "bioio-lif" in manager.suggested_plugins
 
-        # bioio-ome-tiff is in the report (installed) even though it
-        # couldn't read this particular file
-        mock_report = {
-            "bioio-ome-tiff": type("MockSupport", (), {"supported": False})(),
-            "ArrayLike": type("MockSupport", (), {"supported": True})(),
-        }
+            # bioio-lif should also be in installable_plugins
+            assert "bioio-lif" in manager.installable_plugins
 
-        filtered = filter_installed_plugins(suggested, mock_report)
+    def test_manager_excludes_core_plugins_from_installable(self):
+        """Test that core plugins are excluded from installable list."""
+        from unittest.mock import Mock, patch
 
-        # bioio-ome-tiff should be filtered out (it's installed)
-        # bioio-tifffile should remain
-        assert len(filtered) == 1
-        assert filtered[0]["name"] == "bioio-tifffile"
+        from ndevio import ReaderPluginManager
+
+        # Mock report showing no plugins installed
+        with patch("bioio.plugin_feasibility_report") as mock_report:
+            mock_report.return_value = {
+                "ArrayLike": Mock(supported=False),
+            }
+
+            manager = ReaderPluginManager("test.tiff")
+
+            # Core plugins (like bioio-ome-tiff) should not be in installable
+            installable_plugins = manager.installable_plugins
+
+            # bioio-ome-tiff is a core plugin, shouldn't need installation
+            core_plugins = [
+                "bioio-ome-tiff",
+                "bioio-imageio",
+                "bioio-ome-zarr",
+            ]
+            for core in core_plugins:
+                assert core not in installable_plugins
+
+            # bioio-tifffile is not core, should be installable
+            assert "bioio-tifffile" in installable_plugins
 
 
-class TestGetMissingPluginsMessage:
-    """Test get_missing_plugins_message function."""
+class TestFormatPluginInstallationMessage:
+    """Test format_plugin_installation_message function."""
 
-    def test_czi_message_no_report(self):
-        """Test message generation for CZI without feasibility report."""
-        from ndevio._bioio_plugin_utils import get_missing_plugins_message
+    def test_czi_message_basic(self):
+        """Test message generation for CZI file."""
+        from ndevio._bioio_plugin_utils import (
+            format_plugin_installation_message,
+            suggest_plugins_for_path,
+        )
 
-        message = get_missing_plugins_message("test.czi")
+        suggested = suggest_plugins_for_path("test.czi")
+        message = format_plugin_installation_message(
+            filename="test.czi",
+            suggested_plugins=suggested,
+            installed_plugins=set(),
+            installable_plugins=suggested,
+        )
 
         assert "bioio-czi" in message
         assert "pip install" in message or "conda install" in message
 
     def test_unsupported_extension_message(self):
         """Test message for completely unsupported extension."""
-        from ndevio._bioio_plugin_utils import get_missing_plugins_message
+        from ndevio._bioio_plugin_utils import (
+            format_plugin_installation_message,
+        )
 
-        message = get_missing_plugins_message("test.xyz")
+        message = format_plugin_installation_message(
+            filename="test.xyz",
+            suggested_plugins=[],
+            installed_plugins=set(),
+            installable_plugins=[],
+        )
 
         assert "No bioio plugins found" in message or ".xyz" in message
