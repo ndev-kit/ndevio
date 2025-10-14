@@ -19,8 +19,7 @@ class TestReaderPluginManagerInstallable:
             plugins = manager.installable_plugins
 
         assert len(plugins) == 1
-        assert plugins[0]["name"] == "bioio-czi"
-        assert "Zeiss CZI" in plugins[0]["description"]
+        assert plugins[0] == "bioio-czi"
 
     def test_lif_file_no_plugins_installed(self):
         """Test that LIF file suggests bioio-lif plugin."""
@@ -33,7 +32,7 @@ class TestReaderPluginManagerInstallable:
             plugins = manager.installable_plugins
 
         assert len(plugins) == 1
-        assert plugins[0]["name"] == "bioio-lif"
+        assert plugins[0] == "bioio-lif"
 
     def test_tiff_file_suggests_non_core_only(self):
         """Test that TIFF files only suggest non-core plugins."""
@@ -47,9 +46,8 @@ class TestReaderPluginManagerInstallable:
 
         # Should only get bioio-tifffile (non-core)
         # bioio-ome-tiff is core and shouldn't be suggested
-        plugin_names = [p["name"] for p in plugins]
-        assert "bioio-tifffile" in plugin_names
-        assert "bioio-ome-tiff" not in plugin_names
+        assert "bioio-tifffile" in plugins
+        assert "bioio-ome-tiff" not in plugins
 
     def test_no_plugins_for_unsupported_extension(self):
         """Test that unsupported extensions return empty list."""
@@ -123,10 +121,10 @@ class TestPluginInstallerWidget:
         # Should have installable plugins
         installable = widget.manager.installable_plugins
         assert len(installable) > 0
-        assert any(p["name"] == "bioio-czi" for p in installable)
+        assert "bioio-czi" in installable
 
         # First installable plugin should be pre-selected
-        assert widget._plugin_select.value == installable[0]["name"]
+        assert widget._plugin_select.value == installable[0]
 
         # Should have path
         assert widget.manager.path is not None

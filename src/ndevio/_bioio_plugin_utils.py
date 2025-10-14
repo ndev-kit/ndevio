@@ -113,9 +113,9 @@ for plugin_name, info in BIOIO_PLUGINS.items():
 
 def format_plugin_installation_message(
     filename: str,
-    suggested_plugins: list[dict[str, str]],
+    suggested_plugins: list[str],
     installed_plugins: set[str],
-    installable_plugins: list[dict[str, str]],
+    installable_plugins: list[str],
 ) -> str:
     """Generate installation message for bioio plugins.
 
@@ -126,12 +126,12 @@ def format_plugin_installation_message(
     ----------
     filename : str
         Name of the file that couldn't be read
-    suggested_plugins : list of dict
-        All plugins that could read this file type
+    suggested_plugins : list of str
+        Names of all plugins that could read this file type
     installed_plugins : set of str
         Names of plugins that are already installed
-    installable_plugins : list of dict
-        Non-core plugins that aren't installed but could read the file
+    installable_plugins : list of str
+        Names of non-core plugins that aren't installed but could read the file
 
     Returns
     -------
@@ -189,10 +189,10 @@ def format_plugin_installation_message(
     )
 
 
-def suggest_plugins_for_path(path: Path | str) -> list[dict[str, str]]:
-    """Get list of bioio plugins that could read the given file.
+def suggest_plugins_for_path(path: Path | str) -> list[str]:
+    """Get list of bioio plugin names that could read the given file.
 
-    Returns all plugins that support the file's extension, regardless of
+    Returns all plugin names that support the file's extension, regardless of
     whether they're installed or core plugins.
 
     Parameters
@@ -202,16 +202,15 @@ def suggest_plugins_for_path(path: Path | str) -> list[dict[str, str]]:
 
     Returns
     -------
-    list of dict
-        List of plugin info dicts with keys: name, description, repository,
-        extensions, and optionally 'core' and 'note'.
-        Each dict represents a bioio plugin that could read this file.
+    list of str
+        List of plugin names (e.g., 'bioio-czi', 'bioio-ome-tiff') that
+        could read this file. Empty list if no plugins support the extension.
 
     Examples
     --------
     >>> from ndevio._bioio_plugin_utils import suggest_plugins_for_path
     >>> plugins = suggest_plugins_for_path("image.czi")
-    >>> print(plugins[0]["name"])
+    >>> print(plugins[0])
     'bioio-czi'
     """
     from pathlib import Path
@@ -228,37 +227,48 @@ def suggest_plugins_for_path(path: Path | str) -> list[dict[str, str]]:
                 and len(ext.split(".")) > 2
                 and filename.endswith(ext)
             ):
-                result = info.copy()
-                result["name"] = plugin_name
-                return [result]
+                return [plugin_name]
 
     # Fall back to simple extension matching
     file_ext = path.suffix.lower()
-    suggestions = []
 
     if file_ext in _EXTENSION_TO_PLUGIN:
-        for plugin_name in _EXTENSION_TO_PLUGIN[file_ext]:
-            info = BIOIO_PLUGINS[plugin_name].copy()
-            info["name"] = plugin_name
-            suggestions.append(info)
+        return _EXTENSION_TO_PLUGIN[file_ext].copy()
 
-    return suggestions
+    return []
 
 
-def _format_plugin_list(plugins: list[dict[str, str]]) -> str:
-    """Format a list of plugins with installation instructions."""
-    # Filter out core plugins (already installed with ndevio)
-    non_core = [p for p in plugins if not p.get("core", False)]
+def _format_plugin_list(plugin_names: list[str]) -> str:
+    """Format a list of plugin names with installation instructions.
 
-    if not non_core:
+    Parameters
+    ----------
+    plugin_names : list of str
+        Plugin names to format (e.g., ['bioio-czi', 'bioio-lif'])
+
+    Returns
+    -------
+    str
+        Formatted installation instructions
+    """
+    if not plugin_names:
         return ""
 
     lines = []
-    for plugin in non_core:
-        lines.append(f"  • {plugin['name']}")
-        lines.append(f"    {plugin['description']}")
-        if plugin.get("note"):
-            lines.append(f"    Note: {plugin['note']}")
-        lines.append(f"    Install: pip install {plugin['name']}\n")
+    for plugin_name in plugin_names:
+        # Look up plugin info from registry
+        info = BIOIO_PLUGINS.get(plugin_name)
+        if not info:
+            continue
+
+        # Skip core plugins (already installed with ndevio)
+        if info.get("core", False):
+            continue
+
+        lines.append(f"  • {plugin_name}")
+        lines.append(f"    {info['description']}")
+        if info.get("note"):
+            lines.append(f"    Note: {info['note']}")
+        lines.append(f"    Install: pip install {plugin_name}\n")
 
     return "\n".join(lines)

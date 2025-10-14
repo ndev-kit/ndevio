@@ -109,8 +109,7 @@ class TestOpenPluginInstaller:
         # bioio-czi should be filtered out from installable_plugins
         installable = widget.manager.installable_plugins
         if installable:
-            plugin_names = [p["name"] for p in installable]
-            assert "bioio-czi" not in plugin_names
+            assert "bioio-czi" not in installable
 
     def test_suggests_uninstalled_plugins(self, make_napari_viewer):
         """Test that uninstalled plugins are suggested."""
@@ -146,8 +145,7 @@ class TestOpenPluginInstaller:
         # bioio-lif should be in installable_plugins
         installable = widget.manager.installable_plugins
         assert installable is not None
-        plugin_names = [p["name"] for p in installable]
-        assert "bioio-lif" in plugin_names
+        assert "bioio-lif" in installable
 
 
 class TestPluginInstallerWidgetIntegration:
@@ -177,7 +175,7 @@ class TestPluginInstallerWidgetIntegration:
 
         # bioio-czi should be in installable plugins and pre-selected
         installable = widget.manager.installable_plugins
-        assert any(p["name"] == "bioio-czi" for p in installable)
+        assert "bioio-czi" in installable
         assert widget._plugin_select.value == "bioio-czi"
 
     def test_install_button_queues_installation(self, make_napari_viewer):
@@ -211,7 +209,7 @@ class TestPluginInstallerWidgetIntegration:
         widget = PluginInstallerWidget()
 
         # Should have all plugins from manager's available_plugins
-        plugin_names = [p["name"] for p in widget.manager.available_plugins]
+        plugin_names = widget.manager.available_plugins
         expected_names = list(BIOIO_PLUGINS.keys())
 
         assert set(plugin_names) == set(expected_names)
@@ -235,7 +233,7 @@ class TestPluginInstallerWidgetIntegration:
         # bioio-lif should be pre-selected (first installable)
         installable = widget.manager.installable_plugins
         if installable:
-            assert widget._plugin_select.value == installable[0]["name"]
+            assert widget._plugin_select.value == installable[0]
 
     def test_install_updates_status_label(self, make_napari_viewer):
         """Test that status label updates during installation."""

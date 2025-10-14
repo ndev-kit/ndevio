@@ -95,27 +95,24 @@ class ReaderPluginManager:
         self._available_plugins = None  # Cached
 
     @property
-    def available_plugins(self) -> list[dict]:
-        """Get all known bioio plugins from BIOIO_PLUGINS.
+    def available_plugins(self) -> list[str]:
+        """Get all known bioio plugin names from BIOIO_PLUGINS.
 
         Returns
         -------
-        list of dict
-            List of plugin info dicts with keys: name, extensions, description,
-            repository, and optionally 'core' and 'note'.
+        list of str
+            List of plugin names (e.g., ['bioio-czi', 'bioio-ome-tiff', ...]).
 
         Examples
         --------
         >>> manager = ReaderPluginManager()
-        >>> for plugin in manager.available_plugins:
-        ...     print(plugin["name"], plugin["description"])
+        >>> print(manager.available_plugins)
+        ['bioio-czi', 'bioio-dv', 'bioio-imageio', ...]
         """
         if self._available_plugins is None:
             from ._bioio_plugin_utils import BIOIO_PLUGINS
 
-            self._available_plugins = [
-                {"name": name, **info} for name, info in BIOIO_PLUGINS.items()
-            ]
+            self._available_plugins = list(BIOIO_PLUGINS.keys())
         return self._available_plugins
 
     @property
@@ -170,22 +167,22 @@ class ReaderPluginManager:
         return {name for name in report if name != "ArrayLike"}
 
     @property
-    def suggested_plugins(self) -> list[dict]:
-        """Get plugins that could read the current file (installed or not).
+    def suggested_plugins(self) -> list[str]:
+        """Get plugin names that could read the current file (installed or not).
 
-        Based on file extension, returns all plugins that declare support for
-        this file type, regardless of installation status.
+        Based on file extension, returns all plugin names that declare support
+        for this file type, regardless of installation status.
 
         Returns
         -------
-        list of dict
-            List of plugin info dicts. Empty list if no path is set.
+        list of str
+            List of plugin names (e.g., ['bioio-czi']). Empty list if no path.
 
         Examples
         --------
         >>> manager = ReaderPluginManager("image.czi")
-        >>> plugins = manager.suggested_plugins
-        >>> # Typically returns [{"name": "bioio-czi", ...}]
+        >>> print(manager.suggested_plugins)
+        ['bioio-czi']
         """
         if not self.path:
             return []
@@ -195,33 +192,35 @@ class ReaderPluginManager:
         return suggest_plugins_for_path(self.path)
 
     @property
-    def installable_plugins(self) -> list[dict]:
-        """Get non-core plugins that aren't installed but could read the file.
+    def installable_plugins(self) -> list[str]:
+        """Get non-core plugin names that aren't installed but could read the file.
 
         This is the key property for suggesting plugins to install. It filters
         out core plugins (bundled with bioio) and already-installed plugins.
 
         Returns
         -------
-        list of dict
-            List of plugin info dicts for plugins that should be installed.
+        list of str
+            List of plugin names that should be installed.
             Empty list if no path is set or all suitable plugins are installed.
 
         Examples
         --------
         >>> manager = ReaderPluginManager("image.czi")
         >>> if manager.installable_plugins:
-        ...     plugin = manager.installable_plugins[0]
-        ...     print(f"Install: pip install {plugin['name']}")
+        ...     print(f"Install: pip install {manager.installable_plugins[0]}")
         """
+        from ._bioio_plugin_utils import BIOIO_PLUGINS
+
         suggested = self.suggested_plugins
+        installed = self.installed_plugins
 
         # Filter out core plugins and installed plugins
         return [
-            p
-            for p in suggested
-            if not p.get("core", False)
-            and p["name"] not in self.installed_plugins
+            plugin_name
+            for plugin_name in suggested
+            if not BIOIO_PLUGINS.get(plugin_name, {}).get("core", False)
+            and plugin_name not in installed
         ]
 
     def get_working_reader(

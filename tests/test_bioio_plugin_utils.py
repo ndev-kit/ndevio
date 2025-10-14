@@ -11,8 +11,7 @@ class TestSuggestPluginsForPath:
         plugins = suggest_plugins_for_path("test.czi")
 
         assert len(plugins) == 1
-        assert plugins[0]["name"] == "bioio-czi"
-        assert "Zeiss CZI" in plugins[0]["description"]
+        assert plugins[0] == "bioio-czi"
 
     def test_lif_file(self):
         """Test that LIF file suggests bioio-lif."""
@@ -21,7 +20,7 @@ class TestSuggestPluginsForPath:
         plugins = suggest_plugins_for_path("test.lif")
 
         assert len(plugins) == 1
-        assert plugins[0]["name"] == "bioio-lif"
+        assert plugins[0] == "bioio-lif"
 
     def test_tiff_file_suggests_all(self):
         """Test that TIFF files suggest all TIFF-compatible plugins."""
@@ -30,10 +29,9 @@ class TestSuggestPluginsForPath:
         plugins = suggest_plugins_for_path("test.tiff")
 
         # Should get bioio-ome-tiff, bioio-tifffile, bioio-tiff-glob
-        plugin_names = [p["name"] for p in plugins]
-        assert "bioio-ome-tiff" in plugin_names
-        assert "bioio-tifffile" in plugin_names
-        assert "bioio-tiff-glob" in plugin_names
+        assert "bioio-ome-tiff" in plugins
+        assert "bioio-tifffile" in plugins
+        assert "bioio-tiff-glob" in plugins
 
     def test_unsupported_extension(self):
         """Test that unsupported extensions return empty list."""
@@ -66,10 +64,7 @@ class TestReaderPluginManager:
             assert "bioio-czi" in manager.installed_plugins
 
             # bioio-czi should NOT be in installable_plugins (already installed)
-            installable_names = [
-                p["name"] for p in manager.installable_plugins
-            ]
-            assert "bioio-czi" not in installable_names
+            assert "bioio-czi" not in manager.installable_plugins
 
     def test_manager_suggests_uninstalled_plugins(self):
         """Test that manager suggests uninstalled plugins."""
@@ -87,14 +82,10 @@ class TestReaderPluginManager:
             manager = ReaderPluginManager("test.lif")
 
             # bioio-lif should be in suggested_plugins
-            suggested_names = [p["name"] for p in manager.suggested_plugins]
-            assert "bioio-lif" in suggested_names
+            assert "bioio-lif" in manager.suggested_plugins
 
             # bioio-lif should also be in installable_plugins
-            installable_names = [
-                p["name"] for p in manager.installable_plugins
-            ]
-            assert "bioio-lif" in installable_names
+            assert "bioio-lif" in manager.installable_plugins
 
     def test_manager_excludes_core_plugins_from_installable(self):
         """Test that core plugins are excluded from installable list."""
@@ -111,9 +102,7 @@ class TestReaderPluginManager:
             manager = ReaderPluginManager("test.tiff")
 
             # Core plugins (like bioio-ome-tiff) should not be in installable
-            installable_names = [
-                p["name"] for p in manager.installable_plugins
-            ]
+            installable_plugins = manager.installable_plugins
 
             # bioio-ome-tiff is a core plugin, shouldn't need installation
             core_plugins = [
@@ -122,10 +111,10 @@ class TestReaderPluginManager:
                 "bioio-ome-zarr",
             ]
             for core in core_plugins:
-                assert core not in installable_names
+                assert core not in installable_plugins
 
             # bioio-tifffile is not core, should be installable
-            assert "bioio-tifffile" in installable_names
+            assert "bioio-tifffile" in installable_plugins
 
 
 class TestFormatPluginInstallationMessage:

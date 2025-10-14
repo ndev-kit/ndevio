@@ -93,8 +93,8 @@ class PluginInstallerWidget(Container):
         self._info_label = Label(value="Select a plugin to install:")
         self.append(self._info_label)
 
-        # Get all available plugins from manager
-        plugin_names = [p["name"] for p in self.manager.available_plugins]
+        # Get all available plugin names from manager
+        plugin_names = self.manager.available_plugins
 
         self._plugin_select = ComboBox(
             label="Plugin",
@@ -106,7 +106,7 @@ class PluginInstallerWidget(Container):
         # If there are installable plugins, pre-select the first one
         installable = self.manager.installable_plugins
         if installable:
-            self._plugin_select.value = installable[0]["name"]
+            self._plugin_select.value = installable[0]
 
         self.append(self._plugin_select)
 
