@@ -285,7 +285,11 @@ class nImage(BioImage):
         # Build metadata under various condition
         # add channel_axis if unpacking channels as layers
         if IS_MULTICHANNEL:
-            channel_names = self.napari_data.coords[CHANNEL_DIM].data.tolist()
+            # Convert to plain Python strings to avoid numpy string types (NumPy 2.0+)
+            channel_names = [
+                str(c)
+                for c in self.napari_data.coords[CHANNEL_DIM].data.tolist()
+            ]
 
             if self.settings.ndevio_Reader.unpack_channels_as_layers:
                 meta["channel_axis"] = self.napari_data.dims.index(CHANNEL_DIM)

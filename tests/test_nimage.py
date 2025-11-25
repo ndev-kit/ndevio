@@ -207,7 +207,6 @@ def test_get_napari_image_data_mosaic_tile_not_in_memory(
             None,
         ),  # OME-TIFF works with bioio-ome-tiff (core)
         (CZI_FILE, False, "bioio-czi"),  # CZI needs bioio-czi plugin
-        # RGB_TIFF now works with bioio-tifffile (core)
         (RGB_TIFF, True, None),
     ],
 )
@@ -260,7 +259,7 @@ def test_determine_reader_plugin_behavior(
         (LOGO_PNG, True, None),
         (CELLS3D2CH_OME_TIFF, True, None),
         (CZI_FILE, False, ["bioio-czi", "Zeiss CZI files"]),
-        (RGB_TIFF, True, None),  # Now works with bioio-tifffile (core)
+        (RGB_TIFF, True, None),
     ],
 )
 def test_nimage_init_with_various_formats(
