@@ -101,20 +101,21 @@ class TestReaderPluginManager:
 
             manager = ReaderPluginManager("test.tiff")
 
-            # Core plugins (like bioio-ome-tiff) should not be in installable
+            # Core plugins should not be in installable
             installable_plugins = manager.installable_plugins
 
-            # bioio-ome-tiff is a core plugin, shouldn't need installation
+            # These are core plugins, shouldn't need installation
             core_plugins = [
                 "bioio-ome-tiff",
                 "bioio-imageio",
                 "bioio-ome-zarr",
+                "bioio-tifffile",
             ]
             for core in core_plugins:
                 assert core not in installable_plugins
 
-            # bioio-tifffile is not core, should be installable
-            assert "bioio-tifffile" in installable_plugins
+            # bioio-tiff-glob is not core, should be installable
+            assert "bioio-tiff-glob" in installable_plugins
 
 
 class TestFormatPluginInstallationMessage:

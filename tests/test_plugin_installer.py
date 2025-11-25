@@ -44,10 +44,11 @@ class TestReaderPluginManagerInstallable:
             manager = ReaderPluginManager("test.tiff")
             plugins = manager.installable_plugins
 
-        # Should only get bioio-tifffile (non-core)
-        # bioio-ome-tiff is core and shouldn't be suggested
-        assert "bioio-tifffile" in plugins
+        # Should only get bioio-tiff-glob (non-core)
+        # bioio-ome-tiff and bioio-tifffile are core and shouldn't be suggested
+        assert "bioio-tiff-glob" in plugins
         assert "bioio-ome-tiff" not in plugins
+        assert "bioio-tifffile" not in plugins
 
     def test_no_plugins_for_unsupported_extension(self):
         """Test that unsupported extensions return empty list."""

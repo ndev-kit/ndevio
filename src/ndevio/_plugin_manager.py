@@ -230,8 +230,9 @@ class ReaderPluginManager:
 
         Tries readers in priority order:
         1. Preferred reader if it's installed and supported
-        2. Any installed reader that supports the file
-        3. None if no working reader found
+        2. Readers from BIOIO_PLUGINS dict order (highest priority first)
+        3. Any other installed reader that supports the file
+        4. None if no working reader found
 
         Parameters
         ----------
@@ -243,6 +244,12 @@ class ReaderPluginManager:
         Reader or None
             Reader class that can read the file, or None if no suitable
             reader is installed.
+
+        Notes
+        -----
+        The priority order is determined by the ordering of BIOIO_PLUGINS
+        in _bioio_plugin_utils.py, which prioritizes readers based on
+        metadata preservation quality, reliability, and known issues.
 
         Examples
         --------
@@ -274,11 +281,23 @@ class ReaderPluginManager:
             )
             return self._get_reader_module(preferred_reader)
 
-        # Try any installed reader that supports the file
+        # Try readers in priority order from BIOIO_PLUGINS
+        from ._bioio_plugin_utils import get_reader_priority
+
+        for reader_name in get_reader_priority():
+            if reader_name in report and report[reader_name].supported:
+                logger.info(
+                    "Using reader: %s for %s (from priority list)",
+                    reader_name,
+                    self.path,
+                )
+                return self._get_reader_module(reader_name)
+
+        # Try any other installed reader that supports the file
         for name, support in report.items():
             if name != "ArrayLike" and support.supported:
                 logger.info(
-                    "Using reader: %s for %s (preferred not available)",
+                    "Using reader: %s for %s (from installed plugins)",
                     name,
                     self.path,
                 )

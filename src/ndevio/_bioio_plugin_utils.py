@@ -6,6 +6,7 @@ plugin discovery. The ReaderPluginManager uses these utilities internally.
 Public API:
     BIOIO_PLUGINS - Dict of all bioio plugins and their file extensions
     suggest_plugins_for_path() - Get list of suggested plugins by file extension
+    get_reader_priority() - Get reader priority list from BIOIO_PLUGINS order
 
 Internal API (used by ReaderPluginManager):
     format_plugin_installation_message() - Generate installation message
@@ -35,32 +36,20 @@ logger = logging.getLogger(__name__)
 
 # Bioio plugins and their supported extensions
 # Source: https://github.com/bioio-devs/bioio
+#
+# ORDERING MATTERS: Plugins are listed in priority order (highest priority first).
+# This order is used by ReaderPluginManager when selecting readers.
+# Priority is based on:
+# 1. Metadata preservation quality (OME formats preserve most metadata)
+# 2. Reliability and performance for specific formats
+# 3. Known issues or limitations
 BIOIO_PLUGINS = {
-    "bioio-czi": {
-        "extensions": [".czi"],
-        "description": "Zeiss CZI files",
-        "repository": "https://github.com/bioio-devs/bioio-czi",
-    },
-    "bioio-dv": {
-        "extensions": [".dv", ".r3d"],
-        "description": "DeltaVision files",
-        "repository": "https://github.com/bioio-devs/bioio-dv",
-    },
-    "bioio-imageio": {
-        "extensions": [".bmp", ".gif", ".jpg", ".jpeg", ".png"],
-        "description": "Generic image formats (PNG, JPG, etc.)",
-        "repository": "https://github.com/bioio-devs/bioio-imageio",
+    # Highest priority: OME formats with excellent metadata preservation
+    "bioio-ome-zarr": {
+        "extensions": [".zarr"],
+        "description": "OME-Zarr files",
+        "repository": "https://github.com/bioio-devs/bioio-ome-zarr",
         "core": True,
-    },
-    "bioio-lif": {
-        "extensions": [".lif"],
-        "description": "Leica LIF files",
-        "repository": "https://github.com/bioio-devs/bioio-lif",
-    },
-    "bioio-nd2": {
-        "extensions": [".nd2"],
-        "description": "Nikon ND2 files",
-        "repository": "https://github.com/bioio-devs/bioio-nd2",
     },
     "bioio-ome-tiff": {
         "extensions": [".ome.tif", ".ome.tiff", ".tif", ".tiff"],
@@ -73,27 +62,51 @@ BIOIO_PLUGINS = {
         "description": "Tiled OME-TIFF files",
         "repository": "https://github.com/bioio-devs/bioio-ome-tiled-tiff",
     },
-    "bioio-ome-zarr": {
-        "extensions": [".zarr"],
-        "description": "OME-Zarr files",
-        "repository": "https://github.com/bioio-devs/bioio-ome-zarr",
+    # High priority: Format-specific readers with good metadata support
+    "bioio-tifffile": {
+        "extensions": [".tif", ".tiff"],
+        "description": "TIFF files (including those without OME metadata)",
+        "repository": "https://github.com/bioio-devs/bioio-tifffile",
         "core": True,
+    },
+    "bioio-nd2": {
+        "extensions": [".nd2"],
+        "description": "Nikon ND2 files",
+        "repository": "https://github.com/bioio-devs/bioio-nd2",
+    },
+    "bioio-czi": {
+        "extensions": [".czi"],
+        "description": "Zeiss CZI files",
+        "repository": "https://github.com/bioio-devs/bioio-czi",
+    },
+    "bioio-lif": {
+        "extensions": [".lif"],
+        "description": "Leica LIF files",
+        "repository": "https://github.com/bioio-devs/bioio-lif",
+    },
+    "bioio-dv": {
+        "extensions": [".dv", ".r3d"],
+        "description": "DeltaVision files",
+        "repository": "https://github.com/bioio-devs/bioio-dv",
     },
     "bioio-sldy": {
         "extensions": [".sldy", ".dir"],
         "description": "3i SlideBook files",
         "repository": "https://github.com/bioio-devs/bioio-sldy",
     },
-    "bioio-tifffile": {
-        "extensions": [".tif", ".tiff"],
-        "description": "TIFF files (including those without OME metadata)",
-        "repository": "https://github.com/bioio-devs/bioio-tifffile",
+    # Lower priority: Generic/fallback readers
+    "bioio-imageio": {
+        "extensions": [".bmp", ".gif", ".jpg", ".jpeg", ".png"],
+        "description": "Generic image formats (PNG, JPG, etc.)",
+        "repository": "https://github.com/bioio-devs/bioio-imageio",
+        "core": True,
     },
     "bioio-tiff-glob": {
         "extensions": [".tiff"],
         "description": "TIFF sequences (glob patterns)",
         "repository": "https://github.com/bioio-devs/bioio-tiff-glob",
     },
+    # Lowest priority: Requires external dependencies (Java)
     "bioio-bioformats": {
         "extensions": [".oib", ".oif", ".vsi", ".ims", ".lsm", ".stk"],
         "description": "Proprietary microscopy formats (requires Java)",
@@ -109,6 +122,27 @@ for plugin_name, info in BIOIO_PLUGINS.items():
         if ext not in _EXTENSION_TO_PLUGIN:
             _EXTENSION_TO_PLUGIN[ext] = []
         _EXTENSION_TO_PLUGIN[ext].append(plugin_name)
+
+
+def get_reader_priority() -> list[str]:
+    """Get reader priority list from BIOIO_PLUGINS dictionary order.
+
+    Returns plugin names in priority order (highest priority first).
+    This order is used by ReaderPluginManager when selecting readers.
+
+    Returns
+    -------
+    list of str
+        Plugin names in priority order
+
+    Examples
+    --------
+    >>> from ndevio._bioio_plugin_utils import get_reader_priority
+    >>> priority = get_reader_priority()
+    >>> print(priority[0])  # Highest priority reader
+    'bioio-ome-zarr'
+    """
+    return list(BIOIO_PLUGINS.keys())
 
 
 def format_plugin_installation_message(
