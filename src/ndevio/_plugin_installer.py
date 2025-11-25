@@ -64,7 +64,7 @@ def install_plugin(plugin_name: str) -> int:
 
     # Determine which tool to use (pip vs conda)
     # napari-plugin-manager handles this automatically based on environment
-    tool = InstallerTools.PIP  # Default to pip for bioio packages
+    tool = InstallerTools.PYPI  # Default to PYPI for bioio packages
 
     # Queue the installation
     job_id = queue.install(tool=tool, pkgs=[plugin_name])

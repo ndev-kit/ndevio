@@ -8,7 +8,6 @@ import dask.array as da
 # import npe2
 import numpy as np
 import pytest
-from bioio_base.exceptions import UnsupportedFileFormatError
 
 from ndevio._napari_reader import napari_get_reader
 
@@ -107,16 +106,9 @@ def test_reader_supported_formats(
 @pytest.mark.parametrize(
     ("filename", "expected_shape", "should_work"),
     [
-        # RGB_TIFF and MULTISCENE_CZI may not work with core dependencies
-        # Skip these tests for now since they require optional plugins
-        pytest.param(
-            RGB_TIFF,
-            (1440, 1920, 3),
-            False,
-            marks=pytest.mark.skip(
-                reason="RGB_TIFF requires bioio-tifffile or may fail"
-            ),
-        ),
+        # RGB_TIFF should work now that bioio-tifffile is a core dependency
+        (RGB_TIFF, (1440, 1920, 3), True),
+        # MULTISCENE_CZI still requires bioio-czi which is optional
         pytest.param(
             MULTISCENE_CZI,
             (32, 32),
@@ -198,19 +190,22 @@ def test_napari_get_reader_ome_override(resources_dir: Path) -> None:
     assert callable(reader)
 
 
-def test_napari_get_reader_unsupported(resources_dir: Path) -> None:
-    """Test that unsupported file extension raises UnsupportedFileFormatError."""
-    from bioio_base.exceptions import UnsupportedFileFormatError
-
+def test_napari_get_reader_unsupported(resources_dir: Path):
+    """Test that unsupported file extension returns None per napari reader spec."""
     # Mock the widget opener since we don't have a viewer in this test
-    with patch("ndevio._napari_reader._open_plugin_installer"):
-        with pytest.raises(UnsupportedFileFormatError) as exc_info:
-            napari_get_reader(
-                str(resources_dir / "measure_props_Labels.abcdefg"),
-            )
+    with patch("ndevio._napari_reader._open_plugin_installer") as mock_opener:
+        reader = napari_get_reader(
+            str(resources_dir / "measure_props_Labels.abcdefg"),
+        )
 
-        error_msg = str(exc_info.value)
-        # Should indicate no plugins found for this extension
+        # Should return None for unsupported formats (per napari spec)
+        assert reader is None
+
+        # Plugin installer widget should have been called
+        assert mock_opener.called
+        # Check the error message contains the extension
+        error_arg = mock_opener.call_args[0][1]
+        error_msg = str(error_arg)
         assert ".abcdefg" in error_msg or "abcdefg" in error_msg
 
 
@@ -240,22 +235,26 @@ def test_napari_get_reader_png(resources_dir: Path) -> None:
 def test_napari_get_reader_unsupported_czi_with_helpful_error(
     resources_dir: Path, caplog
 ):
-    """Test that unsupported CZI raises UnsupportedFileFormatError with plugin suggestions."""
+    """Test that unsupported CZI returns None with helpful plugin suggestions."""
     # Mock the widget opener since we don't have a viewer in this test
-    with patch("ndevio._napari_reader._open_plugin_installer"):
-        with pytest.raises(UnsupportedFileFormatError) as exc_info:
-            napari_get_reader(str(resources_dir / MULTISCENE_CZI))
+    with patch("ndevio._napari_reader._open_plugin_installer") as mock_opener:
+        reader = napari_get_reader(str(resources_dir / MULTISCENE_CZI))
 
-        error_msg = str(exc_info.value)
+        # Should return None for unsupported formats (per napari spec)
+        assert reader is None
+
+        # Plugin installer widget should have been called
+        assert mock_opener.called
+        error_arg = mock_opener.call_args[0][1]
+        error_msg = str(error_arg)
+
         # Should suggest bioio-czi
         assert "bioio-czi" in error_msg
         assert "Zeiss CZI files" in error_msg
         assert "pip install bioio-czi" in error_msg
 
-        # Should be logged as error (if the napari reader was invoked)
-        # If nothing was logged, don't fail the test; otherwise assert the message is present
-        if caplog.text:
-            assert "ndevio: Unsupported file format" in caplog.text
+        # Should be logged as error
+        assert "ndevio: Unsupported file format" in caplog.text
 
 
 def test_napari_get_reader_supported_formats_work(resources_dir: Path):
@@ -282,33 +281,28 @@ def test_napari_get_reader_supported_formats_work(resources_dir: Path):
     ("filename", "expected_plugin_in_error"),
     [
         (MULTISCENE_CZI, "bioio-czi"),  # CZI needs bioio-czi
-        (
-            RGB_TIFF,
-            "bioio-tifffile",
-        ),  # RGB_TIFF might work or fail; if fails, should suggest bioio-tifffile
     ],
 )
 def test_napari_get_reader_unsupported_formats_helpful_errors(
     resources_dir: Path, filename: str, expected_plugin_in_error: str
 ):
-    """Test that unsupported formats raise helpful errors with plugin suggestions.
+    """Test that unsupported formats return None per napari reader spec.
 
-    Note: Some files (like RGB_TIFF) may be readable by core plugins despite
-    having "bad metadata", in which case this test will pass without error.
-    The test is primarily for formats that definitely need specific plugins (like CZI).
+    napari readers should return None (not raise) when they can't read a file.
+    The plugin installer widget should be shown via settings if enabled.
     """
     # Mock the widget opener since we don't have a viewer in this test
-    with patch("ndevio._napari_reader._open_plugin_installer"):
-        try:
-            reader = napari_get_reader(str(resources_dir / filename))
-            # If we got a reader, the file is readable by installed plugins
-            # This is OK - just means the format is supported
-            if reader is None:
-                pytest.fail(
-                    f"Expected either a reader or an error for {filename}"
-                )
-        except UnsupportedFileFormatError as exc:
-            # File is not readable - check error message has helpful suggestions
-            error_msg = str(exc)
-            assert expected_plugin_in_error in error_msg
-            assert "pip install" in error_msg
+    with patch("ndevio._napari_reader._open_plugin_installer") as mock_opener:
+        reader = napari_get_reader(str(resources_dir / filename))
+
+        # Should return None for unsupported formats (per napari spec)
+        assert reader is None
+
+        # Plugin installer widget should have been called with error info
+        assert mock_opener.called
+        call_args = mock_opener.call_args
+        # Check the UnsupportedFileFormatError message contains plugin suggestion
+        error_arg = call_args[0][1]  # Second argument is the exception
+        error_msg = str(error_arg)
+        assert expected_plugin_in_error in error_msg
+        assert "pip install" in error_msg or "conda install" in error_msg

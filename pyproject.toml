@@ -37,7 +37,7 @@ dependencies = [
     "bioio-ome-tiff",
     "bioio-tifffile",  # a backup tifffile reader with better performance than imageio
     "bioio-imageio",
-    "napari-plugin-manager",  # For plugin installation widget
+    "napari-plugin-manager>=0.1.7",  # Renamed to PYPI from PIP for tool selection https://github.com/napari/napari-plugin-manager/pull/176
 ]
 
 [project.optional-dependencies]

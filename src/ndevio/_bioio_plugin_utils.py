@@ -88,6 +88,7 @@ BIOIO_PLUGINS = {
         "extensions": [".tif", ".tiff"],
         "description": "TIFF files (including those without OME metadata)",
         "repository": "https://github.com/bioio-devs/bioio-tifffile",
+        "core": True,
     },
     "bioio-tiff-glob": {
         "extensions": [".tiff"],
