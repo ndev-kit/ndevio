@@ -45,6 +45,22 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# Default priority order for reader selection when multiple readers support a file.
+# Readers are tried in this order (after preferred_reader, if specified).
+# Priority is based on:
+# - Metadata preservation quality (OME formats preserve most metadata)
+# - Reliability and performance (e.g. tifffile will read a tiff better than imageio)
+DEFAULT_READER_PRIORITY = [
+    "bioio-ome-zarr",  # Best: OME-Zarr for large datasets
+    "bioio-ome-tiff",  # Best: OME-TIFF preserves full metadata
+    "bioio-tifffile",  # Good: Fast, reliable, handles multi-scene TIFFs correctly
+    "bioio-nd2",
+    "bioio-czi",
+    "bioio-lif",
+    "bioio-imageio",
+]
+
+
 class ReaderPluginManager:
     """Centralized manager for bioio reader plugin detection and recommendations.
 
@@ -230,8 +246,9 @@ class ReaderPluginManager:
 
         Tries readers in priority order:
         1. Preferred reader if it's installed and supported
-        2. Any installed reader that supports the file
-        3. None if no working reader found
+        2. Readers from DEFAULT_READER_PRIORITY list in order
+        3. Any other installed reader that supports the file
+        4. None if no working reader found
 
         Parameters
         ----------
@@ -243,6 +260,12 @@ class ReaderPluginManager:
         Reader or None
             Reader class that can read the file, or None if no suitable
             reader is installed.
+
+        Notes
+        -----
+        The default priority order is defined by the module-level
+        DEFAULT_READER_PRIORITY constant, which prioritizes readers based on
+        metadata preservation quality and known issues.
 
         Examples
         --------
@@ -274,11 +297,21 @@ class ReaderPluginManager:
             )
             return self._get_reader_module(preferred_reader)
 
-        # Try any installed reader that supports the file
+        # Try readers in priority order
+        for reader_name in DEFAULT_READER_PRIORITY:
+            if reader_name in report and report[reader_name].supported:
+                logger.info(
+                    "Using reader: %s for %s (from priority list)",
+                    reader_name,
+                    self.path,
+                )
+                return self._get_reader_module(reader_name)
+
+        # Try any other installed reader that supports the file
         for name, support in report.items():
             if name != "ArrayLike" and support.supported:
                 logger.info(
-                    "Using reader: %s for %s (preferred not available)",
+                    "Using reader: %s for %s (from installed plugins)",
                     name,
                     self.path,
                 )

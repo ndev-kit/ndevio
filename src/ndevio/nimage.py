@@ -40,27 +40,24 @@ def determine_reader_plugin(
     image: ImageLike, preferred_reader: str | None = None
 ) -> Reader:
     """
-    Determine the reader for the plugin to be used to load the image.
-    In order of priority:
-        1. If preferred_reader from settings is suitable, use that.
-        2. Otherwise, use bioio.BioImage.determine_plugin() to find a suitable reader.
-        3. If all else fails, raise an error with suggestions for missing plugins.
+    Determine the reader plugin to use for loading an image.
+
+    Convenience wrapper that integrates ReaderPluginManager with ndevio settings.
+    For file paths, uses the priority system (DEFAULT_READER_PRIORITY).
+    For arrays, uses bioio's default plugin detection.
 
     Parameters
     ----------
     image : ImageLike
-        Image to be loaded. Can be a path to an image file, a numpy array,
-        or an xarray DataArray.
+        Image to be loaded (file path, numpy array, or xarray DataArray).
     preferred_reader : str, optional
-        Preferred reader to be used to load the image. If not provided,
-        it will fallback to the preference in settings. Finally, if this
-        preferred reader is not suitable, a reader will be attempted to be
-        determined based on the image type.
+        Preferred reader name. If None, uses ndevio_Reader.preferred_reader
+        from settings.
 
     Returns
     -------
     Reader
-        Reader to be used to load the image.
+        Reader class to use for loading the image.
 
     Raises
     ------
@@ -73,40 +70,34 @@ def determine_reader_plugin(
 
     from ._plugin_manager import ReaderPluginManager
 
-    settings = get_settings()
-
-    preferred_reader = (
-        preferred_reader or settings.ndevio_Reader.preferred_reader  # type: ignore
-    )
-
-    # Only use ReaderPluginManager for file paths, not arrays
+    # For file paths: use ReaderPluginManager
     if isinstance(image, str | Path):
+        settings = get_settings()
+
+        # Get preferred reader from settings if not provided
+        if preferred_reader is None:
+            preferred_reader = settings.ndevio_Reader.preferred_reader  # type: ignore
+
         manager = ReaderPluginManager(image)
         reader = manager.get_working_reader(preferred_reader)
 
         if reader:
             return reader
 
-        # No reader found - raise with helpful message if enabled
+        # No reader found - raise error with installation suggestions
         if settings.ndevio_Reader.suggest_reader_plugins:  # type: ignore
-            raise UnsupportedFileFormatError(
-                reader_name="ndevio",
-                path=str(image),
-                msg_extra=manager.get_installation_message(),
-            )
+            msg_extra = manager.get_installation_message()
         else:
-            # Re-raise without suggestions
-            raise UnsupportedFileFormatError(
-                reader_name="ndevio",
-                path=str(image),
-            )
-    else:
-        # For arrays, use bioio's built-in plugin determination
-        try:
-            return nImage.determine_plugin(image).metadata.get_reader()
-        except UnsupportedFileFormatError:
-            # Re-raise for non-file inputs
-            raise
+            msg_extra = None
+
+        raise UnsupportedFileFormatError(
+            reader_name="ndevio",
+            path=str(image),
+            msg_extra=msg_extra,
+        )
+
+    # For arrays: use bioio's built-in plugin determination
+    return nImage.determine_plugin(image).metadata.get_reader()
 
 
 class nImage(BioImage):
