@@ -45,22 +45,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# Default priority order for reader selection when multiple readers support a file.
-# Readers are tried in this order (after preferred_reader, if specified).
-# Priority is based on:
-# - Metadata preservation quality (OME formats preserve most metadata)
-# - Reliability and performance (e.g. tifffile will read a tiff better than imageio)
-DEFAULT_READER_PRIORITY = [
-    "bioio-ome-zarr",  # Best: OME-Zarr for large datasets
-    "bioio-ome-tiff",  # Best: OME-TIFF preserves full metadata
-    "bioio-tifffile",  # Good: Fast, reliable, handles multi-scene TIFFs correctly
-    "bioio-nd2",
-    "bioio-czi",
-    "bioio-lif",
-    "bioio-imageio",
-]
-
-
 class ReaderPluginManager:
     """Centralized manager for bioio reader plugin detection and recommendations.
 
@@ -246,7 +230,7 @@ class ReaderPluginManager:
 
         Tries readers in priority order:
         1. Preferred reader if it's installed and supported
-        2. Readers from DEFAULT_READER_PRIORITY list in order
+        2. Readers from BIOIO_PLUGINS dict order (highest priority first)
         3. Any other installed reader that supports the file
         4. None if no working reader found
 
@@ -263,9 +247,9 @@ class ReaderPluginManager:
 
         Notes
         -----
-        The default priority order is defined by the module-level
-        DEFAULT_READER_PRIORITY constant, which prioritizes readers based on
-        metadata preservation quality and known issues.
+        The priority order is determined by the ordering of BIOIO_PLUGINS
+        in _bioio_plugin_utils.py, which prioritizes readers based on
+        metadata preservation quality, reliability, and known issues.
 
         Examples
         --------
@@ -297,8 +281,10 @@ class ReaderPluginManager:
             )
             return self._get_reader_module(preferred_reader)
 
-        # Try readers in priority order
-        for reader_name in DEFAULT_READER_PRIORITY:
+        # Try readers in priority order from BIOIO_PLUGINS
+        from ._bioio_plugin_utils import get_reader_priority
+
+        for reader_name in get_reader_priority():
             if reader_name in report and report[reader_name].supported:
                 logger.info(
                     "Using reader: %s for %s (from priority list)",
