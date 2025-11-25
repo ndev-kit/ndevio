@@ -73,6 +73,7 @@ def napari_get_reader(
             open_first_scene_only=open_first_scene_only,
             open_all_scenes=open_all_scenes,
         )
+
     except UnsupportedFileFormatError as e:
         # determine_reader_plugin() already enhanced the error message
         logger.error("ndevio: Unsupported file format: %s", path)
@@ -80,7 +81,9 @@ def napari_get_reader(
         if settings.ndevio_Reader.suggest_reader_plugins:  # type: ignore
             _open_plugin_installer(path, e)
 
-        raise
+        # Return None per napari reader spec - don't raise exception
+        return None
+
     except Exception as e:  # noqa: BLE001
         logger.warning("ndevio: Error reading file: %s", e)
         return None
@@ -195,6 +198,13 @@ def _open_plugin_installer(
 
     # Get viewer, handle case where no viewer available
     viewer = napari.current_viewer()
+
+    # Don't try to open widget if no viewer available (e.g., in tests)
+    if viewer is None:
+        logger.warning(
+            "Cannot open plugin installer widget: No napari viewer available"
+        )
+        return
 
     # Create plugin manager for this file
     manager = ReaderPluginManager(path)
