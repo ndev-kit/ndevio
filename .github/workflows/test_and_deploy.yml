@@ -48,22 +48,17 @@ jobs:
           git clone --depth 1 https://github.com/pyvista/gl-ci-helpers.git
           powershell gl-ci-helpers/appveyor/install_opengl.ps1
 
-      # note: if you need dependencies from conda, considering using
-      # setup-miniconda: https://github.com/conda-incubator/setup-miniconda
-      # and
-      # tox-conda: https://github.com/tox-dev/tox-conda
       - name: Install dependencies
         run: |
           uv venv --python ${{ matrix.python-version }}
-          uv pip install hatch tox-uv tox-gh-actions
+          uv pip install -e . --group dev
 
-      # this runs the platform-specific tests declared in tox.ini
-      - name: Test with tox
+      - name: Run tests
         uses: aganders3/headless-gui@v2
         with:
-          run: uv run tox
+          run: uv run pytest -v --color=yes --cov=ndevio --cov-report=xml
         env:
-          PLATFORM: ${{ matrix.platform }}
+          PYVISTA_OFF_SCREEN: true
 
       - name: Coverage
         uses: codecov/codecov-action@v5

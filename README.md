@@ -93,7 +93,7 @@ For development, clone the repository and install with the dev dependency group:
 ```bash
 git clone https://github.com/ndev-kit/ndevio.git
 cd ndevio
-pip install -e . --dev
+pip install -e . --group dev
 ```
 
 This includes pytest, pytest-cov, pytest-qt, tox-uv, napari, and pyqt6.
