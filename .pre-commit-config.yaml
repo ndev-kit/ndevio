@@ -19,20 +19,10 @@ repos:
     rev: v0.3.0
     hooks:
       - id: napari-plugin-checks
-  # Local development hook - uses installed ndev-settings package
-  - repo: local
+  - repo: https://github.com/ndev-kit/ndev-settings
+    rev: v0.3.0
     hooks:
       - id: reset-settings-values
-        name: Reset settings values to defaults
-        entry: python -m ndev_settings._cli
-        language: system
-        files: ndev_settings\.yaml$
-        pass_filenames: true
-  # After ndev-settings is released, use this instead:
-  # - repo: https://github.com/ndev-kit/ndev-settings
-  #   rev: v0.3.0
-  #   hooks:
-  #     - id: reset-settings-values
   # https://mypy.readthedocs.io/en/stable/
   # you may wish to add this as well!
   # - repo: https://github.com/pre-commit/mirrors-mypy
