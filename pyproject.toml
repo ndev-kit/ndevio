@@ -44,14 +44,6 @@ dependencies = [
 # Allow easily installation with the full, default napari installation
 # (including Qt backend) using ndevio[all].
 all = ["napari[all]"]
-testing = [
-    "tox-uv",
-    "pytest",  # https://docs.pytest.org/en/latest/contents.html
-    "pytest-cov",  # https://pytest-cov.readthedocs.io/en/latest/
-    "pytest-qt",  # https://pytest-qt.readthedocs.io/en/latest/
-    "napari",
-    "pyqt6",  # Explicitly use PyQt6 (napari's future default, has ARM64 macOS support)
-]
 
 [dependency-groups]
 dev = [
@@ -137,3 +129,21 @@ exclude = [
     "*_vendor*",
 ]
 fix = true
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
+
+[tool.pixi.dependencies]
+python = ">=3.10,<3.14"
+
+[tool.pixi.pypi-dependencies]
+ndevio = { path = ".", editable = true }
+
+[tool.pixi.environments]
+default = { solve-group = "default" }
+all = { features = ["all"], solve-group = "default" }
+dev = { features = ["dev"], solve-group = "default" }
+
+[tool.pixi.tasks]
+test = { cmd = "pytest -v --color=yes --cov=ndevio --cov-report=xml" }
