@@ -19,6 +19,14 @@ repos:
     rev: v0.3.0
     hooks:
       - id: napari-plugin-checks
+  - repo: local
+    hooks:
+      - id: reset-settings-values
+        name: Reset settings values to defaults
+        entry: python scripts/reset_settings_values.py
+        language: system
+        files: ^src/ndevio/ndev_settings\.yaml$
+        pass_filenames: false
   # https://mypy.readthedocs.io/en/stable/
   # you may wish to add this as well!
   # - repo: https://github.com/pre-commit/mirrors-mypy

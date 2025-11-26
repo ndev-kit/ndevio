@@ -1,8 +1,8 @@
 ndevio_Reader:
   suggest_reader_plugins:
-    default: True
+    default: true
     tooltip: Whether to suggest plugins to install when no reader can be found
-    value: True
+    value: true
   preferred_reader:
     default: bioio-ome-tiff
     dynamic_choices:
@@ -19,9 +19,9 @@ ndevio_Reader:
     tooltip: How to handle files with multiple scenes
     value: Open Scene Widget
   unpack_channels_as_layers:
-    default: True
+    default: true
     tooltip: Whether to unpack multi-channel images as separate layers
-    value: True
+    value: true
   clear_layers_on_new_scene:
     default: false
     tooltip: Whether to clear the viewer when selecting a new scene
