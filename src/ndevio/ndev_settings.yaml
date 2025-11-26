@@ -17,7 +17,7 @@ ndevio_Reader:
     - View First Scene Only
     default: Open Scene Widget
     tooltip: How to handle files with multiple scenes
-    value: View First Scene Only
+    value: Open Scene Widget
   unpack_channels_as_layers:
     default: True
     tooltip: Whether to unpack multi-channel images as separate layers
