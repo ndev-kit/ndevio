@@ -7,7 +7,6 @@ import logging
 from pathlib import Path
 
 import xarray as xr
-import zarr
 from bioio import BioImage
 from bioio_base.dimensions import DimensionNames
 from bioio_base.reader import Reader
@@ -18,22 +17,6 @@ from ndev_settings import get_settings
 logger = logging.getLogger(__name__)
 
 DELIM = " :: "
-
-
-def _apply_zarr_compat_patch():
-    """Apply zarr compatibility patch for zarr>=3.0 with BioIO."""
-    zarr_version = tuple(int(x) for x in zarr.__version__.split(".")[:2])
-    if zarr_version >= (3, 0) and not hasattr(zarr.storage, "FSStore"):
-
-        class FSStoreShim:
-            def __new__(cls, *args, **kwargs):
-                return zarr.storage.directory.DirectoryStore(*args, **kwargs)
-
-        # patch zarr.storage.FSStore to FFStoreShim
-        zarr.storage.FSStore = FSStoreShim
-
-
-_apply_zarr_compat_patch()
 
 
 def determine_reader_plugin(
