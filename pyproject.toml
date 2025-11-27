@@ -17,13 +17,13 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.10",
+    # "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Image Processing",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 # napari can be included in dependencies if napari imports are required.
 # However, you should not include napari[all], napari[qt],
 # or any other Qt bindings directly (e.g. PyQt5, PySide2).
@@ -33,7 +33,7 @@ dependencies = [
     "xarray",
     "bioio-base",
     "bioio>=2",  # migrates writers to plugins
-    "bioio-ome-zarr",
+    "bioio-ome-zarr>=3",
     "bioio-ome-tiff>=1.2.0",  # minimum for migrated writer
     "bioio-tifffile",  # a backup tifffile reader with better performance than imageio
     "bioio-imageio",
@@ -47,7 +47,6 @@ all = ["napari[all]"]
 
 [dependency-groups]
 dev = [
-    "tox-uv",
     "pytest",  # https://docs.pytest.org/en/latest/contents.html
     "pytest-cov",  # https://pytest-cov.readthedocs.io/en/latest/
     "pytest-qt",  # https://pytest-qt.readthedocs.io/en/latest/
