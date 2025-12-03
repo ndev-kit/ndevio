@@ -2,8 +2,6 @@
 
 from unittest.mock import Mock, patch
 
-import pytest
-
 
 class TestReaderPluginManagerInstallable:
     """Test ReaderPluginManager.installable_plugins property."""
@@ -180,9 +178,6 @@ class TestInstallPlugin:
         # Job ID should be an integer
         assert isinstance(job_id, int)
 
-    @pytest.mark.skip(
-        reason="Requires napari and actual installation - run manually"
-    )
     def test_install_via_queue(self):
         """Manual test for queue-based installation."""
         from ndevio._plugin_installer import (

@@ -113,7 +113,6 @@ def test_reader_supported_formats(
             MULTISCENE_CZI,
             (32, 32),
             False,
-            marks=pytest.mark.skip(reason="CZI requires bioio-czi"),
         ),
     ],
 )

@@ -19,7 +19,7 @@ uv venv
 .venv\Scripts\activate
 
 # Install in editable mode with testing dependencies
-uv pip install -e ".[testing]"
+uv pip install -e . --group dev
 
 # Run tests to verify setup
 pytest -v
