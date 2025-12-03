@@ -65,15 +65,12 @@ def test_save_shapes_as_labels(
     container._save_directory.value = tmp_path
     container._save_name.value = "test"
 
+    expected_save_loc = tmp_path / "Shapes" / "test.tiff"
     container.save_layers_as_ome_tiff()
 
-    # Wait for the threaded worker to complete
-    with qtbot.waitSignal(
-        container._layer_save_worker.finished, timeout=60000
-    ):
-        pass
+    # Wait for file to exist (avoids race condition with signal timing)
+    qtbot.waitUntil(lambda: expected_save_loc.exists(), timeout=60000)
 
-    expected_save_loc = tmp_path / "Shapes" / "test.tiff"
     assert expected_save_loc.exists()
     saved_img = nImage(expected_save_loc)
     assert saved_img.shape[1] == 1  # single channel (C dimension is index 1)
@@ -93,15 +90,11 @@ def test_save_labels(qtbot, make_napari_viewer, tmp_path: Path, test_data):
     container._save_directory.value = tmp_path
     container._save_name.value = "test"
 
+    expected_save_loc = tmp_path / "Labels" / "test.tiff"
     container.save_layers_as_ome_tiff()
 
-    # Wait for the threaded worker to complete
-    with qtbot.waitSignal(
-        container._layer_save_worker.finished, timeout=60000
-    ):
-        pass
-
-    expected_save_loc = tmp_path / "Labels" / "test.tiff"
+    # Wait for file to exist (avoids race condition with signal timing)
+    qtbot.waitUntil(lambda: expected_save_loc.exists(), timeout=60000)
 
     assert expected_save_loc.exists()
     saved_img = nImage(expected_save_loc)
@@ -122,15 +115,11 @@ def test_save_image_layer(
     container._save_directory.value = tmp_path
     container._save_name.value = "test"
 
+    expected_save_loc = tmp_path / "Image" / "test.tiff"
     container.save_layers_as_ome_tiff()
 
-    # Wait for the threaded worker to complete
-    with qtbot.waitSignal(
-        container._layer_save_worker.finished, timeout=60000
-    ):
-        pass
-
-    expected_save_loc = tmp_path / "Image" / "test.tiff"
+    # Wait for file to exist (avoids race condition with signal timing)
+    qtbot.waitUntil(lambda: expected_save_loc.exists(), timeout=60000)
 
     assert expected_save_loc.exists()
     saved_img = nImage(expected_save_loc)
@@ -154,15 +143,11 @@ def test_save_multi_layer(
     container._save_directory.value = tmp_path
     container._save_name.value = "test"
 
+    expected_save_loc = tmp_path / "Layers" / "test.tiff"
     container.save_layers_as_ome_tiff()
 
-    # Wait for the threaded worker to complete
-    with qtbot.waitSignal(
-        container._layer_save_worker.finished, timeout=60000
-    ):
-        pass
-
-    expected_save_loc = tmp_path / "Layers" / "test.tiff"
+    # Wait for file to exist (avoids race condition with signal timing)
+    qtbot.waitUntil(lambda: expected_save_loc.exists(), timeout=60000)
 
     assert expected_save_loc.exists()
     saved_img = nImage(expected_save_loc)
@@ -221,17 +206,17 @@ def test_save_files_as_ome_tiff(test_czi_image, tmp_path: Path, qtbot):
     container._files.value = path
     container._save_directory.value = tmp_path
     save_dir = tmp_path / "ConcatenatedImages"
+    expected_file = save_dir / "0T-4C-0Z-7pos.tiff"
 
     container.save_files_as_ome_tiff()
 
-    # Wait for the threaded worker to complete
-    with qtbot.waitSignal(container._concat_worker.finished, timeout=60000):
-        pass
+    # Wait for file to exist (avoids race condition with signal timing)
+    qtbot.waitUntil(lambda: expected_file.exists(), timeout=60000)
 
     # check that there is 1 file
     assert len(list(save_dir.iterdir())) == 1
     # check the name of the file is 0T-4C-0Z-7pos.tiff
-    assert (save_dir / "0T-4C-0Z-7pos.tiff").exists()
+    assert expected_file.exists()
 
 
 @pytest.mark.parametrize("num_files", [1, 2])
@@ -272,11 +257,9 @@ def test_batch_concatenate_files(tmp_path: Path, resources_dir: Path, qtbot):
     container.batch_concatenate_files()
 
     # Wait for threaded batch to complete
-    qtbot.waitUntil(
-        lambda: not container._batch_runner.is_running, timeout=60000
-    )
-
     expected_output_dir = tmp_path / "test_ConcatenatedImages"
+
+    qtbot.waitUntil(lambda: expected_output_dir.exists(), timeout=60000)
 
     assert expected_output_dir.exists()
     # 4 tiff files + 1 log file = 5 total
@@ -362,9 +345,11 @@ def test_save_scenes_ome_tiff(test_czi_image, tmp_path: Path, qtbot):
 
     container.save_scenes_ome_tiff()
 
-    # Wait for the threaded worker to complete
-    with qtbot.waitSignal(container._scene_worker.finished, timeout=60000):
-        pass
+    # Wait for all 7 scene files to exist (avoids race condition with signal timing)
+    qtbot.waitUntil(
+        lambda: save_dir.exists() and len(list(save_dir.iterdir())) == 7,
+        timeout=60000,
+    )
 
     # check that there are 7 files in the save dir
     assert len(list(save_dir.iterdir())) == 7
