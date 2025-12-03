@@ -19,7 +19,7 @@ uv venv
 .venv\Scripts\activate
 
 # Install in editable mode with testing dependencies
-uv pip install -e ".[testing]"
+uv pip install -e . --group dev
 
 # Run tests to verify setup
 pytest -v
@@ -95,7 +95,7 @@ This package is a **spiritual successor to napari-aicsimageio** but must be inde
 The reader selection follows a priority hierarchy:
 
 1. **Explicit reader parameter** - If passed directly to function
-2. **User preference from settings** - `ndev_settings.ndevio_Reader.preferred_reader`
+2. **User preference from settings** - `ndev_settings.ndevio_reader.preferred_reader`
 3. **bioio feasibility check** - Verify preferred reader supports the file
 4. **bioio auto-detection** - Fallback to bioio's plugin determination
 
@@ -282,7 +282,7 @@ ndevio/
 Settings defined in `ndev_settings.yaml`:
 
 ```yaml
-ndevio_Reader:
+ndevio_reader:
   preferred_reader:
     default: bioio-ome-tiff
     dynamic_choices:
@@ -308,7 +308,7 @@ ndevio_Reader:
 from ndev_settings import get_settings
 
 settings = get_settings()
-preferred = settings.ndevio_Reader.preferred_reader
+preferred = settings.ndevio_reader.preferred_reader
 ```
 
 ---
@@ -562,7 +562,7 @@ def get_reader(path):
 # CORRECT
 def get_preferred_reader(image, preferred_reader=None):
     settings = get_settings()
-    preferred = preferred_reader or settings.ndevio_Reader.preferred_reader
+    preferred = preferred_reader or settings.ndevio_reader.preferred_reader
 
     # Use bioio's feasibility check
     fr = bioio.plugin_feasibility_report(image)

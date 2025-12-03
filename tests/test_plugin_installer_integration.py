@@ -153,7 +153,7 @@ class TestPluginInstallerWidgetIntegration:
 
     def test_widget_created_in_error_mode(self, make_napari_viewer):
         """Test widget creation in error mode with viewer."""
-        from ndevio import ReaderPluginManager
+        from ndevio._plugin_manager import ReaderPluginManager
         from ndevio.widgets import PluginInstallerWidget
 
         make_napari_viewer()  # Create viewer context
@@ -216,7 +216,7 @@ class TestPluginInstallerWidgetIntegration:
 
     def test_widget_preselects_first_installable(self, make_napari_viewer):
         """Test that first installable plugin is pre-selected."""
-        from ndevio import ReaderPluginManager
+        from ndevio._plugin_manager import ReaderPluginManager
         from ndevio.widgets import PluginInstallerWidget
 
         make_napari_viewer()
