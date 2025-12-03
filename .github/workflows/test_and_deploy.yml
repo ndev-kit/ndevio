@@ -55,6 +55,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           use_oidc: true
+          fail_ci_if_error: false
 
   build-and-inspect-package:
     name: Build & inspect package.
