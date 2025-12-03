@@ -259,10 +259,15 @@ def test_batch_concatenate_files(tmp_path: Path, resources_dir: Path, qtbot):
     # Wait for threaded batch to complete
     expected_output_dir = tmp_path / "test_ConcatenatedImages"
 
-    qtbot.waitUntil(lambda: expected_output_dir.exists(), timeout=60000)
+    # 4 tiff files + 1 log file = 5 total
+    qtbot.waitUntil(
+        lambda: expected_output_dir.exists()
+        and len(list(expected_output_dir.iterdir())) == 5,
+        timeout=60000,
+    )
 
     assert expected_output_dir.exists()
-    # 4 tiff files + 1 log file = 5 total
+
     output_files = list(expected_output_dir.iterdir())
     tiff_files = [f for f in output_files if f.suffix == ".tiff"]
     assert len(tiff_files) == 4
