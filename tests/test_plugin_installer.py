@@ -10,7 +10,7 @@ class TestReaderPluginManagerInstallable:
 
     def test_czi_file_no_plugins_installed(self):
         """Test that CZI file suggests bioio-czi plugin when nothing installed."""
-        from ndevio import ReaderPluginManager
+        from ndevio._plugin_manager import ReaderPluginManager
 
         with patch("bioio.plugin_feasibility_report") as mock_report:
             mock_report.return_value = {"ArrayLike": Mock(supported=False)}
@@ -23,7 +23,7 @@ class TestReaderPluginManagerInstallable:
 
     def test_lif_file_no_plugins_installed(self):
         """Test that LIF file suggests bioio-lif plugin."""
-        from ndevio import ReaderPluginManager
+        from ndevio._plugin_manager import ReaderPluginManager
 
         with patch("bioio.plugin_feasibility_report") as mock_report:
             mock_report.return_value = {"ArrayLike": Mock(supported=False)}
@@ -36,7 +36,7 @@ class TestReaderPluginManagerInstallable:
 
     def test_tiff_file_suggests_non_core_only(self):
         """Test that TIFF files only suggest non-core plugins."""
-        from ndevio import ReaderPluginManager
+        from ndevio._plugin_manager import ReaderPluginManager
 
         with patch("bioio.plugin_feasibility_report") as mock_report:
             mock_report.return_value = {"ArrayLike": Mock(supported=False)}
@@ -52,7 +52,7 @@ class TestReaderPluginManagerInstallable:
 
     def test_no_plugins_for_unsupported_extension(self):
         """Test that unsupported extensions return empty list."""
-        from ndevio import ReaderPluginManager
+        from ndevio._plugin_manager import ReaderPluginManager
 
         with patch("bioio.plugin_feasibility_report") as mock_report:
             mock_report.return_value = {"ArrayLike": Mock(supported=False)}
@@ -64,7 +64,7 @@ class TestReaderPluginManagerInstallable:
 
     def test_filters_installed_plugins(self):
         """Test that already installed plugins are filtered out."""
-        from ndevio import ReaderPluginManager
+        from ndevio._plugin_manager import ReaderPluginManager
 
         # Mock feasibility report showing bioio-czi as installed
         with patch("bioio.plugin_feasibility_report") as mock_report:
@@ -106,7 +106,7 @@ class TestPluginInstallerWidget:
 
     def test_error_mode_with_installable_plugins(self, make_napari_viewer):
         """Test widget in error mode with installable plugins."""
-        from ndevio import ReaderPluginManager
+        from ndevio._plugin_manager import ReaderPluginManager
         from ndevio.widgets import PluginInstallerWidget
 
         with patch("bioio.plugin_feasibility_report") as mock_report:
@@ -136,7 +136,7 @@ class TestPluginInstallerWidget:
 
     def test_error_mode_no_installable_plugins(self, make_napari_viewer):
         """Test widget in error mode without installable plugins."""
-        from ndevio import ReaderPluginManager
+        from ndevio._plugin_manager import ReaderPluginManager
         from ndevio.widgets import PluginInstallerWidget
 
         with patch("bioio.plugin_feasibility_report") as mock_report:

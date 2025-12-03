@@ -49,7 +49,7 @@ class TestReaderPluginManager:
         """Test that manager correctly identifies installable plugins."""
         from unittest.mock import Mock, patch
 
-        from ndevio import ReaderPluginManager
+        from ndevio._plugin_manager import ReaderPluginManager
 
         # Mock feasibility report showing bioio-czi as installed
         with patch("bioio.plugin_feasibility_report") as mock_report:
@@ -70,7 +70,7 @@ class TestReaderPluginManager:
         """Test that manager suggests uninstalled plugins."""
         from unittest.mock import Mock, patch
 
-        from ndevio import ReaderPluginManager
+        from ndevio._plugin_manager import ReaderPluginManager
 
         # Mock feasibility report with no bioio-lif installed
         with patch("bioio.plugin_feasibility_report") as mock_report:
@@ -91,7 +91,7 @@ class TestReaderPluginManager:
         """Test that core plugins are excluded from installable list."""
         from unittest.mock import Mock, patch
 
-        from ndevio import ReaderPluginManager
+        from ndevio._plugin_manager import ReaderPluginManager
 
         # Mock report showing no plugins installed
         with patch("bioio.plugin_feasibility_report") as mock_report:
