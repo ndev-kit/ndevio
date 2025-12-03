@@ -22,6 +22,7 @@ RGB_TIFF = (
 CELLS3D2CH_OME_TIFF = "cells3d2ch_legacy.tiff"  # 2 channel, 3D OME-TIFF, from old napari-ndev saving
 LOGO_PNG = "nDev-logo-small.png"  # small PNG file (fix typo)
 CZI_FILE = "0T-4C-0Z-7pos.czi"  # multi-scene CZI file
+ND2_FILE = "ND2_dims_rgb.nd2"  # ND2 file requiring bioio-nd2
 
 
 def test_nImage_init(resources_dir: Path):
@@ -206,7 +207,8 @@ def test_get_napari_image_data_mosaic_tile_not_in_memory(
             True,
             None,
         ),  # OME-TIFF works with bioio-ome-tiff (core)
-        (CZI_FILE, False, "bioio-czi"),  # CZI needs bioio-czi plugin
+        (CZI_FILE, True, None),
+        (ND2_FILE, False, "bioio-nd2"),  # ND2 needs bioio-nd2
         (RGB_TIFF, True, None),
     ],
 )
@@ -258,7 +260,8 @@ def test_determine_reader_plugin_behavior(
     [
         (LOGO_PNG, True, None),
         (CELLS3D2CH_OME_TIFF, True, None),
-        (CZI_FILE, False, ["bioio-czi", "Zeiss CZI files"]),
+        (CZI_FILE, True, None),
+        (ND2_FILE, False, ["bioio-nd2", "pip install"]),
         (RGB_TIFF, True, None),
     ],
 )

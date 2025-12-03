@@ -16,7 +16,7 @@ from ndevio._napari_reader import napari_get_reader
 RGB_TIFF = "RGB_bad_metadata.tiff"  # has two scenes
 MULTISCENE_CZI = r"0T-4C-0Z-7pos.czi"
 PNG_FILE = "nDev-logo-small.png"
-# GIF_FILE = "example.gif"
+ND2_FILE = "ND2_dims_rgb.nd2"
 OME_TIFF = "cells3d2ch_legacy.tiff"
 
 ###############################################################################
@@ -231,31 +231,6 @@ def test_napari_get_reader_png(resources_dir: Path) -> None:
     assert callable(reader)
 
 
-def test_napari_get_reader_unsupported_czi_with_helpful_error(
-    resources_dir: Path, caplog
-):
-    """Test that unsupported CZI returns None with helpful plugin suggestions."""
-    # Mock the widget opener since we don't have a viewer in this test
-    with patch("ndevio._napari_reader._open_plugin_installer") as mock_opener:
-        reader = napari_get_reader(str(resources_dir / MULTISCENE_CZI))
-
-        # Should return None for unsupported formats (per napari spec)
-        assert reader is None
-
-        # Plugin installer widget should have been called
-        assert mock_opener.called
-        error_arg = mock_opener.call_args[0][1]
-        error_msg = str(error_arg)
-
-        # Should suggest bioio-czi
-        assert "bioio-czi" in error_msg
-        assert "Zeiss CZI files" in error_msg
-        assert "pip install bioio-czi" in error_msg
-
-        # Should be logged as error
-        assert "ndevio: Unsupported file format" in caplog.text
-
-
 def test_napari_get_reader_supported_formats_work(resources_dir: Path):
     """Test that supported formats return valid readers."""
     # PNG should work (bioio-imageio is core)
@@ -279,7 +254,7 @@ def test_napari_get_reader_supported_formats_work(resources_dir: Path):
 @pytest.mark.parametrize(
     ("filename", "expected_plugin_in_error"),
     [
-        (MULTISCENE_CZI, "bioio-czi"),  # CZI needs bioio-czi
+        (ND2_FILE, "bioio-nd2"),  # ND2 needs bioio-nd2
     ],
 )
 def test_napari_get_reader_unsupported_formats_helpful_errors(

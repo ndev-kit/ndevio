@@ -171,7 +171,7 @@ def test_save_multi_layer(
 
 @pytest.fixture
 def test_rgb_image(resources_dir: Path):
-    path = resources_dir / "RGB.tiff"
+    path = resources_dir / "RGB_bad_metadata.tiff"
     img = nImage(path)
     return path, img
 
@@ -184,7 +184,7 @@ def test_update_metadata_from_file(make_napari_viewer, test_rgb_image):
     container._files.value = path
     container.update_metadata_on_file_select()
 
-    assert container._save_name.value == "RGB"
+    assert container._save_name.value == "RGB_bad_metadata"
     assert (
         container._dim_shape.value
         == "T: 1, C: 1, Z: 1, Y: 1440, X: 1920, S: 3"
@@ -234,7 +234,7 @@ def test_save_files_as_ome_tiff(test_czi_image, tmp_path: Path, qtbot):
     assert (save_dir / "0T-4C-0Z-7pos.tiff").exists()
 
 
-@pytest.mark.parametrize("num_files", [1, 3])
+@pytest.mark.parametrize("num_files", [1, 2])
 def test_select_next_images(resources_dir: Path, num_files: int):
     container = UtilitiesContainer()
 
@@ -279,10 +279,10 @@ def test_batch_concatenate_files(tmp_path: Path, resources_dir: Path, qtbot):
     expected_output_dir = tmp_path / "test_ConcatenatedImages"
 
     assert expected_output_dir.exists()
-    # 8 tiff files + 1 log file = 9 total
+    # 4 tiff files + 1 log file = 5 total
     output_files = list(expected_output_dir.iterdir())
     tiff_files = [f for f in output_files if f.suffix == ".tiff"]
-    assert len(tiff_files) == 8
+    assert len(tiff_files) == 4
     assert (expected_output_dir / "batch_concatenate.log.txt").exists()
 
 
