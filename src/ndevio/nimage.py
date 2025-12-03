@@ -10,9 +10,7 @@ import xarray as xr
 from bioio import BioImage
 from bioio_base.dimensions import DimensionNames
 from bioio_base.reader import Reader
-from bioio_base.types import ImageLike
-from napari.types import PathLike
-from ndev_settings import get_settings
+from bioio_base.types import ImageLike, PathLike
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +48,7 @@ def determine_reader_plugin(
 
     """
     from bioio_base.exceptions import UnsupportedFileFormatError
+    from ndev_settings import get_settings
 
     from ._plugin_manager import ReaderPluginManager
 
@@ -127,6 +126,8 @@ class nImage(BioImage):
         Note: If no suitable reader can be found, an UnsupportedFileFormatError
         will be raised, with installation suggestions for missing plugins.
         """
+        from ndev_settings import get_settings
+
         self.settings = get_settings()
 
         if reader is None:
