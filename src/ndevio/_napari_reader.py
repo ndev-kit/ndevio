@@ -51,13 +51,13 @@ def napari_get_reader(
     open_first_scene_only = (
         open_first_scene_only
         if open_first_scene_only is not None
-        else settings.ndevio_Reader.scene_handling == "View First Scene Only"  # type: ignore
+        else settings.ndevio_reader.scene_handling == "View First Scene Only"  # type: ignore
     ) or False
 
     open_all_scenes = (
         open_all_scenes
         if open_all_scenes is not None
-        else settings.ndevio_Reader.scene_handling == "View All Scenes"  # type: ignore
+        else settings.ndevio_reader.scene_handling == "View All Scenes"  # type: ignore
     ) or False
 
     if isinstance(path, list):
@@ -78,7 +78,7 @@ def napari_get_reader(
         # determine_reader_plugin() already enhanced the error message
         logger.error("ndevio: Unsupported file format: %s", path)
         # Show plugin installer widget if enabled in settings
-        if settings.ndevio_Reader.suggest_reader_plugins:  # type: ignore
+        if settings.ndevio_reader.suggest_reader_plugins:  # type: ignore
             _open_plugin_installer(path, e)
 
         # Return None per napari reader spec - don't raise exception

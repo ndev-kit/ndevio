@@ -112,7 +112,7 @@ class nImageSceneWidget(Container):
 
     def open_scene(self) -> None:
         """Open the selected scene(s) in the viewer."""
-        if self.settings.ndevio_Reader.clear_layers_on_new_scene:
+        if self.settings.ndevio_reader.clear_layers_on_new_scene:
             self.viewer.layers.clear()
 
         for scene in self._scene_list_widget.value:

@@ -32,7 +32,7 @@ def determine_reader_plugin(
     image : ImageLike
         Image to be loaded (file path, numpy array, or xarray DataArray).
     preferred_reader : str, optional
-        Preferred reader name. If None, uses ndevio_Reader.preferred_reader
+        Preferred reader name. If None, uses ndevio_reader.preferred_reader
         from settings.
 
     Returns
@@ -58,7 +58,7 @@ def determine_reader_plugin(
 
         # Get preferred reader from settings if not provided
         if preferred_reader is None:
-            preferred_reader = settings.ndevio_Reader.preferred_reader  # type: ignore
+            preferred_reader = settings.ndevio_reader.preferred_reader  # type: ignore
 
         manager = ReaderPluginManager(image)
         reader = manager.get_working_reader(preferred_reader)
@@ -67,7 +67,7 @@ def determine_reader_plugin(
             return reader
 
         # No reader found - raise error with installation suggestions
-        if settings.ndevio_Reader.suggest_reader_plugins:  # type: ignore
+        if settings.ndevio_reader.suggest_reader_plugins:  # type: ignore
             msg_extra = manager.get_installation_message()
         else:
             msg_extra = None
@@ -275,7 +275,7 @@ class nImage(BioImage):
                 for c in self.napari_data.coords[CHANNEL_DIM].data.tolist()
             ]
 
-            if self.settings.ndevio_Reader.unpack_channels_as_layers:
+            if self.settings.ndevio_reader.unpack_channels_as_layers:
                 meta["channel_axis"] = self.napari_data.dims.index(CHANNEL_DIM)
 
                 if NO_SCENE:
@@ -288,7 +288,7 @@ class nImage(BioImage):
                         for C in channel_names
                     ]
 
-            if not self.settings.ndevio_Reader.unpack_channels_as_layers:
+            if not self.settings.ndevio_reader.unpack_channels_as_layers:
                 meta["name"] = (
                     f"{DELIM}".join(channel_names)
                     + f"{DELIM}{scene_idx}{DELIM}{scene}{DELIM}{path_stem}"

@@ -1011,7 +1011,7 @@ class UtilitiesContainer(ScrollableContainer):
             save_name,
         )
 
-        scale = self._settings.ndevio_Export.canvas_scale
+        scale = self._settings.ndevio_export.canvas_scale
 
         self._viewer.export_figure(
             path=str(save_path),
@@ -1033,9 +1033,9 @@ class UtilitiesContainer(ScrollableContainer):
             self._save_directory.value, "Figures", save_name
         )
 
-        scale = self._settings.ndevio_Export.canvas_scale
-        if self._settings.ndevio_Export.override_canvas_size:
-            canvas_size = self._settings.ndevio_Export.canvas_size
+        scale = self._settings.ndevio_export.canvas_scale
+        if self._settings.ndevio_export.override_canvas_size:
+            canvas_size = self._settings.ndevio_export.canvas_size
         else:
             canvas_size = self._viewer.window._qt_viewer.canvas.size
 
