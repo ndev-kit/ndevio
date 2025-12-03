@@ -18,6 +18,9 @@ contributions:
     - id: ndevio.make_plugin_installer_widget
       python_name: ndevio.widgets:PluginInstallerWidget
       title: Install BioIO Reader Plugins
+    - id: ndevio.make_utilities_widget
+      python_name: ndevio.widgets:UtilitiesContainer
+      title: I/O Utilities
   readers:
     - command: ndevio.get_reader
       accepts_directories: false
@@ -66,3 +69,5 @@ contributions:
   widgets:
     - command: ndevio.make_plugin_installer_widget
       display_name: Install BioIO Reader Plugins
+    - command: ndevio.make_utilities_widget
+      display_name: I/O Utilities

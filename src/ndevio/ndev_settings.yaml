@@ -26,3 +26,23 @@ ndevio_Reader:
     default: false
     tooltip: Whether to clear the viewer when selecting a new scene
     value: false
+
+ndevio_Export:
+  canvas_scale:
+    default: 1.0
+    min: 0.01
+    max: 100.0
+    step: 1.0
+    tooltip: Scale factor for exported figures and screenshots
+    value: 1.0
+  override_canvas_size:
+    default: false
+    tooltip: Whether to override canvas size when exporting screenshots
+    value: false
+  canvas_size:
+    default: !!python/tuple [1024, 1024]
+    options:
+      min: 1
+      max: 100000
+    tooltip: Height x width of canvas when exporting (if override enabled)
+    value: !!python/tuple [1024, 1024]
