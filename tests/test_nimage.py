@@ -162,6 +162,80 @@ def test_get_napari_metadata(resources_dir: Path):
     assert img.napari_metadata["scale"] is not None
 
 
+def test_get_napari_metadata_ome_validation_error_logged(
+    resources_dir: Path,
+    caplog: pytest.LogCaptureFixture,
+):
+    """Test that OME metadata validation errors are logged but don't crash.
+
+    Some files (e.g., CZI files with LatticeLightsheet acquisition mode) have
+    metadata that doesn't conform to the OME schema, causing ValidationError
+    when accessing ome_metadata. This should be logged as a warning but not
+    prevent the image from loading.
+    """
+    img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+    img.get_napari_image_data()
+
+    # Mock ome_metadata to raise a ValidationError (which inherits from ValueError)
+    with mock.patch.object(
+        type(img),
+        "ome_metadata",
+        new_callable=mock.PropertyMock,
+        side_effect=ValueError("Invalid acquisition_mode: LatticeLightsheet"),
+    ):
+        caplog.clear()
+        metadata = img.get_napari_metadata()
+
+        # Should still return valid metadata
+        assert metadata is not None
+        assert "name" in metadata
+        assert "metadata" in metadata
+
+        # ome_metadata should NOT be in the nested metadata dict
+        assert "ome_metadata" not in metadata["metadata"]
+
+        # raw_image_metadata should still be available
+        assert "raw_image_metadata" in metadata["metadata"]
+
+        # Warning should be logged
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "Could not parse OME metadata" in caplog.records[0].message
+        assert "LatticeLightsheet" in caplog.records[0].message
+
+
+def test_get_napari_metadata_ome_not_implemented_silent(
+    resources_dir: Path,
+    caplog: pytest.LogCaptureFixture,
+):
+    """Test that NotImplementedError for ome_metadata is silently ignored.
+
+    Some readers don't support OME metadata at all. This should be silently
+    ignored without logging.
+    """
+    img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+    img.get_napari_image_data()
+
+    # Mock ome_metadata to raise NotImplementedError
+    with mock.patch.object(
+        type(img),
+        "ome_metadata",
+        new_callable=mock.PropertyMock,
+        side_effect=NotImplementedError(
+            "Reader does not support OME metadata"
+        ),
+    ):
+        caplog.clear()
+        metadata = img.get_napari_metadata()
+
+        # Should still return valid metadata
+        assert metadata is not None
+        assert "ome_metadata" not in metadata["metadata"]
+
+        # No warning should be logged for NotImplementedError
+        assert len(caplog.records) == 0
+
+
 def test_get_napari_image_data_mosaic_tile_in_memory(resources_dir: Path):
     """Test mosaic tile image data in memory."""
     import xarray as xr

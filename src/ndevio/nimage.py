@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import logging
 from pathlib import Path
 
@@ -323,8 +322,20 @@ class nImage(BioImage):
         # get all other metadata
         img_meta = {"bioimage": self, "raw_image_metadata": self.metadata}
 
-        with contextlib.suppress(NotImplementedError):
-            img_meta["metadata"] = self.ome_metadata
+        try:
+            img_meta["ome_metadata"] = self.ome_metadata
+        except NotImplementedError:
+            pass  # Reader doesn't support OME metadata, so we don't attach it to napari metadata
+        except (ValueError, TypeError, KeyError) as e:
+            # Some files have metadata that doesn't conform to OME schema, despite bioio attempting to parse it
+            # (e.g., CZI files with LatticeLightsheet acquisition mode)
+            # As such, when accessing ome_metadata, we may get various exceptions
+            # Log warning but continue - raw metadata is still available
+            logger.warning(
+                "Could not parse OME metadata: %s. "
+                "Raw metadata is still available in 'raw_image_metadata'.",
+                e,
+            )
 
         meta["metadata"] = img_meta
         self.napari_metadata = meta
