@@ -32,7 +32,7 @@ def test_nImage_init(resources_dir: Path):
     assert img.reader is not None
     # Shape is (T, C, Z, Y, X) = (1, 2, 60, 66, 85)
     assert img.data.shape == (1, 2, 60, 66, 85)
-    assert img.napari_data is None
+    assert img.napari_layer_data is None
 
 
 def test_nImage_ome_reader(resources_dir: Path):
@@ -130,39 +130,40 @@ def test_nImage_determine_in_memory_large_file(resources_dir: Path):
         assert img._determine_in_memory() is False
 
 
-def test_get_napari_image_data(resources_dir: Path):
-    """Test getting napari image data in memory."""
+def test_get_layer_data(resources_dir: Path):
+    """Test loading napari layer data in memory."""
     img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-    img.get_napari_image_data()
-    # napari_data will be squeezed and first channel selected by default
-    # Original shape (1, 2, 60, 66, 85) -> first channel (60, 66, 85)
-    assert img.napari_data.shape == (2, 60, 66, 85)
-    assert img.napari_data.dims == ("C", "Z", "Y", "X")
+    img._get_layer_data()
+    # napari_layer_data will be squeezed
+    # Original shape (1, 2, 60, 66, 85) -> (2, 60, 66, 85)
+    assert img.napari_layer_data.shape == (2, 60, 66, 85)
+    assert img.napari_layer_data.dims == ("C", "Z", "Y", "X")
 
 
-def test_get_napari_image_data_not_in_memory(resources_dir: Path):
-    """Test getting napari image data as dask array."""
+def test_get_layer_data_not_in_memory(resources_dir: Path):
+    """Test loading napari layer data as dask array."""
     import dask
 
     img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-    img.get_napari_image_data(in_memory=False)
-    assert img.napari_data is not None
+    img._get_layer_data(in_memory=False)
+    assert img.napari_layer_data is not None
     # check that the data is a dask array
-    assert isinstance(img.napari_data.data, dask.array.core.Array)
+    assert isinstance(img.napari_layer_data.data, dask.array.core.Array)
 
 
-def test_get_napari_metadata(resources_dir: Path):
-    """Test napari metadata generation."""
+def test_get_layer_data_tuples_basic(resources_dir: Path):
+    """Test layer data tuple generation."""
     img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-    img.get_napari_metadata(path=img.path)
-    # With channels, the name will be a list of channel names
-    assert any(
-        "cells3d2ch_legacy" in name for name in img.napari_metadata["name"]
-    )
-    assert img.napari_metadata["scale"] is not None
+    layer_tuples = img.get_layer_data_tuples()
+    # With 2 channels, should get 2 tuples (one per channel)
+    assert len(layer_tuples) == 2
+    for _data, meta, layer_type in layer_tuples:
+        assert "cells3d2ch_legacy" in meta["name"]
+        assert meta["scale"] is not None
+        assert layer_type == "image"  # default layer type
 
 
-def test_get_napari_metadata_ome_validation_error_logged(
+def test_get_layer_data_tuples_ome_validation_error_logged(
     resources_dir: Path,
     caplog: pytest.LogCaptureFixture,
 ):
@@ -174,7 +175,6 @@ def test_get_napari_metadata_ome_validation_error_logged(
     prevent the image from loading.
     """
     img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-    img.get_napari_image_data()
 
     # Mock ome_metadata to raise a ValidationError (which inherits from ValueError)
     with mock.patch.object(
@@ -184,27 +184,33 @@ def test_get_napari_metadata_ome_validation_error_logged(
         side_effect=ValueError("Invalid acquisition_mode: LatticeLightsheet"),
     ):
         caplog.clear()
-        metadata = img.get_napari_metadata()
+        layer_tuples = img.get_layer_data_tuples()
 
-        # Should still return valid metadata
-        assert metadata is not None
-        assert "name" in metadata
-        assert "metadata" in metadata
+        # Should still return valid layer tuples
+        assert layer_tuples is not None
+        assert len(layer_tuples) > 0
 
-        # ome_metadata should NOT be in the nested metadata dict
-        assert "ome_metadata" not in metadata["metadata"]
-
-        # raw_image_metadata should still be available
-        assert "raw_image_metadata" in metadata["metadata"]
+        # Check that metadata dict exists in each tuple
+        for _, meta, _ in layer_tuples:
+            assert "name" in meta
+            assert "metadata" in meta
+            # ome_metadata should NOT be in the nested metadata dict
+            assert "ome_metadata" not in meta["metadata"]
+            # raw_image_metadata should still be available
+            assert "raw_image_metadata" in meta["metadata"]
 
         # Warning should be logged
         assert len(caplog.records) == 1
         assert caplog.records[0].levelname == "WARNING"
         assert "Could not parse OME metadata" in caplog.records[0].message
         assert "LatticeLightsheet" in caplog.records[0].message
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        assert "Could not parse OME metadata" in caplog.records[0].message
+        assert "LatticeLightsheet" in caplog.records[0].message
 
 
-def test_get_napari_metadata_ome_not_implemented_silent(
+def test_get_layer_data_tuples_ome_not_implemented_silent(
     resources_dir: Path,
     caplog: pytest.LogCaptureFixture,
 ):
@@ -214,7 +220,6 @@ def test_get_napari_metadata_ome_not_implemented_silent(
     ignored without logging.
     """
     img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-    img.get_napari_image_data()
 
     # Mock ome_metadata to raise NotImplementedError
     with mock.patch.object(
@@ -226,17 +231,20 @@ def test_get_napari_metadata_ome_not_implemented_silent(
         ),
     ):
         caplog.clear()
-        metadata = img.get_napari_metadata()
+        layer_tuples = img.get_layer_data_tuples()
 
-        # Should still return valid metadata
-        assert metadata is not None
-        assert "ome_metadata" not in metadata["metadata"]
+        # Should still return valid layer tuples
+        assert layer_tuples is not None
+        assert len(layer_tuples) > 0
+
+        for _, meta, _ in layer_tuples:
+            assert "ome_metadata" not in meta["metadata"]
 
         # No warning should be logged for NotImplementedError
         assert len(caplog.records) == 0
 
 
-def test_get_napari_image_data_mosaic_tile_in_memory(resources_dir: Path):
+def test_get_layer_data_mosaic_tile_in_memory(resources_dir: Path):
     """Test mosaic tile image data in memory."""
     import xarray as xr
     from bioio_base.dimensions import DimensionNames
@@ -247,13 +255,12 @@ def test_get_napari_image_data_mosaic_tile_in_memory(resources_dir: Path):
             [1, 2, 3]
         )
         img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-        data = img.get_napari_image_data(in_memory=True)
-        assert data is not None
-        assert data.shape == (3,)
-        assert img.napari_data is not None
+        img._get_layer_data(in_memory=True)
+        assert img.napari_layer_data is not None
+        assert img.napari_layer_data.shape == (3,)
 
 
-def test_get_napari_image_data_mosaic_tile_not_in_memory(
+def test_get_layer_data_mosaic_tile_not_in_memory(
     resources_dir: Path,
 ):
     """Test mosaic tile image data as dask array."""
@@ -266,10 +273,9 @@ def test_get_napari_image_data_mosaic_tile_not_in_memory(
             xr.DataArray([1, 2, 3])
         )
         img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-        data = img.get_napari_image_data(in_memory=False)
-        assert data is not None
-        assert data.shape == (3,)
-        assert img.napari_data is not None
+        img._get_layer_data(in_memory=False)
+        assert img.napari_layer_data is not None
+        assert img.napari_layer_data.shape == (3,)
 
 
 @pytest.mark.parametrize(
@@ -378,69 +384,41 @@ def test_nimage_init_with_various_formats(
 
 
 # =============================================================================
-# Tests for build_napari_layer_tuples
+# Tests for get_layer_data_tuples
 # =============================================================================
 
 
-class TestBuildNapariLayerTuples:
-    """Tests for nImage.build_napari_layer_tuples method."""
+class TestGetLayerDataTuples:
+    """Tests for nImage.get_layer_data_tuples method."""
 
-    def test_image_layer_type_returns_single_tuple_with_channel_axis(
-        self, resources_dir: Path
-    ):
-        """Test that image layer type returns single tuple with channel_axis preserved.
+    def test_multichannel_returns_tuple_per_channel(self, resources_dir: Path):
+        """Test that multichannel images return one tuple per channel.
 
-        For image layers, napari handles channel_axis splitting automatically,
-        so we return a single tuple with channel_axis in the metadata.
+        The new API always splits channels, returning separate tuples for each.
         """
         img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-        layer_tuples = img.build_napari_layer_tuples(layer_type="image")
+        layer_tuples = img.get_layer_data_tuples()
 
-        # Should return single tuple for image layer type
-        assert len(layer_tuples) == 1
-
-        data, meta, layer_type = layer_tuples[0]
-
-        # channel_axis should be preserved for image layers
-        assert "channel_axis" in meta
-        assert meta["channel_axis"] == 0  # C is first dim after squeeze
-
-        # name should be a list of channel names
-        assert isinstance(meta["name"], list)
-        assert len(meta["name"]) == 2  # 2 channels
-
-        # Data shape should include channel dimension
-        assert data.shape == (2, 60, 66, 85)  # CZYX
-        assert layer_type == "image"
-
-    def test_labels_layer_type_splits_channels(self, resources_dir: Path):
-        """Test that labels layer type splits multichannel data into separate tuples.
-
-        For labels layers, napari's add_labels() doesn't support channel_axis,
-        so we manually split the data into separate layer tuples.
-        """
-        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-        layer_tuples = img.build_napari_layer_tuples(layer_type="labels")
-
-        # Should return one tuple per channel
-        assert len(layer_tuples) == 2  # 2 channels
+        # Should return one tuple per channel (2 channels)
+        assert len(layer_tuples) == 2
 
         for data, meta, layer_type in layer_tuples:
-            # channel_axis should NOT be in metadata for labels
+            # channel_axis should NOT be in metadata (we split ourselves)
             assert "channel_axis" not in meta
 
-            # name should be a string, not a list
+            # name should be a string (not a list)
             assert isinstance(meta["name"], str)
 
             # Data shape should NOT include channel dimension
             assert data.shape == (60, 66, 85)  # ZYX only
 
-            assert layer_type == "labels"
+            # Default layer type is "image" (channel names don't match label keywords)
+            assert layer_type == "image"
 
-    def test_labels_layer_names_match_channel_names(self, resources_dir: Path):
-        """Test that split labels layers have correct channel names."""
+    def test_layer_names_include_channel_names(self, resources_dir: Path):
+        """Test that layer names include channel names from the file."""
         img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-        layer_tuples = img.build_napari_layer_tuples(layer_type="labels")
+        layer_tuples = img.get_layer_data_tuples()
 
         # Extract names from the tuples
         names = [meta["name"] for _, meta, _ in layer_tuples]
@@ -452,25 +430,25 @@ class TestBuildNapariLayerTuples:
     def test_single_channel_image_returns_single_tuple(
         self, resources_dir: Path
     ):
-        """Test that single channel images return single tuple for any layer type."""
-        # PNG is single channel (well, RGB but treated differently)
+        """Test that single channel images return single tuple."""
+        # PNG is single channel (or RGB treated as single layer)
         img = nImage(resources_dir / LOGO_PNG)
-        layer_tuples = img.build_napari_layer_tuples(layer_type="labels")
+        layer_tuples = img.get_layer_data_tuples()
 
         # Single channel should return single tuple
         assert len(layer_tuples) == 1
 
         data, meta, layer_type = layer_tuples[0]
         assert "channel_axis" not in meta
-        assert layer_type == "labels"
+        assert layer_type == "image"
 
-    def test_scale_preserved_in_split_labels(self, resources_dir: Path):
-        """Test that scale metadata is preserved when splitting channels."""
+    def test_scale_preserved_in_tuples(self, resources_dir: Path):
+        """Test that scale metadata is preserved in each tuple."""
         img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-        layer_tuples = img.build_napari_layer_tuples(layer_type="labels")
+        layer_tuples = img.get_layer_data_tuples()
 
         for _, meta, _ in layer_tuples:
-            # Scale should be preserved in each split layer
+            # Scale should be preserved in each layer
             assert "scale" in meta
             # Original has physical pixel sizes, so scale should have values
             assert len(meta["scale"]) > 0
@@ -480,26 +458,209 @@ class TestBuildNapariLayerTuples:
 
         img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
 
-        # Test with in_memory=False (dask array)
-        layer_tuples = img.build_napari_layer_tuples(
-            layer_type="labels", in_memory=False
-        )
+        # Test with in_memory=True (numpy array)
+        layer_tuples = img.get_layer_data_tuples(in_memory=True)
+
+        import numpy as np
 
         for data, _, _ in layer_tuples:
-            # Data should be numpy array (sliced from dask)
-            # When we slice a dask array, we get numpy
-            assert data is not None
+            # Data should be numpy array when in_memory=True
+            assert isinstance(data, np.ndarray)
 
-    def test_image_only_metadata_filtered_for_labels(
+    def test_colormap_cycling_for_images(self, resources_dir: Path):
+        """Test that image layers get colormaps based on napari's defaults.
+
+        - 1 channel → gray
+        - 2 channels → magenta, green (MAGENTA_GREEN)
+        - 3+ channels → cycles through CYMRGB
+        """
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+        layer_tuples = img.get_layer_data_tuples()
+
+        # Extract colormaps from the tuples
+        colormaps = [meta.get("colormap") for _, meta, _ in layer_tuples]
+
+        # 2 channels should use MAGENTA_GREEN
+        assert colormaps[0] == "magenta"
+        assert colormaps[1] == "green"
+
+    def test_colormap_single_channel_is_gray(self, resources_dir: Path):
+        """Test that single channel images get gray colormap."""
+        import numpy as np
+        import xarray as xr
+
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+
+        # Mock single channel data (no Channel dimension)
+        mock_data = xr.DataArray(
+            np.zeros((10, 10)),
+            dims=["Y", "X"],
+        )
+        img.napari_layer_data = mock_data
+
+        layer_tuples = img.get_layer_data_tuples()
+        assert len(layer_tuples) == 1
+        assert layer_tuples[0][1]["colormap"] == "gray"
+
+    def test_colormap_three_plus_channels_uses_multi_channel_cycle(
         self, resources_dir: Path
     ):
-        """Test that image-only metadata keys are filtered for non-image layers."""
-        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-        layer_tuples = img.build_napari_layer_tuples(layer_type="labels")
+        """Test that 3+ channel images cycle through MULTI_CHANNEL_CYCLE."""
+        import numpy as np
+        import xarray as xr
+        from bioio_base.dimensions import DimensionNames
 
-        for _, meta, _ in layer_tuples:
-            # These keys should NOT be present for labels
-            assert "rgb" not in meta
+        from ndevio._colormap_utils import MULTI_CHANNEL_CYCLE
+
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+
+        # Mock 4 channel data
+        mock_data = xr.DataArray(
+            np.zeros((4, 10, 10)),
+            dims=[DimensionNames.Channel, "Y", "X"],
+            coords={DimensionNames.Channel: ["ch0", "ch1", "ch2", "ch3"]},
+        )
+        img.napari_layer_data = mock_data
+
+        layer_tuples = img.get_layer_data_tuples()
+        colormaps = [meta.get("colormap") for _, meta, _ in layer_tuples]
+
+        # Should cycle through MULTI_CHANNEL_CYCLE (CMYBGR)
+        assert colormaps[0] == MULTI_CHANNEL_CYCLE[0]  # cyan
+        assert colormaps[1] == MULTI_CHANNEL_CYCLE[1]  # magenta
+        assert colormaps[2] == MULTI_CHANNEL_CYCLE[2]  # yellow
+        assert colormaps[3] == MULTI_CHANNEL_CYCLE[3]  # blue
+
+    def test_auto_detect_labels_from_channel_name(self, resources_dir: Path):
+        """Test that channels with label-like names are detected as labels."""
+        import numpy as np
+        import xarray as xr
+        from bioio_base.dimensions import DimensionNames
+
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+
+        # Mock napari_layer_data with a channel named "mask"
+        mock_data = xr.DataArray(
+            np.zeros((2, 10, 10)),
+            dims=[DimensionNames.Channel, "Y", "X"],
+            coords={DimensionNames.Channel: ["intensity", "mask"]},
+        )
+        img.napari_layer_data = mock_data
+
+        # Call the method (skip loading since we set napari_layer_data manually)
+        layer_tuples = img.get_layer_data_tuples()
+
+        # First channel "intensity" should be image
+        assert layer_tuples[0][2] == "image"
+        # Second channel "mask" should be labels (keyword match)
+        assert layer_tuples[1][2] == "labels"
+
+    def test_channel_types_override_auto_detection(self, resources_dir: Path):
+        """Test that channel_types parameter overrides auto-detection."""
+        import numpy as np
+        import xarray as xr
+        from bioio_base.dimensions import DimensionNames
+
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+
+        # Set up mock data
+        mock_data = xr.DataArray(
+            np.zeros((2, 10, 10)),
+            dims=[DimensionNames.Channel, "Y", "X"],
+            coords={DimensionNames.Channel: ["intensity", "mask"]},
+        )
+        img.napari_layer_data = mock_data
+
+        # Override: set both channels to labels
+        layer_tuples = img.get_layer_data_tuples(
+            channel_types={"intensity": "labels", "mask": "labels"}
+        )
+
+        # Both should be labels due to override
+        assert layer_tuples[0][2] == "labels"
+        assert layer_tuples[1][2] == "labels"
+
+    def test_labels_do_not_get_colormap(self, resources_dir: Path):
+        """Test that labels layers don't get colormap metadata."""
+        import numpy as np
+        import xarray as xr
+        from bioio_base.dimensions import DimensionNames
+
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+
+        # Mock data with a labels channel
+        mock_data = xr.DataArray(
+            np.zeros((1, 10, 10)),
+            dims=[DimensionNames.Channel, "Y", "X"],
+            coords={DimensionNames.Channel: ["segmentation"]},
+        )
+        img.napari_layer_data = mock_data
+
+        layer_tuples = img.get_layer_data_tuples()
+
+        # "segmentation" matches label keyword
+        assert layer_tuples[0][2] == "labels"
+        # Labels should not have colormap
+        assert "colormap" not in layer_tuples[0][1]
+
+    def test_layer_type_override_all_channels(self, resources_dir: Path):
+        """Test that layer_type parameter overrides all channels."""
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+        layer_tuples = img.get_layer_data_tuples(layer_type="labels")
+
+        # All channels should be labels due to override
+        assert len(layer_tuples) == 2
+        for _, meta, layer_type in layer_tuples:
+            assert layer_type == "labels"
+            # Labels should not have colormap
             assert "colormap" not in meta
-            assert "contrast_limits" not in meta
-            assert "channel_axis" not in meta
+
+    def test_layer_type_overrides_channel_types(self, resources_dir: Path):
+        """Test that layer_type takes precedence over channel_types."""
+        import numpy as np
+        import xarray as xr
+        from bioio_base.dimensions import DimensionNames
+
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+
+        mock_data = xr.DataArray(
+            np.zeros((2, 10, 10)),
+            dims=[DimensionNames.Channel, "Y", "X"],
+            coords={DimensionNames.Channel: ["intensity", "mask"]},
+        )
+        img.napari_layer_data = mock_data
+
+        # Even though channel_types says "intensity" should be image,
+        # layer_type="labels" should override everything
+        layer_tuples = img.get_layer_data_tuples(
+            layer_type="labels",
+            channel_types={"intensity": "image", "mask": "image"},
+        )
+
+        # Both should be labels due to layer_type override
+        assert layer_tuples[0][2] == "labels"
+
+    def test_channel_kwargs_override_metadata(self, resources_dir: Path):
+        """Test that channel_kwargs overrides default metadata."""
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+        layer_tuples = img.get_layer_data_tuples(
+            channel_kwargs={
+                img.channel_names[0]: {
+                    "colormap": "blue",
+                    "contrast_limits": (0, 1000),
+                },
+                img.channel_names[1]: {
+                    "opacity": 0.5,
+                },
+            }
+        )
+
+        assert len(layer_tuples) == 2
+        # First channel should have overridden colormap and contrast_limits
+        assert layer_tuples[0][1]["colormap"] == "blue"
+        assert layer_tuples[0][1]["contrast_limits"] == (0, 1000)
+        # Second channel should have opacity override but default colormap
+        assert layer_tuples[1][1]["opacity"] == 0.5
+        assert (
+            layer_tuples[1][1]["colormap"] == "green"
+        )  # default for 2-channel

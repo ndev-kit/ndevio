@@ -34,6 +34,9 @@ def test_napari_viewer_open(resources_dir: Path, make_napari_viewer) -> None:
     viewer = make_napari_viewer()
     viewer.open(str(resources_dir / OME_TIFF), plugin="ndevio")
 
+    # Now channels are split into separate layers, so we should have 2 layers
+    assert len(viewer.layers) == 2
+    # Each layer is a single channel with shape (60, 66, 85)
     assert viewer.layers[0].data.shape == (60, 66, 85)
 
 
@@ -45,13 +48,19 @@ def test_napari_viewer_open(resources_dir: Path, make_napari_viewer) -> None:
     ],
 )
 @pytest.mark.parametrize(
-    ("filename", "expected_shape", "expected_has_scale"),
+    (
+        "filename",
+        "expected_shape",
+        "expected_has_scale",
+        "expected_num_layers",
+    ),
     [
         # PNG shape is (106, 243, 4) - actual dimensions of nDev-logo-small.png
         # PNG files from bioio-imageio don't include scale metadata
-        (PNG_FILE, (106, 243, 4), False),
-        # OME-TIFF shape is (2, 60, 66, 85) - CZYX with 2 channels
-        (OME_TIFF, (2, 60, 66, 85), True),
+        (PNG_FILE, (106, 243, 4), False, 1),
+        # OME-TIFF has 2 channels that are now split into separate layers
+        # Each layer shape is (60, 66, 85) - ZYX
+        (OME_TIFF, (60, 66, 85), True, 2),
     ],
 )
 def test_reader_supported_formats(
@@ -61,6 +70,7 @@ def test_reader_supported_formats(
     expected_shape: tuple[int, ...],
     expected_dtype,
     expected_has_scale: bool,
+    expected_num_layers: int,
     make_napari_viewer,
 ) -> None:
     """Test reader with formats that should work with core dependencies."""
@@ -80,9 +90,9 @@ def test_reader_supported_formats(
     # Get data
     layer_data = partial_napari_reader_function(path)
 
-    # We should return at least one layer
+    # We should return expected number of layers
     assert layer_data is not None
-    assert len(layer_data) > 0
+    assert len(layer_data) == expected_num_layers
 
     data, meta, _ = layer_data[0]
 
