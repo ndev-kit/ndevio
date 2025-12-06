@@ -4925,8 +4925,8 @@ packages:
   requires_python: '>=3.10'
 - pypi: ./
   name: ndevio
-  version: 0.4.1.dev9+gb94b2e223.d20251203
-  sha256: da1c3a7aa05ed557ec53ec8a62fd72f207d3a363915acf5812ce2327a71e2992
+  version: 0.5.1.dev0+g6b347af8b.d20251205
+  sha256: 165deea7b03f51ad0dd372f6cfc0669323dbd86483fc56e466e87649a2706d68
   requires_dist:
   - bioio-base
   - bioio-imageio
