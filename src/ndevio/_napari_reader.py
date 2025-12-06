@@ -11,7 +11,7 @@ from ndev_settings import get_settings
 from .nimage import determine_reader_plugin, nImage
 
 if TYPE_CHECKING:
-    from napari.types import LayerData, PathLike, ReaderFunction
+    from napari.types import LayerDataTuple, PathLike, ReaderFunction
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +96,7 @@ def napari_reader_function(
     open_first_scene_only: bool = False,
     open_all_scenes: bool = False,
     layer_type: str = "image",
-) -> list[LayerData] | None:
+) -> list[LayerDataTuple] | None:
     """
     Read a file using the given reader function.
 
