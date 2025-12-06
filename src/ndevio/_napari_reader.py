@@ -136,9 +136,9 @@ def napari_reader_function(
 
     # open first scene only
     if len(img.scenes) == 1 or open_first_scene_only:
-        img_data = img.get_napari_image_data(in_memory=in_memory)
-        img_meta = img.get_napari_metadata(path)
-        return [(img_data.data, img_meta, layer_type)]
+        return img.build_napari_layer_tuples(
+            path=path, layer_type=layer_type, in_memory=in_memory
+        )
 
     # TODO: USE settings for open first or all scenes to set the nubmer of iterations of a for loop
     # check napari reader settings stuff
@@ -147,9 +147,11 @@ def napari_reader_function(
         layer_list = []
         for scene in img.scenes:
             img.set_scene(scene)
-            img_data = img.get_napari_image_data(in_memory=in_memory)
-            img_meta = img.get_napari_metadata(path)
-            layer_list.append((img_data.data, img_meta, layer_type))
+            layer_list.extend(
+                img.build_napari_layer_tuples(
+                    path=path, layer_type=layer_type, in_memory=in_memory
+                )
+            )
         return layer_list
 
     # open scene widget

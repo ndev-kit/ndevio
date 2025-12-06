@@ -228,17 +228,28 @@ class nImage(BioImage):
 
         return self.napari_data
 
+    # Metadata keys that are only valid for image layers, not labels/other layers
+    # Note: channel_axis is NOT included here because the reader function needs it
+    # to split multichannel data for non-image layers, then removes it before
+    # passing to napari
+    _IMAGE_ONLY_METADATA_KEYS = {"rgb", "colormap", "contrast_limits"}
+
     def get_napari_metadata(
         self,
         path: PathLike | None = None,
+        layer_type: str = "image",
     ) -> dict:
         """
         Get the metadata for the image to be displayed in napari.
 
         Parameters
         ----------
-        path : PathLike
+        path : PathLike, optional
             Path to the image file.
+        layer_type : str, optional
+            The napari layer type ('image', 'labels', etc.). Default is 'image'.
+            Some metadata keys (like 'channel_axis', 'rgb') are only valid for
+            image layers and will be filtered out for other layer types.
 
         Returns
         -------
@@ -338,5 +349,95 @@ class nImage(BioImage):
             )
 
         meta["metadata"] = img_meta
+
+        # Filter out image-only metadata keys for non-image layer types
+        if layer_type != "image":
+            meta = {
+                k: v
+                for k, v in meta.items()
+                if k not in self._IMAGE_ONLY_METADATA_KEYS
+            }
+
         self.napari_metadata = meta
         return self.napari_metadata
+
+    def build_napari_layer_tuples(
+        self,
+        path: PathLike | None = None,
+        layer_type: str = "image",
+        in_memory: bool | None = None,
+    ) -> list[tuple]:
+        """
+        Build napari layer data tuples, handling channel splitting for non-image layers.
+
+        For image layers, napari handles channel_axis splitting automatically
+        with conveniences like cycling colormaps and additive blending.
+        For other layer types (labels, etc.), we manually split the data
+        along the channel axis since only add_image() supports channel_axis.
+
+        Parameters
+        ----------
+        path : PathLike, optional
+            Path to the image file. If None, uses self.path.
+        layer_type : str, optional
+            The napari layer type ('image', 'labels', etc.). Default is 'image'.
+        in_memory : bool, optional
+            Whether to load the image in memory. If None, determined automatically.
+
+        Returns
+        -------
+        list[tuple]
+            List of (data, metadata, layer_type) tuples ready for napari.
+
+        Examples
+        --------
+        >>> img = nImage("path/to/image.tiff")
+        >>> layer_tuples = img.build_napari_layer_tuples(layer_type="labels")
+        >>> for data, meta, ltype in layer_tuples:
+        ...     viewer.add_layer(Layer.create(data, meta, ltype))
+
+        """
+        # Ensure data and metadata are loaded
+        if self.napari_data is None:
+            self.get_napari_image_data(in_memory=in_memory)
+
+        img_data = self.napari_data
+        img_meta = self.get_napari_metadata(path=path, layer_type=layer_type)
+
+        # For image layers, napari handles channel_axis - return as single tuple
+        if layer_type == "image" or "channel_axis" not in img_meta:
+            return [(img_data.data, img_meta, layer_type)]
+
+        # For non-image layers, check if we need to split channels manually
+        channel_axis = img_meta.pop("channel_axis", None)
+
+        if channel_axis is not None:
+            # We have multichannel data that needs manual splitting
+            names = img_meta.get("name", [])
+            if not isinstance(names, list):
+                names = [names]
+
+            layer_tuples = []
+            n_channels = img_data.shape[channel_axis]
+
+            for i in range(n_channels):
+                # Slice the data along channel axis
+                slices = [slice(None)] * img_data.ndim
+                slices[channel_axis] = i
+                channel_data = img_data.data[tuple(slices)]
+
+                # Build per-channel metadata
+                channel_meta = img_meta.copy()
+                if i < len(names):
+                    channel_meta["name"] = names[i]
+                # Handle case where name is still a list
+                if "name" in channel_meta and isinstance(
+                    channel_meta["name"], list
+                ):
+                    channel_meta["name"] = (
+                        names[i] if i < len(names) else f"channel_{i}"
+                    )
+
+                layer_tuples.append((channel_data, channel_meta, layer_type))
+
+            return layer_tuples

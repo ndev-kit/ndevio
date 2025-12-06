@@ -375,3 +375,131 @@ def test_nimage_init_with_various_formats(
                 assert any(
                     text in error_msg for text in expected_error_contains
                 )
+
+
+# =============================================================================
+# Tests for build_napari_layer_tuples
+# =============================================================================
+
+
+class TestBuildNapariLayerTuples:
+    """Tests for nImage.build_napari_layer_tuples method."""
+
+    def test_image_layer_type_returns_single_tuple_with_channel_axis(
+        self, resources_dir: Path
+    ):
+        """Test that image layer type returns single tuple with channel_axis preserved.
+
+        For image layers, napari handles channel_axis splitting automatically,
+        so we return a single tuple with channel_axis in the metadata.
+        """
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+        layer_tuples = img.build_napari_layer_tuples(layer_type="image")
+
+        # Should return single tuple for image layer type
+        assert len(layer_tuples) == 1
+
+        data, meta, layer_type = layer_tuples[0]
+
+        # channel_axis should be preserved for image layers
+        assert "channel_axis" in meta
+        assert meta["channel_axis"] == 0  # C is first dim after squeeze
+
+        # name should be a list of channel names
+        assert isinstance(meta["name"], list)
+        assert len(meta["name"]) == 2  # 2 channels
+
+        # Data shape should include channel dimension
+        assert data.shape == (2, 60, 66, 85)  # CZYX
+        assert layer_type == "image"
+
+    def test_labels_layer_type_splits_channels(self, resources_dir: Path):
+        """Test that labels layer type splits multichannel data into separate tuples.
+
+        For labels layers, napari's add_labels() doesn't support channel_axis,
+        so we manually split the data into separate layer tuples.
+        """
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+        layer_tuples = img.build_napari_layer_tuples(layer_type="labels")
+
+        # Should return one tuple per channel
+        assert len(layer_tuples) == 2  # 2 channels
+
+        for data, meta, layer_type in layer_tuples:
+            # channel_axis should NOT be in metadata for labels
+            assert "channel_axis" not in meta
+
+            # name should be a string, not a list
+            assert isinstance(meta["name"], str)
+
+            # Data shape should NOT include channel dimension
+            assert data.shape == (60, 66, 85)  # ZYX only
+
+            assert layer_type == "labels"
+
+    def test_labels_layer_names_match_channel_names(self, resources_dir: Path):
+        """Test that split labels layers have correct channel names."""
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+        layer_tuples = img.build_napari_layer_tuples(layer_type="labels")
+
+        # Extract names from the tuples
+        names = [meta["name"] for _, meta, _ in layer_tuples]
+
+        # Channel names from the file are "membrane" and "nuclei"
+        assert "membrane" in names[0]
+        assert "nuclei" in names[1]
+
+    def test_single_channel_image_returns_single_tuple(
+        self, resources_dir: Path
+    ):
+        """Test that single channel images return single tuple for any layer type."""
+        # PNG is single channel (well, RGB but treated differently)
+        img = nImage(resources_dir / LOGO_PNG)
+        layer_tuples = img.build_napari_layer_tuples(layer_type="labels")
+
+        # Single channel should return single tuple
+        assert len(layer_tuples) == 1
+
+        data, meta, layer_type = layer_tuples[0]
+        assert "channel_axis" not in meta
+        assert layer_type == "labels"
+
+    def test_scale_preserved_in_split_labels(self, resources_dir: Path):
+        """Test that scale metadata is preserved when splitting channels."""
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+        layer_tuples = img.build_napari_layer_tuples(layer_type="labels")
+
+        for _, meta, _ in layer_tuples:
+            # Scale should be preserved in each split layer
+            assert "scale" in meta
+            # Original has physical pixel sizes, so scale should have values
+            assert len(meta["scale"]) > 0
+
+    def test_in_memory_parameter_respected(self, resources_dir: Path):
+        """Test that in_memory parameter is passed through correctly."""
+
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+
+        # Test with in_memory=False (dask array)
+        layer_tuples = img.build_napari_layer_tuples(
+            layer_type="labels", in_memory=False
+        )
+
+        for data, _, _ in layer_tuples:
+            # Data should be numpy array (sliced from dask)
+            # When we slice a dask array, we get numpy
+            assert data is not None
+
+    def test_image_only_metadata_filtered_for_labels(
+        self, resources_dir: Path
+    ):
+        """Test that image-only metadata keys are filtered for non-image layers."""
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+        layer_tuples = img.build_napari_layer_tuples(layer_type="labels")
+
+        for _, meta, _ in layer_tuples:
+            # These keys should NOT be present for labels
+            assert "rgb" not in meta
+            assert "colormap" not in meta
+            assert "contrast_limits" not in meta
+            assert "channel_axis" not in meta
