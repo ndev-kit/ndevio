@@ -126,14 +126,11 @@ class nImageSceneWidget(Container):
             self.img.napari_layer_data = None
             self.img.layer_data_tuples = None
 
-            # Get layer tuples and add to viewer
-            for data, meta, layer_type in self.img.get_layer_data_tuples(
+            # Get layer tuples and add to viewer using napari's Layer.create()
+            from napari.layers import Layer
+
+            for ldt in self.img.get_layer_data_tuples(
                 in_memory=self.in_memory
             ):
-                if layer_type == "image":
-                    self.viewer.add_image(data, **meta)
-                elif layer_type == "labels":
-                    self.viewer.add_labels(data, **meta)
-                else:
-                    # Fallback for unknown layer types
-                    self.viewer.add_image(data, **meta)
+                layer = Layer.create(*ldt)
+                self.viewer.add_layer(layer)

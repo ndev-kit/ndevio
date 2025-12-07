@@ -442,17 +442,29 @@ class nImage(BioImage):
 
         Returns
         -------
-        list[tuple]
+        list[LayerDataTuple]
             List of (data, metadata, layer_type) tuples ready for napari.
 
         Examples
         --------
+        Add layers to a napari viewer using `Layer.create()`:
+
+        >>> from napari.layers import Layer
         >>> img = nImage("path/to/image.tiff")
-        >>> for data, meta, layer_type in img.get_layer_data_tuples():
-        ...     if layer_type == "image":
-        ...         viewer.add_image(data, **meta)
-        ...     else:
-        ...         viewer.add_labels(data, **meta)
+        >>> for ldt in img.get_layer_data_tuples():
+        ...     layer = Layer.create(*ldt)
+        ...     viewer.add_layer(layer)
+
+        Override layer types for mixed image/labels files:
+
+        >>> img.get_layer_data_tuples(
+        ...     channel_types={"DAPI": "image", "nuclei_mask": "labels"}
+        ... )
+
+        See Also
+        --------
+        napari.layers.Layer.create : Creates a layer from a LayerDataTuple.
+        https://napari.org/dev/plugins/building_a_plugin/guides.html
 
         """
         # Load image data if not already loaded
