@@ -85,3 +85,8 @@ venv/
 # pixi environments
 .pixi/*
 !.pixi/config.toml
+
+# ndevio sampledata that is hosted on Zenodo
+ndevio/sampledata/neocortex-3Ch.tiff
+ndevio/sampledata/scratch-assay-labeled-10T-2Ch.tiff
+ndevio/sampledata/neuron-4Ch_raw.tiff

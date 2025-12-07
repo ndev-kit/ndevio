@@ -373,7 +373,9 @@ class nImage(BioImage):
                 channel_idx, n_channels
             )
             meta["blending"] = (
-                "additive" if n_channels > 1 else "translucent_no_depth"
+                "additive"
+                if channel_idx > 0 and n_channels > 1
+                else "translucent_no_depth"
             )
 
         # Apply per-channel overrides
