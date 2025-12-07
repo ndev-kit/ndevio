@@ -120,10 +120,6 @@ def napari_reader_function(
         List containing image data, metadata, and layer type
 
     """
-    if isinstance(path, list):
-        logger.info("Bioio: Expected a single path, got a list of paths.")
-        return None
-
     img = nImage(path, reader=reader)
     logger.info("Bioio: Reading file with %d scenes", len(img.scenes))
 
@@ -132,19 +128,15 @@ def napari_reader_function(
         return img.get_layer_data_tuples(in_memory=in_memory)
 
     # open all scenes as layers
-    if len(img.scenes) > 1 and open_all_scenes:
+    if open_all_scenes:
         layer_list = []
         for scene in img.scenes:
             img.set_scene(scene)
             layer_list.extend(img.get_layer_data_tuples(in_memory=in_memory))
         return layer_list
 
-    # open scene widget
-    if len(img.scenes) > 1 and not open_all_scenes:
-        _open_scene_container(path=path, img=img, in_memory=in_memory)
-        return [(None,)]
-
-    logger.warning("Bioio: Error reading file")
+    # else: open scene widget
+    _open_scene_container(path=path, img=img, in_memory=in_memory)
     return [(None,)]
 
 
