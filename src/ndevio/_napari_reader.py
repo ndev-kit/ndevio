@@ -11,7 +11,7 @@ from ndev_settings import get_settings
 from .nimage import determine_reader_plugin, nImage
 
 if TYPE_CHECKING:
-    from napari.types import LayerData, PathLike, ReaderFunction
+    from napari.types import LayerDataTuple, PathLike, ReaderFunction
 
 logger = logging.getLogger(__name__)
 
@@ -95,8 +95,7 @@ def napari_reader_function(
     in_memory: bool | None = None,
     open_first_scene_only: bool = False,
     open_all_scenes: bool = False,
-    layer_type: str = "image",
-) -> list[LayerData] | None:
+) -> list[LayerDataTuple] | None:
     """
     Read a file using the given reader function.
 
@@ -104,12 +103,10 @@ def napari_reader_function(
     ----------
     path : PathLike
         Path to the file to be read
-    reader : None
-        Bioio Reader function to be used to read the file, by default None.
+    reader : Callable
+        Bioio Reader class to be used to read the file.
     in_memory : bool, optional
         Whether to read the file in memory, by default None.
-    layer_type : str, optional
-        Type of layer to be created in napari, by default 'image'.
     open_first_scene_only : bool, optional
         Whether to ignore multi-scene files and just open the first scene,
         by default False.
@@ -123,41 +120,23 @@ def napari_reader_function(
         List containing image data, metadata, and layer type
 
     """
-    if isinstance(path, list):
-        logger.info("Bioio: Expected a single path, got a list of paths.")
-        return None
-
     img = nImage(path, reader=reader)
-    in_memory = (
-        img._determine_in_memory(path) if in_memory is None else in_memory
-    )
-    # TODO: Guess layer type here (check channel names for labels?)
-    logger.info("Bioio: Reading in-memory: %s", in_memory)
+    logger.info("Bioio: Reading file with %d scenes", len(img.scenes))
 
     # open first scene only
     if len(img.scenes) == 1 or open_first_scene_only:
-        img_data = img.get_napari_image_data(in_memory=in_memory)
-        img_meta = img.get_napari_metadata(path)
-        return [(img_data.data, img_meta, layer_type)]
+        return img.get_layer_data_tuples(in_memory=in_memory)
 
-    # TODO: USE settings for open first or all scenes to set the nubmer of iterations of a for loop
-    # check napari reader settings stuff
     # open all scenes as layers
-    if len(img.scenes) > 1 and open_all_scenes:
+    if open_all_scenes:
         layer_list = []
         for scene in img.scenes:
             img.set_scene(scene)
-            img_data = img.get_napari_image_data(in_memory=in_memory)
-            img_meta = img.get_napari_metadata(path)
-            layer_list.append((img_data.data, img_meta, layer_type))
+            layer_list.extend(img.get_layer_data_tuples(in_memory=in_memory))
         return layer_list
 
-    # open scene widget
-    if len(img.scenes) > 1 and not open_all_scenes:
-        _open_scene_container(path=path, img=img, in_memory=in_memory)
-        return [(None,)]
-
-    logger.warning("Bioio: Error reading file")
+    # else: open scene widget
+    _open_scene_container(path=path, img=img, in_memory=in_memory)
     return [(None,)]
 
 

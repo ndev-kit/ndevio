@@ -4,16 +4,23 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import xarray as xr
 from bioio import BioImage
 from bioio_base.dimensions import DimensionNames
 from bioio_base.reader import Reader
-from bioio_base.types import ImageLike, PathLike
+from bioio_base.types import ImageLike
+
+if TYPE_CHECKING:
+    from napari.types import LayerDataTuple
 
 logger = logging.getLogger(__name__)
 
 DELIM = " :: "
+
+# Keywords that indicate a channel contains labels/segmentation data
+LABEL_KEYWORDS = ["label", "mask", "segmentation", "seg", "roi"]
 
 
 def determine_reader_plugin(
@@ -83,7 +90,7 @@ def determine_reader_plugin(
 
 class nImage(BioImage):
     """
-    An nImage is a BioImage with additional functionality for napari-ndev.
+    An nImage is a BioImage with additional functionality for napari.
 
     Parameters
     ----------
@@ -96,14 +103,9 @@ class nImage(BioImage):
 
     Attributes
     ----------
+    layer_data_tuples : list[tuple] | None
+        Cached layer data tuples from get_layer_data_tuples().
     See BioImage for inherited attributes.
-
-    Methods
-    -------
-    get_napari_image_data(in_memory=None)
-        Get the image data as a xarray, optionally loading it into memory.
-
-
     """
 
     def __init__(self, image: ImageLike, reader: Reader | None = None) -> None:
@@ -133,8 +135,8 @@ class nImage(BioImage):
             reader = determine_reader_plugin(image)
 
         super().__init__(image=image, reader=reader)  # type: ignore
-        self.napari_data = None
-        self.napari_metadata = {}
+        self.napari_layer_data: xr.DataArray | None = None
+        self.layer_data_tuples: list[tuple] | None = None
         self.path = image if isinstance(image, str | Path) else None
 
     def _determine_in_memory(
@@ -181,21 +183,15 @@ class nImage(BioImage):
             and filesize < max_in_mem_percent * available_mem
         )
 
-    def get_napari_image_data(
-        self, in_memory: bool | None = None
-    ) -> xr.DataArray:
+    def _get_layer_data(self, in_memory: bool | None = None) -> xr.DataArray:
         """
-        Get the image data as a xarray DataArray.
-
-        From BioImage documentation:
-        If you do not want the image pre-stitched together, you can use the base reader
-        by either instantiating the reader independently or using the `.reader` property.
+        Load and cache the image data as an xarray DataArray.
 
         Parameters
         ----------
         in_memory : bool, optional
-            Whether to load the image in memory or not.
-            If None, will determine whether to load in memory based on the image size.
+            Whether to load the image in memory or as dask array.
+            If None, determined automatically based on file size.
 
         Returns
         -------
@@ -209,9 +205,11 @@ class nImage(BioImage):
         if DimensionNames.MosaicTile in self.reader.dims.order:
             try:
                 if in_memory:
-                    self.napari_data = self.reader.mosaic_xarray_data.squeeze()
+                    self.napari_layer_data = (
+                        self.reader.mosaic_xarray_data.squeeze()
+                    )
                 else:
-                    self.napari_data = (
+                    self.napari_layer_data = (
                         self.reader.mosaic_xarray_dask_data.squeeze()
                     )
 
@@ -222,91 +220,27 @@ class nImage(BioImage):
                 return None
         else:
             if in_memory:
-                self.napari_data = self.reader.xarray_data.squeeze()
+                self.napari_layer_data = self.reader.xarray_data.squeeze()
             else:
-                self.napari_data = self.reader.xarray_dask_data.squeeze()
+                self.napari_layer_data = self.reader.xarray_dask_data.squeeze()
 
-        return self.napari_data
+        return self.napari_layer_data
 
-    def get_napari_metadata(
-        self,
-        path: PathLike | None = None,
-    ) -> dict:
-        """
-        Get the metadata for the image to be displayed in napari.
+    def _infer_layer_type(self, channel_name: str) -> str:
+        """Infer layer type from channel name."""
+        name_lower = channel_name.lower()
+        if any(keyword in name_lower for keyword in LABEL_KEYWORDS):
+            return "labels"
+        return "image"
 
-        Parameters
-        ----------
-        path : PathLike
-            Path to the image file.
+    def _get_scale(self) -> tuple | None:
+        """Extract physical pixel scale from image metadata according to number of napari dims."""
+        if self.napari_layer_data is None:
+            return None
 
-        Returns
-        -------
-        dict
-            Metadata for the image to be displayed in napari.
-
-        """
-        if self.napari_data is None:
-            self.get_napari_image_data()  # this also sets self.path
-        # override the nImage path only if provided
-        path = self.path if path is None else path
-
-        # Determine available metadata information
-        meta = {}
-        scene = self.current_scene
-        scene_idx = self.current_scene_index
-        path_stem = (
-            Path(self.path).stem if self.path is not None else "unknown path"
-        )
-
-        NO_SCENE = (
-            len(self.scenes) == 1 and self.current_scene == "Image:0"
-        )  # Image:0 is the default scene name, suggesting there is no information
-        CHANNEL_DIM = DimensionNames.Channel
-        IS_MULTICHANNEL = CHANNEL_DIM in self.napari_data.dims
-
-        # Build metadata under various condition
-        # add channel_axis if unpacking channels as layers
-        if IS_MULTICHANNEL:
-            # Convert to plain Python strings to avoid numpy string types (NumPy 2.0+)
-            channel_names = [
-                str(c)
-                for c in self.napari_data.coords[CHANNEL_DIM].data.tolist()
-            ]
-
-            if self.settings.ndevio_reader.unpack_channels_as_layers:
-                meta["channel_axis"] = self.napari_data.dims.index(CHANNEL_DIM)
-
-                if NO_SCENE:
-                    meta["name"] = [
-                        f"{C}{DELIM}{path_stem}" for C in channel_names
-                    ]
-                else:
-                    meta["name"] = [
-                        f"{C}{DELIM}{scene_idx}{DELIM}{scene}{DELIM}{path_stem}"
-                        for C in channel_names
-                    ]
-
-            if not self.settings.ndevio_reader.unpack_channels_as_layers:
-                meta["name"] = (
-                    f"{DELIM}".join(channel_names)
-                    + f"{DELIM}{scene_idx}{DELIM}{scene}{DELIM}{path_stem}"
-                )
-
-        if not IS_MULTICHANNEL:
-            if NO_SCENE:
-                meta["name"] = path_stem
-            else:
-                meta["name"] = f"{scene_idx}{DELIM}{scene}{DELIM}{path_stem}"
-
-        # Handle if RGB
-        if DimensionNames.Samples in self.reader.dims.order:
-            meta["rgb"] = True
-
-        # Handle scales
         scale = [
             getattr(self.physical_pixel_sizes, dim)
-            for dim in self.napari_data.dims
+            for dim in self.napari_layer_data.dims
             if dim
             in {
                 DimensionNames.SpatialX,
@@ -316,16 +250,25 @@ class nImage(BioImage):
             and getattr(self.physical_pixel_sizes, dim) is not None
         ]
 
-        if scale:
-            meta["scale"] = tuple(scale)
+        return tuple(scale) if scale else None
 
-        # get all other metadata
+    def _build_metadata(self) -> dict:
+        """
+        Build base metadata dict with bioimage reference and raw metadata.
+
+        Returns
+        -------
+        dict
+            Metadata dict with 'bioimage', 'raw_image_metadata', and optionally
+            'ome_metadata'.
+
+        """
         img_meta = {"bioimage": self, "raw_image_metadata": self.metadata}
 
         try:
             img_meta["ome_metadata"] = self.ome_metadata
         except NotImplementedError:
-            pass  # Reader doesn't support OME metadata, so we don't attach it to napari metadata
+            pass  # Reader doesn't support OME metadata
         except (ValueError, TypeError, KeyError) as e:
             # Some files have metadata that doesn't conform to OME schema, despite bioio attempting to parse it
             # (e.g., CZI files with LatticeLightsheet acquisition mode)
@@ -337,6 +280,267 @@ class nImage(BioImage):
                 e,
             )
 
-        meta["metadata"] = img_meta
-        self.napari_metadata = meta
-        return self.napari_metadata
+        return img_meta
+
+    def _build_layer_name(
+        self, channel_name: str | None = None, include_scene: bool = True
+    ) -> str:
+        """
+        Build layer name from channel name, scene info, and file path.
+
+        Parameters
+        ----------
+        channel_name : str, optional
+            Name of the channel. If None, omitted from name.
+        include_scene : bool, optional
+            Whether to include scene info. Default True.
+
+        Returns
+        -------
+        str
+            Formatted layer name.
+
+        """
+        path_stem = (
+            Path(self.path).stem if self.path is not None else "unknown path"
+        )
+
+        # Check if scene info is meaningful
+        no_scene = len(self.scenes) == 1 and self.current_scene == "Image:0"
+
+        parts = []
+        if channel_name:
+            parts.append(channel_name)
+        if include_scene and not no_scene:
+            parts.extend([str(self.current_scene_index), self.current_scene])
+        parts.append(path_stem)
+
+        return DELIM.join(parts)
+
+    def _build_single_layer_tuple(
+        self,
+        data,
+        layer_type: str,
+        base_metadata: dict,
+        scale: tuple | None,
+        channel_name: str | None = None,
+        channel_idx: int = 0,
+        n_channels: int = 1,
+        channel_kwargs: dict[str, dict] | None = None,
+    ) -> tuple:
+        """
+        Build a single layer tuple with appropriate metadata.
+
+        Parameters
+        ----------
+        data : array-like
+            Image data for this layer.
+        layer_type : str
+            Type of layer ('image', 'labels', etc.).
+        base_metadata : dict
+            Base metadata dict with bioimage reference.
+        scale : tuple | None
+            Physical pixel scale, or None.
+        channel_name : str, optional
+            Channel name for layer naming.
+        channel_idx : int
+            Index of this channel (for colormap selection).
+        n_channels : int
+            Total number of channels (for colormap selection).
+        channel_kwargs : dict[str, dict], optional
+            Per-channel metadata overrides. Maps channel name to dict of
+            napari layer kwargs to override defaults.
+
+        Returns
+        -------
+        tuple
+            (data, metadata, layer_type) tuple for napari.
+
+        """
+        meta = {
+            "name": self._build_layer_name(channel_name),
+            "metadata": base_metadata,
+        }
+
+        if scale:
+            meta["scale"] = scale
+
+        # Add image-specific metadata
+        if layer_type == "image":
+            from ._colormap_utils import get_colormap_for_channel
+
+            meta["colormap"] = get_colormap_for_channel(
+                channel_idx, n_channels
+            )
+            meta["blending"] = (
+                "additive" if n_channels > 1 else "translucent_no_depth"
+            )
+
+        # Apply per-channel overrides
+        if channel_kwargs and channel_name and channel_name in channel_kwargs:
+            meta.update(channel_kwargs[channel_name])
+
+        return (data, meta, layer_type)
+
+    def _resolve_layer_type(
+        self,
+        channel_name: str,
+        layer_type_override: str | None,
+        channel_types: dict[str, str] | None,
+    ) -> str:
+        """
+        Resolve the layer type for a channel.
+
+        Priority: global override > per-channel override > auto-detect.
+
+        """
+        if layer_type_override is not None:
+            return layer_type_override
+        if channel_types and channel_name in channel_types:
+            return channel_types[channel_name]
+        return self._infer_layer_type(channel_name)
+
+    # =========================================================================
+    # Public API
+    # =========================================================================
+
+    def get_layer_data_tuples(
+        self,
+        in_memory: bool | None = None,
+        layer_type: str | None = None,
+        channel_types: dict[str, str] | None = None,
+        channel_kwargs: dict[str, dict] | None = None,
+    ) -> list[LayerDataTuple]:
+        """
+        Build layer data tuples for napari.
+
+        Always splits multichannel data into separate layers, allowing
+        different layer types per channel. Automatically detects label
+        layers from channel names containing keywords like 'label', 'mask',
+        'segmentation'.
+
+        Parameters
+        ----------
+        in_memory : bool, optional
+            Load data in memory or as dask array. If None, determined
+            automatically based on file size.
+        layer_type : str, optional
+            Override layer type for ALL channels. Valid values: 'image',
+            'labels', 'shapes', 'points', 'surface', 'tracks', 'vectors'.
+            If None, auto-detection is used (based on channel names).
+            Takes precedence over channel_types.
+        channel_types : dict[str, str], optional
+            Override automatic layer type detection per-channel. Maps channel
+            name to layer type ('image' or 'labels').
+            e.g., {"DAPI": "image", "nuclei_mask": "labels"}
+            Ignored if layer_type is provided.
+        channel_kwargs : dict[str, dict], optional
+            Per-channel metadata overrides. Maps channel name to dict of
+            napari layer kwargs (colormap, contrast_limits, opacity, etc.).
+            e.g., {"DAPI": {"colormap": "blue", "contrast_limits": (0, 1000)}}
+            These override the automatically generated metadata.
+
+        Returns
+        -------
+        list[LayerDataTuple]
+            List of (data, metadata, layer_type) tuples ready for napari.
+
+        Examples
+        --------
+        Add layers to a napari viewer using `Layer.create()`:
+
+        >>> from napari.layers import Layer
+        >>> img = nImage("path/to/image.tiff")
+        >>> for ldt in img.get_layer_data_tuples():
+        ...     layer = Layer.create(*ldt)
+        ...     viewer.add_layer(layer)
+
+        Override layer types for mixed image/labels files:
+
+        >>> img.get_layer_data_tuples(
+        ...     channel_types={"DAPI": "image", "nuclei_mask": "labels"}
+        ... )
+
+        See Also
+        --------
+        napari.layers.Layer.create : Creates a layer from a LayerDataTuple.
+        https://napari.org/dev/plugins/building_a_plugin/guides.html
+
+        """
+        # Load image data if not already loaded
+        if self.napari_layer_data is None:
+            self._get_layer_data(in_memory=in_memory)
+
+        if layer_type is not None:
+            channel_types = None  # Global override ignores per-channel
+
+        base_metadata = self._build_metadata()
+        scale = self._get_scale()
+        channel_dim = DimensionNames.Channel
+
+        # Handle RGB images specially
+        if DimensionNames.Samples in self.reader.dims.order:
+            meta = {
+                "name": self._build_layer_name(),
+                "rgb": True,
+                "metadata": base_metadata,
+            }
+            if scale:
+                meta["scale"] = scale
+            self.layer_data_tuples = [
+                (self.napari_layer_data.data, meta, "image")
+            ]
+            return self.layer_data_tuples
+
+        # Single channel image (no channel dimension)
+        if channel_dim not in self.napari_layer_data.dims:
+            effective_type = layer_type or "image"
+            self.layer_data_tuples = [
+                self._build_single_layer_tuple(
+                    data=self.napari_layer_data.data,
+                    layer_type=effective_type,
+                    base_metadata=base_metadata,
+                    scale=scale,
+                    n_channels=1,
+                    channel_kwargs=channel_kwargs,
+                )
+            ]
+            return self.layer_data_tuples
+
+        # Multichannel image - split into separate layers
+        channel_names = [
+            str(c)
+            for c in self.napari_layer_data.coords[channel_dim].data.tolist()
+        ]
+        channel_axis = self.napari_layer_data.dims.index(channel_dim)
+        n_channels = self.napari_layer_data.shape[channel_axis]
+
+        layer_tuples = []
+        for i in range(n_channels):
+            channel_name = (
+                channel_names[i] if i < len(channel_names) else f"channel_{i}"
+            )
+            effective_type = self._resolve_layer_type(
+                channel_name, layer_type, channel_types
+            )
+
+            # Slice data along channel axis
+            slices = [slice(None)] * self.napari_layer_data.ndim
+            slices[channel_axis] = i
+            channel_data = self.napari_layer_data.data[tuple(slices)]
+
+            layer_tuples.append(
+                self._build_single_layer_tuple(
+                    data=channel_data,
+                    layer_type=effective_type,
+                    base_metadata=base_metadata,
+                    scale=scale,
+                    channel_name=channel_name,
+                    channel_idx=i,
+                    n_channels=n_channels,
+                    channel_kwargs=channel_kwargs,
+                )
+            )
+
+        self.layer_data_tuples = layer_tuples
+        return self.layer_data_tuples

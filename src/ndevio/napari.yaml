@@ -9,12 +9,6 @@ contributions:
     - id: ndevio.get_reader
       python_name: ndevio._napari_reader:napari_get_reader
       title: Open file with ndevio
-    - id: ndevio.write_multiple
-      python_name: ndevio._writer:write_multiple
-      title: Save multi-layer data with ndevio
-    - id: ndevio.write_single_image
-      python_name: ndevio._writer:write_single_image
-      title: Save image data with ndevio
     - id: ndevio.make_plugin_installer_widget
       python_name: ndevio.widgets:PluginInstallerWidget
       title: Install BioIO Reader Plugins
@@ -59,13 +53,6 @@ contributions:
         '*.wlz', '*.wmf', '*.wmv', '*.wpi', '*.xbm', '*.xdce', '*.xml', '*.xpm', '*.xqd',
         '*.xqf', '*.xv', '*.xys', '*.zfp', '*.zfr', '*.zip', '*.zpo', '*.zvi'
       ]
-  writers:
-    - command: ndevio.write_multiple
-      layer_types: ['image*','labels*']
-      filename_extensions: []
-    - command: ndevio.write_single_image
-      layer_types: ['image']
-      filename_extensions: ['.npy']
   widgets:
     - command: ndevio.make_plugin_installer_widget
       display_name: Install BioIO Reader Plugins

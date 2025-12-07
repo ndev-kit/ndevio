@@ -121,7 +121,16 @@ class nImageSceneWidget(Container):
             # Use scene indexes to cover for duplicate names
             scene_index = int(scene.split(DELIMITER)[0])
             self.img.set_scene(scene_index)
-            img_data = self.img.get_napari_image_data(in_memory=self.in_memory)
-            img_meta = self.img.get_napari_metadata()
 
-            self.viewer.add_image(img_data.data, **img_meta)
+            # Clear cached data so new scene is loaded
+            self.img.napari_layer_data = None
+            self.img.layer_data_tuples = None
+
+            # Get layer tuples and add to viewer using napari's Layer.create()
+            from napari.layers import Layer
+
+            for ldt in self.img.get_layer_data_tuples(
+                in_memory=self.in_memory
+            ):
+                layer = Layer.create(*ldt)
+                self.viewer.add_layer(layer)
