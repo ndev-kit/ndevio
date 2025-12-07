@@ -18,10 +18,6 @@ ndevio_reader:
     default: Open Scene Widget
     tooltip: How to handle files with multiple scenes
     value: Open Scene Widget
-  unpack_channels_as_layers:
-    default: true
-    tooltip: Whether to unpack multi-channel images as separate layers
-    value: true
   clear_layers_on_new_scene:
     default: false
     tooltip: Whether to clear the viewer when selecting a new scene
