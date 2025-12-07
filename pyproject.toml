@@ -88,6 +88,9 @@ xfail_strict = true
 # filterwarnings = ["error"] # recommended by PP309
 log_cli_level = "INFO"
 testpaths = ["tests"]
+markers = [
+    "network: marks tests as requiring network access (deselect with '-m \"not network\"')",
+]
 
 [tool.coverage]
 report.fail_under = 80
