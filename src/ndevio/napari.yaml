@@ -3,7 +3,7 @@ display_name: ndevio
 # use 'hidden' to remove plugin from napari hub search results
 visibility: public
 # see https://napari.org/stable/plugins/technical_references/manifest.html#fields for valid categories
-# categories: []
+categories: ["IO", "Dataset", "Utilities"]
 contributions:
   commands:
     - id: ndevio.get_reader
@@ -15,6 +15,24 @@ contributions:
     - id: ndevio.make_utilities_widget
       python_name: ndevio.widgets:UtilitiesContainer
       title: I/O Utilities
+    - id: ndevio.make_ndev_logo
+      python_name: ndevio.sampledata:ndev_logo
+      title: Load ndev logo
+    - id: ndevio.make_scratch_assay
+      python_name: ndevio.sampledata:scratch_assay
+      title: Load scratch assay data
+    - id: ndevio.make_neocortex
+      python_name: ndevio.sampledata:neocortex
+      title: Load neocortex data
+    - id: ndevio.make_neuron_raw
+      python_name: ndevio.sampledata:neuron_raw
+      title: Load raw neuron data
+    - id: ndevio.make_neuron_labels
+      python_name: ndevio.sampledata:neuron_labels
+      title: Load neuron labels data
+    - id: ndevio.make_neuron_labels_processed
+      python_name: ndevio.sampledata:neuron_labels_processed
+      title: Load processed neuron labels data
   readers:
     - command: ndevio.get_reader
       accepts_directories: false
@@ -58,3 +76,22 @@ contributions:
       display_name: Install BioIO Reader Plugins
     - command: ndevio.make_utilities_widget
       display_name: I/O Utilities
+  sample_data:
+    - command: ndevio.make_ndev_logo
+      display_name: ndev logo
+      key: ndevio.ndev_logo
+    - command: ndevio.make_scratch_assay
+      display_name: Scratch Assay Labeled (10T+2Ch) (4MB)
+      key: ndevio.scratch_assay
+    - command: ndevio.make_neocortex
+      display_name: Neocortex (3Ch) (2MB)
+      key: ndevio.neocortex
+    - command: ndevio.make_neuron_raw
+      display_name: Neuron Raw (2D+4Ch) (32MB)
+      key: ndevio.neuron_raw
+    - command: ndevio.make_neuron_labels
+      display_name: Neuron Labels (2D+4Ch)
+      key: ndevio.neuron_labels
+    - command: ndevio.make_neuron_labels_processed
+      display_name: Neuron Labels Processed (2D+4Ch)
+      key: ndevio.neuron_labels_processed

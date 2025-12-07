@@ -321,7 +321,7 @@ class UtilitiesContainer(ScrollableContainer):
         self._set_batch_button_state(running=False)
         self._results.value = (
             "Batch concatenated files in directory."
-            f'\nAt {time.strftime("%H:%M:%S")}'
+            f"\nAt {time.strftime('%H:%M:%S')}"
         )
 
     def _on_batch_error(self, ctx, exception):
@@ -702,7 +702,7 @@ class UtilitiesContainer(ScrollableContainer):
         except AttributeError:
             self._results.value = (
                 "Tried to update metadata, but no layer selected."
-                f'\nAt {time.strftime("%H:%M:%S")}'
+                f"\nAt {time.strftime('%H:%M:%S')}"
             )
         except KeyError:
             scale = selected_layer.scale
@@ -714,7 +714,7 @@ class UtilitiesContainer(ScrollableContainer):
             self._results.value = (
                 "Tried to update metadata, but could only update scale"
                 " because layer not opened with ndevio reader."
-                f'\nAt {time.strftime("%H:%M:%S")}'
+                f"\nAt {time.strftime('%H:%M:%S')}"
             )
 
     def open_images(self):
@@ -855,7 +855,7 @@ class UtilitiesContainer(ScrollableContainer):
         self._progress_bar.value = 1
         self._results.value = (
             f"Saved Concatenated Image: {save_path.name}"
-            f'\nAt {time.strftime("%H:%M:%S")}'
+            f"\nAt {time.strftime('%H:%M:%S')}"
         )
 
     def _on_concat_error(self, exception: Exception) -> None:
@@ -865,7 +865,7 @@ class UtilitiesContainer(ScrollableContainer):
         self._progress_bar.value = 0
         self._results.value = (
             f"Error concatenating files: {exception}"
-            f'\nAt {time.strftime("%H:%M:%S")}'
+            f"\nAt {time.strftime('%H:%M:%S')}"
         )
 
     def _build_file_sets(self) -> list[tuple[list[Path], str]]:
@@ -899,7 +899,7 @@ class UtilitiesContainer(ScrollableContainer):
 
         if not file_sets:
             self._results.value = (
-                f'No complete file sets found.\nAt {time.strftime("%H:%M:%S")}'
+                f"No complete file sets found.\nAt {time.strftime('%H:%M:%S')}"
             )
             return
 
@@ -974,7 +974,7 @@ class UtilitiesContainer(ScrollableContainer):
         self._progress_bar.value = self._progress_bar.value + 1
         self._results.value = (
             f"Extracted scene {scene_idx}: {scene_name}"
-            f'\nAt {time.strftime("%H:%M:%S")}'
+            f"\nAt {time.strftime('%H:%M:%S')}"
         )
 
     def _on_scenes_complete(self, scenes_list: list, _=None) -> None:
@@ -982,7 +982,7 @@ class UtilitiesContainer(ScrollableContainer):
         self._progress_bar.label = ""
         self._results.value = (
             f"Saved extracted scenes: {scenes_list}"
-            f'\nAt {time.strftime("%H:%M:%S")}'
+            f"\nAt {time.strftime('%H:%M:%S')}"
         )
 
     def _on_scene_error(self, exc: Exception) -> None:
@@ -991,7 +991,7 @@ class UtilitiesContainer(ScrollableContainer):
         self._progress_bar.max = 1
         self._progress_bar.value = 0
         self._results.value = (
-            f'Error extracting scenes: {exc}\nAt {time.strftime("%H:%M:%S")}'
+            f"Error extracting scenes: {exc}\nAt {time.strftime('%H:%M:%S')}"
         )
 
     def canvas_export_figure(self) -> None:
@@ -1000,7 +1000,7 @@ class UtilitiesContainer(ScrollableContainer):
             self._results.value = (
                 "Exporting Figure only works in 2D mode."
                 "\nUse Screenshot for 3D figures."
-                f'\nAt {time.strftime("%H:%M:%S")}'
+                f"\nAt {time.strftime('%H:%M:%S')}"
             )
             return
 
@@ -1022,7 +1022,7 @@ class UtilitiesContainer(ScrollableContainer):
             f"Exported canvas figure to Figures directory."
             f"\nSaved as {save_name}"
             f"\nWith scale factor of {scale}"
-            f'\nAt {time.strftime("%H:%M:%S")}'
+            f"\nAt {time.strftime('%H:%M:%S')}"
         )
         return
 
@@ -1051,7 +1051,7 @@ class UtilitiesContainer(ScrollableContainer):
             f"\nSaved as {save_name}"
             f"\nWith canvas dimensions of {canvas_size}"
             f"\nWith scale factor of {scale}"
-            f'\nAt {time.strftime("%H:%M:%S")}'
+            f"\nAt {time.strftime('%H:%M:%S')}"
         )
         return
 
@@ -1118,7 +1118,7 @@ class UtilitiesContainer(ScrollableContainer):
         self._results.value = (
             f"Saved {self._layer_save_type}: "
             + str(self._save_name.value)
-            + f'\nAt {time.strftime("%H:%M:%S")}'
+            + f"\nAt {time.strftime('%H:%M:%S')}"
         )
 
     def _on_layer_save_error(self, exc: Exception) -> None:
@@ -1127,5 +1127,5 @@ class UtilitiesContainer(ScrollableContainer):
         self._progress_bar.max = 1
         self._progress_bar.value = 0
         self._results.value = (
-            f'Error saving layers: {exc}\nAt {time.strftime("%H:%M:%S")}'
+            f"Error saving layers: {exc}\nAt {time.strftime('%H:%M:%S')}"
         )
