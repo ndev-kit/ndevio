@@ -37,7 +37,7 @@ def _validate_layer_data_tuples(
         data, kwargs, layer_type = layer_tuple
 
         # Data should be array-like with shape
-        assert hasattr(data, "shape")
+        assert hasattr(data, 'shape')
         assert len(data.shape) >= 2  # At minimum 2D
 
         # kwargs should be a dict
@@ -45,7 +45,7 @@ def _validate_layer_data_tuples(
 
         # layer_type should be a string
         assert isinstance(layer_type, str)
-        assert layer_type in ("image", "labels")
+        assert layer_type in ('image', 'labels')
 
         if expected_layer_type:
             assert layer_type == expected_layer_type
@@ -57,21 +57,21 @@ class TestLocalSampleData:
     def test_ndev_logo(self):
         """Test loading ndev logo returns valid LayerDataTuples."""
         result = ndev_logo()
-        _validate_layer_data_tuples(result, expected_layer_type="image")
+        _validate_layer_data_tuples(result, expected_layer_type='image')
         # Logo should be a single image layer
         assert len(result) == 1
 
     def test_neuron_labels(self):
         """Test loading neuron labels returns valid LayerDataTuples."""
         result = neuron_labels()
-        _validate_layer_data_tuples(result, expected_layer_type="labels")
+        _validate_layer_data_tuples(result, expected_layer_type='labels')
         # Should have 4 channels as separate label layers
         assert len(result) == 4
 
     def test_neuron_labels_processed(self):
         """Test loading processed neuron labels returns valid LayerDataTuples."""
         result = neuron_labels_processed()
-        _validate_layer_data_tuples(result, expected_layer_type="labels")
+        _validate_layer_data_tuples(result, expected_layer_type='labels')
         # Should have 4 channels as separate label layers
         assert len(result) == 4
 
@@ -93,19 +93,19 @@ class TestNetworkSampleData:
         assert len(result) == 4
         # Check we have both image and labels types
         layer_types = [t[2] for t in result]
-        assert "image" in layer_types
-        assert "labels" in layer_types
+        assert 'image' in layer_types
+        assert 'labels' in layer_types
 
     def test_neocortex(self):
         """Test loading neocortex returns valid LayerDataTuples."""
         result = neocortex()
-        _validate_layer_data_tuples(result, expected_layer_type="image")
+        _validate_layer_data_tuples(result, expected_layer_type='image')
         # Should have 3 channels as separate image layers
         assert len(result) == 3
 
     def test_neuron_raw(self):
         """Test loading neuron raw returns valid LayerDataTuples."""
         result = neuron_raw()
-        _validate_layer_data_tuples(result, expected_layer_type="image")
+        _validate_layer_data_tuples(result, expected_layer_type='image')
         # Should have 4 channels as separate image layers
         assert len(result) == 4

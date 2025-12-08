@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 try:  # noqa: D104
     from ._version import version as __version__
 except ImportError:
-    __version__ = "unknown"
+    __version__ = 'unknown'
 
 from . import helpers
 
@@ -14,15 +14,15 @@ if TYPE_CHECKING:
 
 def __getattr__(name: str):
     """Lazily import nImage to speed up package import."""
-    if name == "nImage":
+    if name == 'nImage':
         from .nimage import nImage
 
         return nImage
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
 
 
 __all__ = [
-    "__version__",
-    "helpers",
-    "nImage",
+    '__version__',
+    'helpers',
+    'nImage',
 ]

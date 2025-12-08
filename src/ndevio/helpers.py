@@ -22,12 +22,12 @@ if TYPE_CHECKING:
     from ndevio import nImage
 
 __all__ = [
-    "check_for_missing_files",
-    "create_id_string",
-    "elide_string",
-    "get_channel_names",
-    "get_directory_and_files",
-    "get_squeezed_dim_order",
+    'check_for_missing_files',
+    'create_id_string',
+    'elide_string',
+    'get_channel_names',
+    'get_directory_and_files',
+    'get_squeezed_dim_order',
 ]
 
 
@@ -57,17 +57,17 @@ def get_directory_and_files(
     """
     if pattern is None:
         pattern = [
-            "tif",
-            "tiff",
-            "nd2",
-            "czi",
-            "lif",
-            "oib",
-            "png",
-            "jpg",
-            "jpeg",
-            "bmp",
-            "gif",
+            'tif',
+            'tiff',
+            'nd2',
+            'czi',
+            'lif',
+            'oib',
+            'png',
+            'jpg',
+            'jpeg',
+            'bmp',
+            'gif',
         ]
     if dir_path is None:
         return None, []
@@ -75,16 +75,16 @@ def get_directory_and_files(
     directory = Path(dir_path)
 
     if dir_path is not None and not directory.exists():
-        raise FileNotFoundError(f"Directory {dir_path} does not exist.")
+        raise FileNotFoundError(f'Directory {dir_path} does not exist.')
 
     pattern = [pattern] if isinstance(pattern, str) else pattern
     # add *. to each pattern if it doesn't already have either
     pattern_glob = []
     for pat in pattern:
-        if "." not in pat:
-            pat = f"*.{pat}"
-        if "*" not in pat:
-            pat = f"*{pat}"
+        if '.' not in pat:
+            pat = f'*.{pat}'
+        if '*' not in pat:
+            pat = f'*{pat}'
         pattern_glob.append(pat)
 
     files = []
@@ -113,15 +113,15 @@ def get_channel_names(img: nImage | BioImage) -> list[str]:
         The channel names.
 
     """
-    if "S" in img.dims.order:
-        return ["red", "green", "blue"]
+    if 'S' in img.dims.order:
+        return ['red', 'green', 'blue']
     # Ensure we have plain Python strings, not numpy string types
     return [str(c) for c in img.channel_names]
 
 
 def get_squeezed_dim_order(
     img: nImage | BioImage,
-    skip_dims: tuple[str, ...] | list[str] | str = ("C", "S"),
+    skip_dims: tuple[str, ...] | list[str] | str = ('C', 'S'),
 ) -> str:
     """
     Return a string containing the squeezed dimensions of the given BioImage.
@@ -141,7 +141,7 @@ def get_squeezed_dim_order(
     """
     if isinstance(skip_dims, str):
         skip_dims = (skip_dims,)
-    return "".join(
+    return ''.join(
         {k: v for k, v in img.dims.items() if v > 1 and k not in skip_dims}
     )
 
@@ -177,7 +177,7 @@ def create_id_string(img: nImage | BioImage, identifier: str) -> str:
             scene = img.ome_metadata.images[scene_idx].name
     except NotImplementedError:
         scene = img.current_scene  # not useful with OmeTiffReader, atm
-    id_string = f"{identifier}__{scene_idx}__{scene}"
+    id_string = f'{identifier}__{scene_idx}__{scene}'
     return id_string
 
 
@@ -216,7 +216,7 @@ def check_for_missing_files(
 
 
 def elide_string(
-    input_string: str, max_length: int = 15, location: str = "middle"
+    input_string: str, max_length: int = 15, location: str = 'middle'
 ) -> str:
     """
     Elide a string if it exceeds the specified length.
@@ -249,11 +249,11 @@ def elide_string(
     if max_length <= 5:
         return input_string[:max_length]
     # Elide the string based on the location
-    if location == "start":
-        return "..." + input_string[-(max_length - 3) :]
-    if location == "end":
-        return input_string[: max_length - 3] + "..."
-    if location == "middle":
+    if location == 'start':
+        return '...' + input_string[-(max_length - 3) :]
+    if location == 'end':
+        return input_string[: max_length - 3] + '...'
+    if location == 'middle':
         half_length = (max_length - 3) // 2
-        return input_string[:half_length] + "..." + input_string[-half_length:]
+        return input_string[:half_length] + '...' + input_string[-half_length:]
     raise ValueError('Invalid location. Must be "start", "middle", or "end".')

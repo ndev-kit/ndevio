@@ -58,7 +58,7 @@ def install_plugin(plugin_name: str) -> int:
         InstallerTools,
     )
 
-    logger.info("Queueing installation for: %s", plugin_name)
+    logger.info('Queueing installation for: %s', plugin_name)
 
     queue = get_installer_queue()
 
@@ -69,7 +69,7 @@ def install_plugin(plugin_name: str) -> int:
     # Queue the installation
     job_id = queue.install(tool=tool, pkgs=[plugin_name])
 
-    logger.info("Installation queued with job ID: %s", job_id)
+    logger.info('Installation queued with job ID: %s', job_id)
     return job_id
 
 
@@ -107,7 +107,7 @@ def verify_plugin_installed(plugin_name: str) -> bool:
     """
     try:
         # Convert plugin name to module name (bioio-czi -> bioio_czi)
-        module_name = plugin_name.replace("-", "_")
+        module_name = plugin_name.replace('-', '_')
         __import__(module_name)
         return True
     except ImportError:

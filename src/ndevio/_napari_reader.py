@@ -51,17 +51,17 @@ def napari_get_reader(
     open_first_scene_only = (
         open_first_scene_only
         if open_first_scene_only is not None
-        else settings.ndevio_reader.scene_handling == "View First Scene Only"  # type: ignore
+        else settings.ndevio_reader.scene_handling == 'View First Scene Only'  # type: ignore
     ) or False
 
     open_all_scenes = (
         open_all_scenes
         if open_all_scenes is not None
-        else settings.ndevio_reader.scene_handling == "View All Scenes"  # type: ignore
+        else settings.ndevio_reader.scene_handling == 'View All Scenes'  # type: ignore
     ) or False
 
     if isinstance(path, list):
-        logger.info("Bioio: Expected a single path, got a list of paths.")
+        logger.info('Bioio: Expected a single path, got a list of paths.')
         return None
 
     try:
@@ -76,7 +76,7 @@ def napari_get_reader(
 
     except UnsupportedFileFormatError as e:
         # determine_reader_plugin() already enhanced the error message
-        logger.error("ndevio: Unsupported file format: %s", path)
+        logger.error('ndevio: Unsupported file format: %s', path)
         # Show plugin installer widget if enabled in settings
         if settings.ndevio_reader.suggest_reader_plugins:  # type: ignore
             _open_plugin_installer(path, e)
@@ -85,7 +85,7 @@ def napari_get_reader(
         return None
 
     except Exception as e:  # noqa: BLE001
-        logger.warning("ndevio: Error reading file: %s", e)
+        logger.warning('ndevio: Error reading file: %s', e)
         return None
 
 
@@ -121,7 +121,7 @@ def napari_reader_function(
 
     """
     img = nImage(path, reader=reader)
-    logger.info("Bioio: Reading file with %d scenes", len(img.scenes))
+    logger.info('Bioio: Reading file with %d scenes', len(img.scenes))
 
     # open first scene only
     if len(img.scenes) == 1 or open_first_scene_only:
@@ -152,8 +152,8 @@ def _open_scene_container(
     viewer = napari.current_viewer()
     viewer.window.add_dock_widget(
         nImageSceneWidget(viewer, path, img, in_memory),
-        area="right",
-        name=f"{Path(path).stem}{DELIMITER}Scenes",
+        area='right',
+        name=f'{Path(path).stem}{DELIMITER}Scenes',
     )
 
 
@@ -181,7 +181,7 @@ def _open_plugin_installer(
     # Don't try to open widget if no viewer available (e.g., in tests)
     if viewer is None:
         logger.warning(
-            "Cannot open plugin installer widget: No napari viewer available"
+            'Cannot open plugin installer widget: No napari viewer available'
         )
         return
 
@@ -191,6 +191,6 @@ def _open_plugin_installer(
     widget = PluginInstallerWidget(plugin_manager=manager)
     viewer.window.add_dock_widget(
         widget,
-        area="right",
-        name="Install BioIO Plugin",
+        area='right',
+        name='Install BioIO Plugin',
     )

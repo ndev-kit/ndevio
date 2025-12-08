@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-DELIMITER = " :: "
+DELIMITER = ' :: '
 
 
 class nImageSceneWidget(Container):
@@ -92,7 +92,7 @@ class nImageSceneWidget(Container):
         self.in_memory = in_memory
         self.settings = get_settings()
         self.scenes = [
-            f"{idx}{DELIMITER}{scene}"
+            f'{idx}{DELIMITER}{scene}'
             for idx, scene in enumerate(self.img.scenes)
         ]
 

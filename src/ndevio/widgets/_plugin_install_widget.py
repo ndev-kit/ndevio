@@ -81,23 +81,23 @@ class PluginInstallerWidget(Container):
             # Error mode: show file that failed
             file_name = self.manager.path.name
             self._title_label = Label(
-                value=f"<b>Cannot read file:</b> {file_name}"
+                value=f'<b>Cannot read file:</b> {file_name}'
             )
         else:
             # Standalone mode: general title
             self._title_label = Label(
-                value="<b>Install BioIO Reader Plugin</b>"
+                value='<b>Install BioIO Reader Plugin</b>'
             )
         self.append(self._title_label)
 
-        self._info_label = Label(value="Select a plugin to install:")
+        self._info_label = Label(value='Select a plugin to install:')
         self.append(self._info_label)
 
         # Get all available plugin names from manager
         plugin_names = self.manager.available_plugins
 
         self._plugin_select = ComboBox(
-            label="Plugin",
+            label='Plugin',
             choices=plugin_names,
             value=None,
             nullable=True,
@@ -111,11 +111,11 @@ class PluginInstallerWidget(Container):
         self.append(self._plugin_select)
 
         # Install button
-        self._install_button = PushButton(text="Install Plugin")
+        self._install_button = PushButton(text='Install Plugin')
         self.append(self._install_button)
 
         # Status label
-        self._status_label = Label(value="")
+        self._status_label = Label(value='')
         self.append(self._status_label)
 
     def _connect_events(self):
@@ -124,16 +124,16 @@ class PluginInstallerWidget(Container):
 
     def _on_install_clicked(self):
         """Handle install button click."""
-        self._status_label.value = "Installing..."
+        self._status_label.value = 'Installing...'
 
         # Get selected plugin name
         plugin_name = self._plugin_select.value
 
         if not plugin_name:
-            self._status_label.value = "No plugin selected"
+            self._status_label.value = 'No plugin selected'
             return
 
-        logger.info("User requested install of: %s", plugin_name)
+        logger.info('User requested install of: %s', plugin_name)
 
         # Use napari-plugin-manager's InstallerQueue
         from .._plugin_installer import get_installer_queue, install_plugin
@@ -144,8 +144,8 @@ class PluginInstallerWidget(Container):
         # Connect to the queue's signals to monitor progress
         def on_process_finished(event):
             """Handle installation completion."""
-            exit_code = event.get("exit_code", 1)
-            pkgs = event.get("pkgs", [])
+            exit_code = event.get('exit_code', 1)
+            pkgs = event.get('pkgs', [])
 
             # Check if this event is for our package
             if plugin_name not in pkgs:
@@ -153,17 +153,17 @@ class PluginInstallerWidget(Container):
 
             if exit_code == 0:
                 self._status_label.value = (
-                    f"✓ Successfully installed {plugin_name}!\n\n"
-                    "⚠ It is recommended to restart napari."
+                    f'✓ Successfully installed {plugin_name}!\n\n'
+                    '⚠ It is recommended to restart napari.'
                 )
-                logger.info("Plugin installed successfully: %s", plugin_name)
+                logger.info('Plugin installed successfully: %s', plugin_name)
             else:
                 self._status_label.value = (
-                    f"✗ Installation failed for {plugin_name}\n"
-                    f"Exit code: {exit_code}\n"
-                    "Check the console for details."
+                    f'✗ Installation failed for {plugin_name}\n'
+                    f'Exit code: {exit_code}\n'
+                    'Check the console for details.'
                 )
-                logger.error("Plugin installation failed: %s", plugin_name)
+                logger.error('Plugin installation failed: %s', plugin_name)
 
             # Disconnect after completion (success or failure)
             if self._queue_connection is not None:
@@ -180,4 +180,4 @@ class PluginInstallerWidget(Container):
 
         # Queue the installation (returns job ID)
         job_id = install_plugin(plugin_name)
-        logger.info("Installation job %s queued for %s", job_id, plugin_name)
+        logger.info('Installation job %s queued for %s', job_id, plugin_name)

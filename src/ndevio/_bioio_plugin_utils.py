@@ -45,80 +45,80 @@ logger = logging.getLogger(__name__)
 # 3. Known issues or limitations
 BIOIO_PLUGINS = {
     # Highest priority: OME formats with excellent metadata preservation
-    "bioio-ome-zarr": {
-        "extensions": [".zarr"],
-        "description": "OME-Zarr files",
-        "repository": "https://github.com/bioio-devs/bioio-ome-zarr",
-        "core": True,
+    'bioio-ome-zarr': {
+        'extensions': ['.zarr'],
+        'description': 'OME-Zarr files',
+        'repository': 'https://github.com/bioio-devs/bioio-ome-zarr',
+        'core': True,
     },
-    "bioio-ome-tiff": {
-        "extensions": [".ome.tif", ".ome.tiff", ".tif", ".tiff"],
-        "description": "OME-TIFF files with valid OME-XML metadata",
-        "repository": "https://github.com/bioio-devs/bioio-ome-tiff",
-        "core": True,
+    'bioio-ome-tiff': {
+        'extensions': ['.ome.tif', '.ome.tiff', '.tif', '.tiff'],
+        'description': 'OME-TIFF files with valid OME-XML metadata',
+        'repository': 'https://github.com/bioio-devs/bioio-ome-tiff',
+        'core': True,
     },
-    "bioio-ome-tiled-tiff": {
-        "extensions": [".tiles.ome.tif"],
-        "description": "Tiled OME-TIFF files",
-        "repository": "https://github.com/bioio-devs/bioio-ome-tiled-tiff",
+    'bioio-ome-tiled-tiff': {
+        'extensions': ['.tiles.ome.tif'],
+        'description': 'Tiled OME-TIFF files',
+        'repository': 'https://github.com/bioio-devs/bioio-ome-tiled-tiff',
     },
     # High priority: Format-specific readers with good metadata support
-    "bioio-tifffile": {
-        "extensions": [".tif", ".tiff"],
-        "description": "TIFF files (including those without OME metadata)",
-        "repository": "https://github.com/bioio-devs/bioio-tifffile",
-        "core": True,
+    'bioio-tifffile': {
+        'extensions': ['.tif', '.tiff'],
+        'description': 'TIFF files (including those without OME metadata)',
+        'repository': 'https://github.com/bioio-devs/bioio-tifffile',
+        'core': True,
     },
-    "bioio-nd2": {
-        "extensions": [".nd2"],
-        "description": "Nikon ND2 files",
-        "repository": "https://github.com/bioio-devs/bioio-nd2",
+    'bioio-nd2': {
+        'extensions': ['.nd2'],
+        'description': 'Nikon ND2 files',
+        'repository': 'https://github.com/bioio-devs/bioio-nd2',
     },
-    "bioio-czi": {
-        "extensions": [".czi"],
-        "description": "Zeiss CZI files",
-        "repository": "https://github.com/bioio-devs/bioio-czi",
+    'bioio-czi': {
+        'extensions': ['.czi'],
+        'description': 'Zeiss CZI files',
+        'repository': 'https://github.com/bioio-devs/bioio-czi',
     },
-    "bioio-lif": {
-        "extensions": [".lif"],
-        "description": "Leica LIF files",
-        "repository": "https://github.com/bioio-devs/bioio-lif",
+    'bioio-lif': {
+        'extensions': ['.lif'],
+        'description': 'Leica LIF files',
+        'repository': 'https://github.com/bioio-devs/bioio-lif',
     },
-    "bioio-dv": {
-        "extensions": [".dv", ".r3d"],
-        "description": "DeltaVision files",
-        "repository": "https://github.com/bioio-devs/bioio-dv",
+    'bioio-dv': {
+        'extensions': ['.dv', '.r3d'],
+        'description': 'DeltaVision files',
+        'repository': 'https://github.com/bioio-devs/bioio-dv',
     },
-    "bioio-sldy": {
-        "extensions": [".sldy", ".dir"],
-        "description": "3i SlideBook files",
-        "repository": "https://github.com/bioio-devs/bioio-sldy",
+    'bioio-sldy': {
+        'extensions': ['.sldy', '.dir'],
+        'description': '3i SlideBook files',
+        'repository': 'https://github.com/bioio-devs/bioio-sldy',
     },
     # Lower priority: Generic/fallback readers
-    "bioio-imageio": {
-        "extensions": [".bmp", ".gif", ".jpg", ".jpeg", ".png"],
-        "description": "Generic image formats (PNG, JPG, etc.)",
-        "repository": "https://github.com/bioio-devs/bioio-imageio",
-        "core": True,
+    'bioio-imageio': {
+        'extensions': ['.bmp', '.gif', '.jpg', '.jpeg', '.png'],
+        'description': 'Generic image formats (PNG, JPG, etc.)',
+        'repository': 'https://github.com/bioio-devs/bioio-imageio',
+        'core': True,
     },
-    "bioio-tiff-glob": {
-        "extensions": [".tiff"],
-        "description": "TIFF sequences (glob patterns)",
-        "repository": "https://github.com/bioio-devs/bioio-tiff-glob",
+    'bioio-tiff-glob': {
+        'extensions': ['.tiff'],
+        'description': 'TIFF sequences (glob patterns)',
+        'repository': 'https://github.com/bioio-devs/bioio-tiff-glob',
     },
     # Lowest priority: Requires external dependencies (Java)
-    "bioio-bioformats": {
-        "extensions": [".oib", ".oif", ".vsi", ".ims", ".lsm", ".stk"],
-        "description": "Proprietary microscopy formats (requires Java)",
-        "repository": "https://github.com/bioio-devs/bioio-bioformats",
-        "note": "Requires Java Runtime Environment",
+    'bioio-bioformats': {
+        'extensions': ['.oib', '.oif', '.vsi', '.ims', '.lsm', '.stk'],
+        'description': 'Proprietary microscopy formats (requires Java)',
+        'repository': 'https://github.com/bioio-devs/bioio-bioformats',
+        'note': 'Requires Java Runtime Environment',
     },
 }
 
 # Map extensions to plugin names for quick lookup
 _EXTENSION_TO_PLUGIN = {}
 for plugin_name, info in BIOIO_PLUGINS.items():
-    for ext in info["extensions"]:
+    for ext in info['extensions']:
         if ext not in _EXTENSION_TO_PLUGIN:
             _EXTENSION_TO_PLUGIN[ext] = []
         _EXTENSION_TO_PLUGIN[ext].append(plugin_name)
@@ -181,7 +181,7 @@ def format_plugin_installation_message(
     if not suggested_plugins:
         return (
             f"\n\nNo bioio plugins found for '{filename}'.\n"
-            "See https://github.com/bioio-devs/bioio for available plugins."
+            'See https://github.com/bioio-devs/bioio for available plugins.'
         )
 
     # Format the plugin list (filters out core plugins automatically)
@@ -190,36 +190,36 @@ def format_plugin_installation_message(
     # Build appropriate message based on what's installed/missing
     if installed_plugins and installable_plugins and plugin_list:
         # Case 1: Some plugins installed but failed, suggest alternatives
-        installed_str = ", ".join(sorted(installed_plugins))
+        installed_str = ', '.join(sorted(installed_plugins))
         return (
             f"\n\nInstalled plugin '{installed_str}' failed to read '{filename}'.\n"
-            "Try one of these alternatives:\n\n"
-            f"{plugin_list}"
-            "\nRestart napari/Python after installing."
+            'Try one of these alternatives:\n\n'
+            f'{plugin_list}'
+            '\nRestart napari/Python after installing.'
         )
 
     if installed_plugins and not installable_plugins:
         # Case 2: All suggested plugins already installed but still failed
-        installed_str = ", ".join(sorted(installed_plugins))
+        installed_str = ', '.join(sorted(installed_plugins))
         return (
             f"\nFile '{filename}' is supported by: {installed_str}\n"
-            "However, the plugin failed to read it.\n"
-            "This may indicate a corrupt file or incompatible format variant."
+            'However, the plugin failed to read it.\n'
+            'This may indicate a corrupt file or incompatible format variant.'
         )
 
     if plugin_list:
         # Case 3: No installed plugins, suggest installing
         return (
             f"\n\nTo read '{filename}', install one of:\n\n"
-            f"{plugin_list}"
-            "\nRestart napari/Python after installing."
+            f'{plugin_list}'
+            '\nRestart napari/Python after installing.'
         )
 
     # Case 4: All suggested plugins are core plugins (already should be installed)
     return (
         f"\n\nRequired plugins for '{filename}' should already be installed.\n"
         "If you're still having issues, check your installation or "
-        "open an issue at https://github.com/ndev-kit/ndevio."
+        'open an issue at https://github.com/ndev-kit/ndevio.'
     )
 
 
@@ -254,11 +254,11 @@ def suggest_plugins_for_path(path: Path | str) -> list[str]:
 
     # Check compound extensions first (.ome.tiff, .tiles.ome.tif, etc.)
     for plugin_name, info in BIOIO_PLUGINS.items():
-        for ext in info["extensions"]:
+        for ext in info['extensions']:
             # Compound extension: multiple dots and matches filename
             if (
-                ext.startswith(".")
-                and len(ext.split(".")) > 2
+                ext.startswith('.')
+                and len(ext.split('.')) > 2
                 and filename.endswith(ext)
             ):
                 return [plugin_name]
@@ -286,7 +286,7 @@ def _format_plugin_list(plugin_names: list[str]) -> str:
         Formatted installation instructions
     """
     if not plugin_names:
-        return ""
+        return ''
 
     lines = []
     for plugin_name in plugin_names:
@@ -296,13 +296,13 @@ def _format_plugin_list(plugin_names: list[str]) -> str:
             continue
 
         # Skip core plugins (already installed with ndevio)
-        if info.get("core", False):
+        if info.get('core', False):
             continue
 
-        lines.append(f"  • {plugin_name}")
-        lines.append(f"    {info['description']}")
-        if info.get("note"):
-            lines.append(f"    Note: {info['note']}")
-        lines.append(f"    Install: pip install {plugin_name}\n")
+        lines.append(f'  • {plugin_name}')
+        lines.append(f'    {info["description"]}')
+        if info.get('note'):
+            lines.append(f'    Note: {info["note"]}')
+        lines.append(f'    Install: pip install {plugin_name}\n')
 
-    return "\n".join(lines)
+    return '\n'.join(lines)
