@@ -8,4 +8,4 @@ import pytest
 @pytest.fixture
 def resources_dir() -> Path:
     """Return path to test resources directory."""
-    return Path(__file__).parent / "resources"
+    return Path(__file__).parent / 'resources'

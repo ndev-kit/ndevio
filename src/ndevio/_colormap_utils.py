@@ -4,13 +4,13 @@ This module provides colormap cycles for
 multichannel image display.
 """
 
-SINGLE_CHANNEL_COLORMAP = "gray"
+SINGLE_CHANNEL_COLORMAP = 'gray'
 
-TWO_CHANNEL_CYCLE = ["magenta", "green"]
+TWO_CHANNEL_CYCLE = ['magenta', 'green']
 
-MULTI_CHANNEL_CYCLE = ["cyan", "magenta", "yellow", "blue", "green", "red"]
+MULTI_CHANNEL_CYCLE = ['cyan', 'magenta', 'yellow', 'blue', 'green', 'red']
 
-RGB = ["red", "green", "blue"]
+RGB = ['red', 'green', 'blue']
 
 
 def get_colormap_for_channel(channel_idx: int, n_channels: int) -> str:
@@ -43,9 +43,9 @@ def get_colormap_for_channel(channel_idx: int, n_channels: int) -> str:
 
 
 __all__ = [
-    "SINGLE_CHANNEL_COLORMAP",
-    "TWO_CHANNEL_CYCLE",
-    "MULTI_CHANNEL_CYCLE",
-    "RGB",
-    "get_colormap_for_channel",
+    'SINGLE_CHANNEL_COLORMAP',
+    'TWO_CHANNEL_CYCLE',
+    'MULTI_CHANNEL_CYCLE',
+    'RGB',
+    'get_colormap_for_channel',
 ]

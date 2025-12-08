@@ -137,7 +137,7 @@ class ReaderPluginManager:
         if self._feasibility_report is None and self.path:
             from bioio import plugin_feasibility_report
 
-            logger.debug("Generating feasibility report for: %s", self.path)
+            logger.debug('Generating feasibility report for: %s', self.path)
             self._feasibility_report = plugin_feasibility_report(self.path)
         return self._feasibility_report or {}
 
@@ -164,7 +164,7 @@ class ReaderPluginManager:
         ...     print("OME-TIFF reader is available")
         """
         report = self.feasibility_report
-        return {name for name in report if name != "ArrayLike"}
+        return {name for name in report if name != 'ArrayLike'}
 
     @property
     def suggested_plugins(self) -> list[str]:
@@ -219,11 +219,13 @@ class ReaderPluginManager:
         return [
             plugin_name
             for plugin_name in suggested
-            if not BIOIO_PLUGINS.get(plugin_name, {}).get("core", False)
+            if not BIOIO_PLUGINS.get(plugin_name, {}).get('core', False)
             and plugin_name not in installed
         ]
 
-    def get_working_reader(self, preferred_reader: str | None = None) -> Reader | None:
+    def get_working_reader(
+        self, preferred_reader: str | None = None
+    ) -> Reader | None:
         """Get a reader that can actually read this file.
 
         Tries readers in priority order:
@@ -259,8 +261,8 @@ class ReaderPluginManager:
         """
         if not self.path:
             logger.warning(
-                "Cannot get working reader without a path. "
-                "Initialize ReaderPluginManager with a file path."
+                'Cannot get working reader without a path. '
+                'Initialize ReaderPluginManager with a file path.'
             )
             return None
 
@@ -273,7 +275,7 @@ class ReaderPluginManager:
             and report[preferred_reader].supported
         ):
             logger.info(
-                "Using preferred reader: %s for %s",
+                'Using preferred reader: %s for %s',
                 preferred_reader,
                 self.path,
             )
@@ -285,7 +287,7 @@ class ReaderPluginManager:
         for reader_name in get_reader_priority():
             if reader_name in report and report[reader_name].supported:
                 logger.info(
-                    "Using reader: %s for %s (from priority list)",
+                    'Using reader: %s for %s (from priority list)',
                     reader_name,
                     self.path,
                 )
@@ -293,15 +295,15 @@ class ReaderPluginManager:
 
         # Try any other installed reader that supports the file
         for name, support in report.items():
-            if name != "ArrayLike" and support.supported:
+            if name != 'ArrayLike' and support.supported:
                 logger.info(
-                    "Using reader: %s for %s (from installed plugins)",
+                    'Using reader: %s for %s (from installed plugins)',
                     name,
                     self.path,
                 )
                 return self._get_reader_module(name)
 
-        logger.warning("No working reader found for: %s", self.path)
+        logger.warning('No working reader found for: %s', self.path)
         return None
 
     def get_installation_message(self) -> str:
@@ -323,7 +325,7 @@ class ReaderPluginManager:
         ...     print(manager.get_installation_message())
         """
         if not self.path:
-            return ""
+            return ''
 
         from ._bioio_plugin_utils import format_plugin_installation_message
 
@@ -354,7 +356,7 @@ class ReaderPluginManager:
             If the reader module cannot be imported
         """
         # Convert plugin name to module name (bioio-czi -> bioio_czi)
-        module_name = reader_name.replace("-", "_")
-        logger.debug("Importing reader module: %s", module_name)
+        module_name = reader_name.replace('-', '_')
+        logger.debug('Importing reader module: %s', module_name)
         module = importlib.import_module(module_name)
         return module.Reader

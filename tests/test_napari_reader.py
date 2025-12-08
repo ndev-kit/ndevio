@@ -13,11 +13,11 @@ from ndevio._napari_reader import napari_get_reader
 
 ###############################################################################
 
-RGB_TIFF = "RGB_bad_metadata.tiff"  # has two scenes
-MULTISCENE_CZI = r"0T-4C-0Z-7pos.czi"
-PNG_FILE = "nDev-logo-small.png"
-ND2_FILE = "ND2_dims_rgb.nd2"
-OME_TIFF = "cells3d2ch_legacy.tiff"
+RGB_TIFF = 'RGB_bad_metadata.tiff'  # has two scenes
+MULTISCENE_CZI = r'0T-4C-0Z-7pos.czi'
+PNG_FILE = 'nDev-logo-small.png'
+ND2_FILE = 'ND2_dims_rgb.nd2'
+OME_TIFF = 'cells3d2ch_legacy.tiff'
 
 ###############################################################################
 
@@ -32,7 +32,7 @@ def test_napari_viewer_open(resources_dir: Path, make_napari_viewer) -> None:
     is shimmed to DirectoryStore with a compatibility patch in nImage.
     """
     viewer = make_napari_viewer()
-    viewer.open(str(resources_dir / OME_TIFF), plugin="ndevio")
+    viewer.open(str(resources_dir / OME_TIFF), plugin='ndevio')
 
     # Now channels are split into separate layers, so we should have 2 layers
     assert len(viewer.layers) == 2
@@ -41,7 +41,7 @@ def test_napari_viewer_open(resources_dir: Path, make_napari_viewer) -> None:
 
 
 @pytest.mark.parametrize(
-    ("in_memory", "expected_dtype"),
+    ('in_memory', 'expected_dtype'),
     [
         (True, np.ndarray),
         (False, da.core.Array),
@@ -49,10 +49,10 @@ def test_napari_viewer_open(resources_dir: Path, make_napari_viewer) -> None:
 )
 @pytest.mark.parametrize(
     (
-        "filename",
-        "expected_shape",
-        "expected_has_scale",
-        "expected_num_layers",
+        'filename',
+        'expected_shape',
+        'expected_has_scale',
+        'expected_num_layers',
     ),
     [
         # PNG shape is (106, 243, 4) - actual dimensions of nDev-logo-small.png
@@ -101,20 +101,20 @@ def test_reader_supported_formats(
     assert data.shape == expected_shape
 
     # Check meta has expected keys
-    assert "name" in meta
+    assert 'name' in meta
     if expected_has_scale:
-        assert "scale" in meta
+        assert 'scale' in meta
 
 
 @pytest.mark.parametrize(
-    ("in_memory", "expected_dtype"),
+    ('in_memory', 'expected_dtype'),
     [
         (True, np.ndarray),
         (False, da.core.Array),
     ],
 )
 @pytest.mark.parametrize(
-    ("filename", "expected_shape", "should_work"),
+    ('filename', 'expected_shape', 'should_work'),
     [
         # RGB_TIFF should work now that bioio-tifffile is a core dependency
         (RGB_TIFF, (1440, 1920, 3), True),
@@ -158,7 +158,7 @@ def test_for_multiscene_widget(
         if len(viewer.window._dock_widgets) != 0:
             # Get the second scene
             scene_widget = (
-                viewer.window._dock_widgets[f"{Path(filename).stem} :: Scenes"]
+                viewer.window._dock_widgets[f'{Path(filename).stem} :: Scenes']
                 .widget()
                 ._magic_widget
             )
@@ -202,9 +202,9 @@ def test_napari_get_reader_ome_override(resources_dir: Path) -> None:
 def test_napari_get_reader_unsupported(resources_dir: Path):
     """Test that unsupported file extension returns None per napari reader spec."""
     # Mock the widget opener since we don't have a viewer in this test
-    with patch("ndevio._napari_reader._open_plugin_installer") as mock_opener:
+    with patch('ndevio._napari_reader._open_plugin_installer') as mock_opener:
         reader = napari_get_reader(
-            str(resources_dir / "measure_props_Labels.abcdefg"),
+            str(resources_dir / 'measure_props_Labels.abcdefg'),
         )
 
         # Should return None for unsupported formats (per napari spec)
@@ -215,22 +215,22 @@ def test_napari_get_reader_unsupported(resources_dir: Path):
         # Check the error message contains the extension
         error_arg = mock_opener.call_args[0][1]
         error_msg = str(error_arg)
-        assert ".abcdefg" in error_msg or "abcdefg" in error_msg
+        assert '.abcdefg' in error_msg or 'abcdefg' in error_msg
 
 
 def test_napari_get_reader_general_exception(caplog):
     """Test that general exceptions in determine_reader_plugin are handled correctly."""
-    test_path = "non_existent_file.xyz"
+    test_path = 'non_existent_file.xyz'
 
     # Mock determine_reader_plugin to raise an exception
-    with patch("ndevio._napari_reader.determine_reader_plugin") as mock_reader:
-        mock_reader.side_effect = Exception("Test exception")
+    with patch('ndevio._napari_reader.determine_reader_plugin') as mock_reader:
+        mock_reader.side_effect = Exception('Test exception')
 
         reader = napari_get_reader(test_path)
         assert reader is None
 
-        assert "ndevio: Error reading file" in caplog.text
-        assert "Test exception" in caplog.text
+        assert 'ndevio: Error reading file' in caplog.text
+        assert 'Test exception' in caplog.text
 
 
 def test_napari_get_reader_png(resources_dir: Path) -> None:
@@ -262,9 +262,9 @@ def test_napari_get_reader_supported_formats_work(resources_dir: Path):
 
 
 @pytest.mark.parametrize(
-    ("filename", "expected_plugin_in_error"),
+    ('filename', 'expected_plugin_in_error'),
     [
-        (ND2_FILE, "bioio-nd2"),  # ND2 needs bioio-nd2
+        (ND2_FILE, 'bioio-nd2'),  # ND2 needs bioio-nd2
     ],
 )
 def test_napari_get_reader_unsupported_formats_helpful_errors(
@@ -276,7 +276,7 @@ def test_napari_get_reader_unsupported_formats_helpful_errors(
     The plugin installer widget should be shown via settings if enabled.
     """
     # Mock the widget opener since we don't have a viewer in this test
-    with patch("ndevio._napari_reader._open_plugin_installer") as mock_opener:
+    with patch('ndevio._napari_reader._open_plugin_installer') as mock_opener:
         reader = napari_get_reader(str(resources_dir / filename))
 
         # Should return None for unsupported formats (per napari spec)
@@ -289,4 +289,4 @@ def test_napari_get_reader_unsupported_formats_helpful_errors(
         error_arg = call_args[0][1]  # Second argument is the exception
         error_msg = str(error_arg)
         assert expected_plugin_in_error in error_msg
-        assert "pip install" in error_msg or "conda install" in error_msg
+        assert 'pip install' in error_msg or 'conda install' in error_msg

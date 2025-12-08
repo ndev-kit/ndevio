@@ -17,10 +17,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-DELIM = " :: "
+DELIM = ' :: '
 
 # Keywords that indicate a channel contains labels/segmentation data
-LABEL_KEYWORDS = ["label", "mask", "segmentation", "seg", "roi"]
+LABEL_KEYWORDS = ['label', 'mask', 'segmentation', 'seg', 'roi']
 
 
 def determine_reader_plugin(
@@ -79,7 +79,7 @@ def determine_reader_plugin(
             msg_extra = None
 
         raise UnsupportedFileFormatError(
-            reader_name="ndevio",
+            reader_name='ndevio',
             path=str(image),
             msg_extra=msg_extra,
         )
@@ -205,7 +205,9 @@ class nImage(BioImage):
         if DimensionNames.MosaicTile in self.reader.dims.order:
             try:
                 if in_memory:
-                    self.napari_layer_data = self.reader.mosaic_xarray_data.squeeze()
+                    self.napari_layer_data = (
+                        self.reader.mosaic_xarray_data.squeeze()
+                    )
                 else:
                     self.napari_layer_data = (
                         self.reader.mosaic_xarray_dask_data.squeeze()
@@ -213,7 +215,7 @@ class nImage(BioImage):
 
             except NotImplementedError:
                 logger.warning(
-                    "Bioio: Mosaic tile switching not supported for this reader"
+                    'Bioio: Mosaic tile switching not supported for this reader'
                 )
                 return None
         else:
@@ -228,8 +230,8 @@ class nImage(BioImage):
         """Infer layer type from channel name."""
         name_lower = channel_name.lower()
         if any(keyword in name_lower for keyword in LABEL_KEYWORDS):
-            return "labels"
-        return "image"
+            return 'labels'
+        return 'image'
 
     def _get_scale(self) -> tuple | None:
         """Extract physical pixel scale from image metadata according to number of napari dims."""
@@ -261,10 +263,10 @@ class nImage(BioImage):
             'ome_metadata'.
 
         """
-        img_meta = {"bioimage": self, "raw_image_metadata": self.metadata}
+        img_meta = {'bioimage': self, 'raw_image_metadata': self.metadata}
 
         try:
-            img_meta["ome_metadata"] = self.ome_metadata
+            img_meta['ome_metadata'] = self.ome_metadata
         except NotImplementedError:
             pass  # Reader doesn't support OME metadata
         except (ValueError, TypeError, KeyError) as e:
@@ -273,7 +275,7 @@ class nImage(BioImage):
             # As such, when accessing ome_metadata, we may get various exceptions
             # Log warning but continue - raw metadata is still available
             logger.warning(
-                "Could not parse OME metadata: %s. "
+                'Could not parse OME metadata: %s. '
                 "Raw metadata is still available in 'raw_image_metadata'.",
                 e,
             )
@@ -299,10 +301,12 @@ class nImage(BioImage):
             Formatted layer name.
 
         """
-        path_stem = Path(self.path).stem if self.path is not None else "unknown path"
+        path_stem = (
+            Path(self.path).stem if self.path is not None else 'unknown path'
+        )
 
         # Check if scene info is meaningful
-        no_scene = len(self.scenes) == 1 and self.current_scene == "Image:0"
+        no_scene = len(self.scenes) == 1 and self.current_scene == 'Image:0'
 
         parts = []
         if channel_name:
@@ -354,22 +358,24 @@ class nImage(BioImage):
 
         """
         meta = {
-            "name": self._build_layer_name(channel_name),
-            "metadata": base_metadata,
+            'name': self._build_layer_name(channel_name),
+            'metadata': base_metadata,
         }
 
         if scale:
-            meta["scale"] = scale
+            meta['scale'] = scale
 
         # Add image-specific metadata
-        if layer_type == "image":
+        if layer_type == 'image':
             from ._colormap_utils import get_colormap_for_channel
 
-            meta["colormap"] = get_colormap_for_channel(channel_idx, n_channels)
-            meta["blending"] = (
-                "additive"
+            meta['colormap'] = get_colormap_for_channel(
+                channel_idx, n_channels
+            )
+            meta['blending'] = (
+                'additive'
                 if channel_idx > 0 and n_channels > 1
-                else "translucent_no_depth"
+                else 'translucent_no_depth'
             )
 
         # Apply per-channel overrides
@@ -477,18 +483,20 @@ class nImage(BioImage):
         # Handle RGB images specially
         if DimensionNames.Samples in self.reader.dims.order:
             meta = {
-                "name": self._build_layer_name(),
-                "rgb": True,
-                "metadata": base_metadata,
+                'name': self._build_layer_name(),
+                'rgb': True,
+                'metadata': base_metadata,
             }
             if scale:
-                meta["scale"] = scale
-            self.layer_data_tuples = [(self.napari_layer_data.data, meta, "image")]
+                meta['scale'] = scale
+            self.layer_data_tuples = [
+                (self.napari_layer_data.data, meta, 'image')
+            ]
             return self.layer_data_tuples
 
         # Single channel image (no channel dimension)
         if channel_dim not in self.napari_layer_data.dims:
-            effective_type = layer_type or "image"
+            effective_type = layer_type or 'image'
             self.layer_data_tuples = [
                 self._build_single_layer_tuple(
                     data=self.napari_layer_data.data,
@@ -503,7 +511,8 @@ class nImage(BioImage):
 
         # Multichannel image - split into separate layers
         channel_names = [
-            str(c) for c in self.napari_layer_data.coords[channel_dim].data.tolist()
+            str(c)
+            for c in self.napari_layer_data.coords[channel_dim].data.tolist()
         ]
         channel_axis = self.napari_layer_data.dims.index(channel_dim)
         n_channels = self.napari_layer_data.shape[channel_axis]
@@ -511,7 +520,7 @@ class nImage(BioImage):
         layer_tuples = []
         for i in range(n_channels):
             channel_name = (
-                channel_names[i] if i < len(channel_names) else f"channel_{i}"
+                channel_names[i] if i < len(channel_names) else f'channel_{i}'
             )
             effective_type = self._resolve_layer_type(
                 channel_name, layer_type, channel_types

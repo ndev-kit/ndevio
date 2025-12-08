@@ -10,52 +10,52 @@ class TestReaderPluginManagerInstallable:
         """Test that CZI file suggests bioio-czi plugin when nothing installed."""
         from ndevio._plugin_manager import ReaderPluginManager
 
-        with patch("bioio.plugin_feasibility_report") as mock_report:
-            mock_report.return_value = {"ArrayLike": Mock(supported=False)}
+        with patch('bioio.plugin_feasibility_report') as mock_report:
+            mock_report.return_value = {'ArrayLike': Mock(supported=False)}
 
-            manager = ReaderPluginManager("test.czi")
+            manager = ReaderPluginManager('test.czi')
             plugins = manager.installable_plugins
 
         assert len(plugins) == 1
-        assert plugins[0] == "bioio-czi"
+        assert plugins[0] == 'bioio-czi'
 
     def test_lif_file_no_plugins_installed(self):
         """Test that LIF file suggests bioio-lif plugin."""
         from ndevio._plugin_manager import ReaderPluginManager
 
-        with patch("bioio.plugin_feasibility_report") as mock_report:
-            mock_report.return_value = {"ArrayLike": Mock(supported=False)}
+        with patch('bioio.plugin_feasibility_report') as mock_report:
+            mock_report.return_value = {'ArrayLike': Mock(supported=False)}
 
-            manager = ReaderPluginManager("test.lif")
+            manager = ReaderPluginManager('test.lif')
             plugins = manager.installable_plugins
 
         assert len(plugins) == 1
-        assert plugins[0] == "bioio-lif"
+        assert plugins[0] == 'bioio-lif'
 
     def test_tiff_file_suggests_non_core_only(self):
         """Test that TIFF files only suggest non-core plugins."""
         from ndevio._plugin_manager import ReaderPluginManager
 
-        with patch("bioio.plugin_feasibility_report") as mock_report:
-            mock_report.return_value = {"ArrayLike": Mock(supported=False)}
+        with patch('bioio.plugin_feasibility_report') as mock_report:
+            mock_report.return_value = {'ArrayLike': Mock(supported=False)}
 
-            manager = ReaderPluginManager("test.tiff")
+            manager = ReaderPluginManager('test.tiff')
             plugins = manager.installable_plugins
 
         # Should only get bioio-tiff-glob (non-core)
         # bioio-ome-tiff and bioio-tifffile are core and shouldn't be suggested
-        assert "bioio-tiff-glob" in plugins
-        assert "bioio-ome-tiff" not in plugins
-        assert "bioio-tifffile" not in plugins
+        assert 'bioio-tiff-glob' in plugins
+        assert 'bioio-ome-tiff' not in plugins
+        assert 'bioio-tifffile' not in plugins
 
     def test_no_plugins_for_unsupported_extension(self):
         """Test that unsupported extensions return empty list."""
         from ndevio._plugin_manager import ReaderPluginManager
 
-        with patch("bioio.plugin_feasibility_report") as mock_report:
-            mock_report.return_value = {"ArrayLike": Mock(supported=False)}
+        with patch('bioio.plugin_feasibility_report') as mock_report:
+            mock_report.return_value = {'ArrayLike': Mock(supported=False)}
 
-            manager = ReaderPluginManager("test.xyz")
+            manager = ReaderPluginManager('test.xyz')
             plugins = manager.installable_plugins
 
         assert len(plugins) == 0
@@ -65,13 +65,13 @@ class TestReaderPluginManagerInstallable:
         from ndevio._plugin_manager import ReaderPluginManager
 
         # Mock feasibility report showing bioio-czi as installed
-        with patch("bioio.plugin_feasibility_report") as mock_report:
+        with patch('bioio.plugin_feasibility_report') as mock_report:
             mock_report.return_value = {
-                "bioio-czi": Mock(supported=True),
-                "ArrayLike": Mock(supported=False),
+                'bioio-czi': Mock(supported=True),
+                'ArrayLike': Mock(supported=False),
             }
 
-            manager = ReaderPluginManager("test.czi")
+            manager = ReaderPluginManager('test.czi')
             plugins = manager.installable_plugins
 
         # bioio-czi should be filtered out since it's "installed"
@@ -94,7 +94,7 @@ class TestPluginInstallerWidget:
         assert widget.manager.path is None
 
         # Title should be standalone message
-        assert "Install BioIO Reader Plugin" in widget._title_label.value
+        assert 'Install BioIO Reader Plugin' in widget._title_label.value
 
         # No path, so no pre-selection
         assert (
@@ -107,11 +107,11 @@ class TestPluginInstallerWidget:
         from ndevio._plugin_manager import ReaderPluginManager
         from ndevio.widgets import PluginInstallerWidget
 
-        with patch("bioio.plugin_feasibility_report") as mock_report:
+        with patch('bioio.plugin_feasibility_report') as mock_report:
             # Mock report showing no plugins installed
-            mock_report.return_value = {"ArrayLike": Mock(supported=False)}
+            mock_report.return_value = {'ArrayLike': Mock(supported=False)}
 
-            manager = ReaderPluginManager("test.czi")
+            manager = ReaderPluginManager('test.czi')
             widget = PluginInstallerWidget(plugin_manager=manager)
 
         # Should have ALL plugins available
@@ -120,31 +120,31 @@ class TestPluginInstallerWidget:
         # Should have installable plugins
         installable = widget.manager.installable_plugins
         assert len(installable) > 0
-        assert "bioio-czi" in installable
+        assert 'bioio-czi' in installable
 
         # First installable plugin should be pre-selected
         assert widget._plugin_select.value == installable[0]
 
         # Should have path
         assert widget.manager.path is not None
-        assert widget.manager.path.name == "test.czi"
+        assert widget.manager.path.name == 'test.czi'
 
         # Title should show filename
-        assert "test.czi" in widget._title_label.value
+        assert 'test.czi' in widget._title_label.value
 
     def test_error_mode_no_installable_plugins(self, make_napari_viewer):
         """Test widget in error mode without installable plugins."""
         from ndevio._plugin_manager import ReaderPluginManager
         from ndevio.widgets import PluginInstallerWidget
 
-        with patch("bioio.plugin_feasibility_report") as mock_report:
+        with patch('bioio.plugin_feasibility_report') as mock_report:
             # Mock report showing all suggested plugins already installed
             mock_report.return_value = {
-                "bioio-imageio": Mock(supported=False),  # for .xyz files
-                "ArrayLike": Mock(supported=False),
+                'bioio-imageio': Mock(supported=False),  # for .xyz files
+                'ArrayLike': Mock(supported=False),
             }
 
-            manager = ReaderPluginManager("test.png")
+            manager = ReaderPluginManager('test.png')
             widget = PluginInstallerWidget(plugin_manager=manager)
 
         # Should still have ALL plugins available
@@ -173,7 +173,7 @@ class TestInstallPlugin:
         from ndevio._plugin_installer import install_plugin
 
         # This will queue the installation but not actually run it
-        job_id = install_plugin("bioio-imageio")
+        job_id = install_plugin('bioio-imageio')
 
         # Job ID should be an integer
         assert isinstance(job_id, int)
@@ -199,7 +199,7 @@ class TestInstallPlugin:
 
         # Check that we got a completion event
         assert len(completed) > 0
-        assert "bioio-imageio" in completed[0].get("pkgs", [])
+        assert 'bioio-imageio' in completed[0].get('pkgs', [])
 
 
 class TestVerifyPluginInstalled:
@@ -210,14 +210,14 @@ class TestVerifyPluginInstalled:
         from ndevio._plugin_installer import verify_plugin_installed
 
         # bioio should be installed since it's a dependency
-        assert verify_plugin_installed("bioio")
+        assert verify_plugin_installed('bioio')
 
     def test_verify_not_installed_plugin(self):
         """Test verification of a plugin that isn't installed."""
         from ndevio._plugin_installer import verify_plugin_installed
 
         # Use a plugin that definitely won't be installed
-        assert not verify_plugin_installed("bioio-nonexistent-plugin-12345")
+        assert not verify_plugin_installed('bioio-nonexistent-plugin-12345')
 
     def test_verify_converts_name_format(self):
         """Test that plugin name is correctly converted to module name."""
@@ -225,7 +225,7 @@ class TestVerifyPluginInstalled:
 
         # Test with installed package (bioio-base should be installed)
         # The function should convert bioio-base -> bioio_base
-        result = verify_plugin_installed("bioio-base")
+        result = verify_plugin_installed('bioio-base')
         assert isinstance(result, bool)
 
 

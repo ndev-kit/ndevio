@@ -15,16 +15,16 @@ class TestOpenPluginInstaller:
         import ndevio._napari_reader as reader_module
 
         viewer = make_napari_viewer()
-        test_path = "test.czi"
+        test_path = 'test.czi'
         error = UnsupportedFileFormatError(
-            reader_name="test", path=test_path, msg_extra=""
+            reader_name='test', path=test_path, msg_extra=''
         )
 
         # Mock plugin_feasibility_report from bioio (not ndevio)
-        with patch("bioio.plugin_feasibility_report") as mock_report:
+        with patch('bioio.plugin_feasibility_report') as mock_report:
             mock_report.return_value = {
-                "bioio-ome-tiff": Mock(supported=False),
-                "ArrayLike": Mock(supported=False),
+                'bioio-ome-tiff': Mock(supported=False),
+                'ArrayLike': Mock(supported=False),
             }
 
             # Call the function
@@ -36,7 +36,7 @@ class TestOpenPluginInstaller:
         # Find the plugin installer widget
         plugin_widget = None
         for name, widget in viewer.window.dock_widgets.items():
-            if "Install BioIO Plugin" in name:
+            if 'Install BioIO Plugin' in name:
                 plugin_widget = widget
                 break
 
@@ -49,12 +49,12 @@ class TestOpenPluginInstaller:
         import ndevio._napari_reader as reader_module
 
         viewer = make_napari_viewer()
-        test_path = Path("path/to/test.czi")
+        test_path = Path('path/to/test.czi')
         error = UnsupportedFileFormatError(
-            reader_name="test", path=str(test_path), msg_extra=""
+            reader_name='test', path=str(test_path), msg_extra=''
         )
 
-        with patch("bioio.plugin_feasibility_report") as mock_report:
+        with patch('bioio.plugin_feasibility_report') as mock_report:
             mock_report.return_value = {}
 
             reader_module._open_plugin_installer(test_path, error)
@@ -63,7 +63,7 @@ class TestOpenPluginInstaller:
         # Find the plugin installer widget by name
         widget = None
         for name, docked_widget in viewer.window.dock_widgets.items():
-            if "Install BioIO Plugin" in name:
+            if 'Install BioIO Plugin' in name:
                 widget = docked_widget
                 break
 
@@ -80,18 +80,18 @@ class TestOpenPluginInstaller:
         import ndevio._napari_reader as reader_module
 
         viewer = make_napari_viewer()
-        test_path = "test.czi"
+        test_path = 'test.czi'
         error = UnsupportedFileFormatError(
-            reader_name="test", path=test_path, msg_extra=""
+            reader_name='test', path=test_path, msg_extra=''
         )
 
         # Mock feasibility report showing bioio-czi as installed
-        with patch("bioio.plugin_feasibility_report") as mock_report:
+        with patch('bioio.plugin_feasibility_report') as mock_report:
             mock_report.return_value = {
-                "bioio-czi": Mock(
+                'bioio-czi': Mock(
                     supported=False
                 ),  # Installed but can't read this file
-                "ArrayLike": Mock(supported=False),
+                'ArrayLike': Mock(supported=False),
             }
 
             reader_module._open_plugin_installer(test_path, error)
@@ -100,7 +100,7 @@ class TestOpenPluginInstaller:
         # Find the plugin installer widget by name
         widget = None
         for name, docked_widget in viewer.window.dock_widgets.items():
-            if "Install BioIO Plugin" in name:
+            if 'Install BioIO Plugin' in name:
                 widget = docked_widget
                 break
 
@@ -109,7 +109,7 @@ class TestOpenPluginInstaller:
         # bioio-czi should be filtered out from installable_plugins
         installable = widget.manager.installable_plugins
         if installable:
-            assert "bioio-czi" not in installable
+            assert 'bioio-czi' not in installable
 
     def test_suggests_uninstalled_plugins(self, make_napari_viewer):
         """Test that uninstalled plugins are suggested."""
@@ -118,16 +118,16 @@ class TestOpenPluginInstaller:
         import ndevio._napari_reader as reader_module
 
         viewer = make_napari_viewer()
-        test_path = "test.lif"  # LIF files need bioio-lif
+        test_path = 'test.lif'  # LIF files need bioio-lif
         error = UnsupportedFileFormatError(
-            reader_name="test", path=test_path, msg_extra=""
+            reader_name='test', path=test_path, msg_extra=''
         )
 
         # Mock feasibility report with no bioio-lif installed
-        with patch("bioio.plugin_feasibility_report") as mock_report:
+        with patch('bioio.plugin_feasibility_report') as mock_report:
             mock_report.return_value = {
-                "bioio-ome-tiff": Mock(supported=False),
-                "ArrayLike": Mock(supported=False),
+                'bioio-ome-tiff': Mock(supported=False),
+                'ArrayLike': Mock(supported=False),
             }
 
             reader_module._open_plugin_installer(test_path, error)
@@ -136,7 +136,7 @@ class TestOpenPluginInstaller:
         # Find the plugin installer widget by name
         widget = None
         for name, docked_widget in viewer.window.dock_widgets.items():
-            if "Install BioIO Plugin" in name:
+            if 'Install BioIO Plugin' in name:
                 widget = docked_widget
                 break
 
@@ -145,7 +145,7 @@ class TestOpenPluginInstaller:
         # bioio-lif should be in installable_plugins
         installable = widget.manager.installable_plugins
         assert installable is not None
-        assert "bioio-lif" in installable
+        assert 'bioio-lif' in installable
 
 
 class TestPluginInstallerWidgetIntegration:
@@ -159,24 +159,24 @@ class TestPluginInstallerWidgetIntegration:
         make_napari_viewer()  # Create viewer context
 
         # Create manager for a CZI file
-        with patch("bioio.plugin_feasibility_report") as mock_report:
+        with patch('bioio.plugin_feasibility_report') as mock_report:
             # Mock report showing no plugins installed
             mock_report.return_value = {
-                "ArrayLike": Mock(supported=False),
+                'ArrayLike': Mock(supported=False),
             }
 
-            manager = ReaderPluginManager("test.czi")
+            manager = ReaderPluginManager('test.czi')
             widget = PluginInstallerWidget(plugin_manager=manager)
 
         # Verify widget state
         assert widget.manager.path is not None
-        assert widget.manager.path.name == "test.czi"
-        assert "test.czi" in widget._title_label.value
+        assert widget.manager.path.name == 'test.czi'
+        assert 'test.czi' in widget._title_label.value
 
         # bioio-czi should be in installable plugins and pre-selected
         installable = widget.manager.installable_plugins
-        assert "bioio-czi" in installable
-        assert widget._plugin_select.value == "bioio-czi"
+        assert 'bioio-czi' in installable
+        assert widget._plugin_select.value == 'bioio-czi'
 
     def test_install_button_queues_installation(self, make_napari_viewer):
         """Test that clicking install button queues installation."""
@@ -187,17 +187,17 @@ class TestPluginInstallerWidgetIntegration:
         widget = PluginInstallerWidget()
 
         # Select a plugin
-        widget._plugin_select.value = "bioio-imageio"
+        widget._plugin_select.value = 'bioio-imageio'
 
         # Mock the install_plugin function at the point of import
-        with patch("ndevio._plugin_installer.install_plugin") as mock_install:
+        with patch('ndevio._plugin_installer.install_plugin') as mock_install:
             mock_install.return_value = 123  # Mock job ID
 
             # Click install button
             widget._on_install_clicked()
 
             # Verify install was called with correct plugin
-            mock_install.assert_called_once_with("bioio-imageio")
+            mock_install.assert_called_once_with('bioio-imageio')
 
     def test_widget_shows_all_plugins(self, make_napari_viewer):
         """Test that widget shows all available plugins."""
@@ -222,12 +222,12 @@ class TestPluginInstallerWidgetIntegration:
         make_napari_viewer()
 
         # Mock report showing no plugins installed
-        with patch("bioio.plugin_feasibility_report") as mock_report:
+        with patch('bioio.plugin_feasibility_report') as mock_report:
             mock_report.return_value = {
-                "ArrayLike": Mock(supported=False),
+                'ArrayLike': Mock(supported=False),
             }
 
-            manager = ReaderPluginManager("test.lif")
+            manager = ReaderPluginManager('test.lif')
             widget = PluginInstallerWidget(plugin_manager=manager)
 
         # bioio-lif should be pre-selected (first installable)
@@ -242,14 +242,14 @@ class TestPluginInstallerWidgetIntegration:
         make_napari_viewer()
 
         widget = PluginInstallerWidget()
-        widget._plugin_select.value = "bioio-imageio"
+        widget._plugin_select.value = 'bioio-imageio'
 
-        with patch("ndevio._plugin_installer.install_plugin") as mock_install:
+        with patch('ndevio._plugin_installer.install_plugin') as mock_install:
             mock_install.return_value = 123
 
             # Status should update to "Installing..."
             widget._on_install_clicked()
-            assert "Installing" in widget._status_label.value
+            assert 'Installing' in widget._status_label.value
 
     def test_no_plugin_selected_shows_error(self, make_napari_viewer):
         """Test that clicking install with no selection shows error."""
@@ -262,4 +262,4 @@ class TestPluginInstallerWidgetIntegration:
 
         widget._on_install_clicked()
 
-        assert "No plugin selected" in widget._status_label.value
+        assert 'No plugin selected' in widget._status_label.value
