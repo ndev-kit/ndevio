@@ -48,9 +48,7 @@ class TestCheckForMissingFiles:
         file1 = directory / "file1.txt"
         file1.write_text("Test file 1")
 
-        missing = check_for_missing_files(
-            ["file1.txt", "file3.txt"], directory
-        )
+        missing = check_for_missing_files(["file1.txt", "file3.txt"], directory)
         assert missing == [("file3.txt", "test_dir")]
 
 
@@ -193,9 +191,7 @@ class TestElideString:
 
     def test_start_elision(self):
         """Test start elision."""
-        assert (
-            elide_string("thisisaverylongstring", 10, "start") == "...gstring"
-        )
+        assert elide_string("thisisaverylongstring", 10, "start") == "...gstring"
 
     def test_end_elision(self):
         """Test end elision."""

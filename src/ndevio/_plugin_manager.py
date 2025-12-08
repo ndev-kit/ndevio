@@ -223,9 +223,7 @@ class ReaderPluginManager:
             and plugin_name not in installed
         ]
 
-    def get_working_reader(
-        self, preferred_reader: str | None = None
-    ) -> Reader | None:
+    def get_working_reader(self, preferred_reader: str | None = None) -> Reader | None:
         """Get a reader that can actually read this file.
 
         Tries readers in priority order:

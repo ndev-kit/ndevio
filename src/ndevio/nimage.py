@@ -205,9 +205,7 @@ class nImage(BioImage):
         if DimensionNames.MosaicTile in self.reader.dims.order:
             try:
                 if in_memory:
-                    self.napari_layer_data = (
-                        self.reader.mosaic_xarray_data.squeeze()
-                    )
+                    self.napari_layer_data = self.reader.mosaic_xarray_data.squeeze()
                 else:
                     self.napari_layer_data = (
                         self.reader.mosaic_xarray_dask_data.squeeze()
@@ -301,9 +299,7 @@ class nImage(BioImage):
             Formatted layer name.
 
         """
-        path_stem = (
-            Path(self.path).stem if self.path is not None else "unknown path"
-        )
+        path_stem = Path(self.path).stem if self.path is not None else "unknown path"
 
         # Check if scene info is meaningful
         no_scene = len(self.scenes) == 1 and self.current_scene == "Image:0"
@@ -369,9 +365,7 @@ class nImage(BioImage):
         if layer_type == "image":
             from ._colormap_utils import get_colormap_for_channel
 
-            meta["colormap"] = get_colormap_for_channel(
-                channel_idx, n_channels
-            )
+            meta["colormap"] = get_colormap_for_channel(channel_idx, n_channels)
             meta["blending"] = (
                 "additive"
                 if channel_idx > 0 and n_channels > 1
@@ -489,9 +483,7 @@ class nImage(BioImage):
             }
             if scale:
                 meta["scale"] = scale
-            self.layer_data_tuples = [
-                (self.napari_layer_data.data, meta, "image")
-            ]
+            self.layer_data_tuples = [(self.napari_layer_data.data, meta, "image")]
             return self.layer_data_tuples
 
         # Single channel image (no channel dimension)
@@ -511,8 +503,7 @@ class nImage(BioImage):
 
         # Multichannel image - split into separate layers
         channel_names = [
-            str(c)
-            for c in self.napari_layer_data.coords[channel_dim].data.tolist()
+            str(c) for c in self.napari_layer_data.coords[channel_dim].data.tolist()
         ]
         channel_axis = self.napari_layer_data.dims.index(channel_dim)
         n_channels = self.napari_layer_data.shape[channel_axis]

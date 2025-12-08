@@ -300,9 +300,9 @@ def _format_plugin_list(plugin_names: list[str]) -> str:
             continue
 
         lines.append(f"  • {plugin_name}")
-        lines.append(f"    {info['description']}")
+        lines.append(f'    {info["description"]}')
         if info.get("note"):
-            lines.append(f"    Note: {info['note']}")
+            lines.append(f'    Note: {info["note"]}')
         lines.append(f"    Install: pip install {plugin_name}\n")
 
     return "\n".join(lines)

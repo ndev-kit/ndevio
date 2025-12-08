@@ -140,9 +140,7 @@ def napari_reader_function(
     return [(None,)]
 
 
-def _open_scene_container(
-    path: PathLike, img: nImage, in_memory: bool
-) -> None:
+def _open_scene_container(path: PathLike, img: nImage, in_memory: bool) -> None:
     from pathlib import Path
 
     import napari
@@ -157,9 +155,7 @@ def _open_scene_container(
     )
 
 
-def _open_plugin_installer(
-    path: PathLike, error: UnsupportedFileFormatError
-) -> None:
+def _open_plugin_installer(path: PathLike, error: UnsupportedFileFormatError) -> None:
     """Open the plugin installer widget for an unsupported file.
 
     Parameters

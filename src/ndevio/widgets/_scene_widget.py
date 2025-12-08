@@ -92,8 +92,7 @@ class nImageSceneWidget(Container):
         self.in_memory = in_memory
         self.settings = get_settings()
         self.scenes = [
-            f"{idx}{DELIMITER}{scene}"
-            for idx, scene in enumerate(self.img.scenes)
+            f"{idx}{DELIMITER}{scene}" for idx, scene in enumerate(self.img.scenes)
         ]
 
         self._init_widgets()
@@ -129,8 +128,6 @@ class nImageSceneWidget(Container):
             # Get layer tuples and add to viewer using napari's Layer.create()
             from napari.layers import Layer
 
-            for ldt in self.img.get_layer_data_tuples(
-                in_memory=self.in_memory
-            ):
+            for ldt in self.img.get_layer_data_tuples(in_memory=self.in_memory):
                 layer = Layer.create(*ldt)
                 self.viewer.add_layer(layer)

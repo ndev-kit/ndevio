@@ -14,9 +14,7 @@ from ndevio.sampledata import (
 )
 
 
-def _validate_layer_data_tuples(
-    result: list, expected_layer_type: str | None = None
-):
+def _validate_layer_data_tuples(result: list, expected_layer_type: str | None = None):
     """Helper to validate LayerDataTuple structure.
 
     Parameters

@@ -80,14 +80,10 @@ class PluginInstallerWidget(Container):
         if self.manager.path is not None:
             # Error mode: show file that failed
             file_name = self.manager.path.name
-            self._title_label = Label(
-                value=f"<b>Cannot read file:</b> {file_name}"
-            )
+            self._title_label = Label(value=f"<b>Cannot read file:</b> {file_name}")
         else:
             # Standalone mode: general title
-            self._title_label = Label(
-                value="<b>Install BioIO Reader Plugin</b>"
-            )
+            self._title_label = Label(value="<b>Install BioIO Reader Plugin</b>")
         self.append(self._title_label)
 
         self._info_label = Label(value="Select a plugin to install:")

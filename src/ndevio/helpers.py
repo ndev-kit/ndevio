@@ -141,9 +141,7 @@ def get_squeezed_dim_order(
     """
     if isinstance(skip_dims, str):
         skip_dims = (skip_dims,)
-    return "".join(
-        {k: v for k, v in img.dims.items() if v > 1 and k not in skip_dims}
-    )
+    return "".join({k: v for k, v in img.dims.items() if v > 1 and k not in skip_dims})
 
 
 def create_id_string(img: nImage | BioImage, identifier: str) -> str:

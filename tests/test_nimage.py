@@ -16,10 +16,10 @@ from bioio_base.exceptions import UnsupportedFileFormatError
 from ndevio import nImage
 from ndevio.nimage import determine_reader_plugin
 
-RGB_TIFF = (
-    "RGB_bad_metadata.tiff"  # has two scenes, with really difficult metadata
+RGB_TIFF = "RGB_bad_metadata.tiff"  # has two scenes, with really difficult metadata
+CELLS3D2CH_OME_TIFF = (
+    "cells3d2ch_legacy.tiff"  # 2 channel, 3D OME-TIFF, from old napari-ndev saving
 )
-CELLS3D2CH_OME_TIFF = "cells3d2ch_legacy.tiff"  # 2 channel, 3D OME-TIFF, from old napari-ndev saving
 LOGO_PNG = "nDev-logo-small.png"  # small PNG file (fix typo)
 CZI_FILE = "0T-4C-0Z-7pos.czi"  # multi-scene CZI file
 ND2_FILE = "ND2_dims_rgb.nd2"  # ND2 file requiring bioio-nd2
@@ -61,9 +61,7 @@ def test_nImage_ome_reader(resources_dir: Path):
     # available. The project does not require bioio_tifffile as a test
     # dependency, so skip this part when it's missing.
     if bioio_tifffile is None:  # pragma: no cover - optional
-        pytest.skip(
-            "bioio_tifffile not installed; skipping reader-override checks"
-        )
+        pytest.skip("bioio_tifffile not installed; skipping reader-override checks")
 
     nimg = nImage(img_path, reader=bioio_tifffile.Reader)
 
@@ -119,9 +117,7 @@ def test_nImage_determine_in_memory_large_file(resources_dir: Path):
     """Test in-memory determination for large files."""
     img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
     with (
-        mock.patch(
-            "psutil.virtual_memory", return_value=mock.Mock(available=1e9)
-        ),
+        mock.patch("psutil.virtual_memory", return_value=mock.Mock(available=1e9)),
         mock.patch(
             "bioio_base.io.pathlike_to_fs",
             return_value=(mock.Mock(size=lambda x: 5e9), ""),
@@ -226,9 +222,7 @@ def test_get_layer_data_tuples_ome_not_implemented_silent(
         type(img),
         "ome_metadata",
         new_callable=mock.PropertyMock,
-        side_effect=NotImplementedError(
-            "Reader does not support OME metadata"
-        ),
+        side_effect=NotImplementedError("Reader does not support OME metadata"),
     ):
         caplog.clear()
         layer_tuples = img.get_layer_data_tuples()
@@ -251,9 +245,7 @@ def test_get_layer_data_mosaic_tile_in_memory(resources_dir: Path):
 
     with mock.patch.object(nImage, "reader", create=True) as mock_reader:
         mock_reader.dims.order = [DimensionNames.MosaicTile]
-        mock_reader.mosaic_xarray_data.squeeze.return_value = xr.DataArray(
-            [1, 2, 3]
-        )
+        mock_reader.mosaic_xarray_data.squeeze.return_value = xr.DataArray([1, 2, 3])
         img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
         img._get_layer_data(in_memory=True)
         assert img.napari_layer_data is not None
@@ -269,8 +261,8 @@ def test_get_layer_data_mosaic_tile_not_in_memory(
 
     with mock.patch.object(nImage, "reader", create=True) as mock_reader:
         mock_reader.dims.order = [DimensionNames.MosaicTile]
-        mock_reader.mosaic_xarray_dask_data.squeeze.return_value = (
-            xr.DataArray([1, 2, 3])
+        mock_reader.mosaic_xarray_dask_data.squeeze.return_value = xr.DataArray(
+            [1, 2, 3]
         )
         img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
         img._get_layer_data(in_memory=False)
@@ -378,9 +370,7 @@ def test_nimage_init_with_various_formats(
             error_msg = str(e)
             # Should contain at least one of the expected error texts
             if expected_error_contains:
-                assert any(
-                    text in error_msg for text in expected_error_contains
-                )
+                assert any(text in error_msg for text in expected_error_contains)
 
 
 # =============================================================================
@@ -427,9 +417,7 @@ class TestGetLayerDataTuples:
         assert "membrane" in names[0]
         assert "nuclei" in names[1]
 
-    def test_single_channel_image_returns_single_tuple(
-        self, resources_dir: Path
-    ):
+    def test_single_channel_image_returns_single_tuple(self, resources_dir: Path):
         """Test that single channel images return single tuple."""
         # PNG is single channel (or RGB treated as single layer)
         img = nImage(resources_dir / LOGO_PNG)
@@ -661,6 +649,4 @@ class TestGetLayerDataTuples:
         assert layer_tuples[0][1]["contrast_limits"] == (0, 1000)
         # Second channel should have opacity override but default colormap
         assert layer_tuples[1][1]["opacity"] == 0.5
-        assert (
-            layer_tuples[1][1]["colormap"] == "green"
-        )  # default for 2-channel
+        assert layer_tuples[1][1]["colormap"] == "green"  # default for 2-channel

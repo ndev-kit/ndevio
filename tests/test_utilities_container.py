@@ -9,9 +9,7 @@ from ndevio.widgets._utilities_container import UtilitiesContainer
 
 image_2d = np.asarray([[0, 0, 1, 1], [0, 0, 1, 1], [2, 2, 1, 1], [2, 2, 1, 1]])
 shapes_2d = np.array([[0.25, 0.25], [0.25, 2.75], [2.75, 2.75], [2.75, 0.25]])
-labels_2d = np.asarray(
-    [[0, 0, 0, 0], [0, 1, 1, 0], [0, 1, 1, 0], [0, 0, 0, 0]]
-)
+labels_2d = np.asarray([[0, 0, 0, 0], [0, 1, 1, 0], [0, 1, 1, 0], [0, 0, 0, 0]])
 
 image_4d = np.random.random((1, 1, 10, 10))
 shapes_4d = [
@@ -102,9 +100,7 @@ def test_save_labels(qtbot, make_napari_viewer, tmp_path: Path, test_data):
     assert saved_img.channel_names == ["Labels"]
 
 
-def test_save_image_layer(
-    qtbot, make_napari_viewer, test_data, tmp_path: Path
-):
+def test_save_image_layer(qtbot, make_napari_viewer, test_data, tmp_path: Path):
     test_image, _, _, squeezed_dims = test_data
     viewer = make_napari_viewer()
     viewer.add_image(test_image)
@@ -127,9 +123,7 @@ def test_save_image_layer(
     assert saved_img.channel_names == ["0"]
 
 
-def test_save_multi_layer(
-    qtbot, make_napari_viewer, test_data, tmp_path: Path
-):
+def test_save_multi_layer(qtbot, make_napari_viewer, test_data, tmp_path: Path):
     test_image, _, test_labels, squeezed_dims = test_data
     viewer = make_napari_viewer()
     viewer.add_image(test_image)
@@ -170,10 +164,7 @@ def test_update_metadata_from_file(make_napari_viewer, test_rgb_image):
     container.update_metadata_on_file_select()
 
     assert container._save_name.value == "RGB_bad_metadata"
-    assert (
-        container._dim_shape.value
-        == "T: 1, C: 1, Z: 1, Y: 1440, X: 1920, S: 3"
-    )
+    assert container._dim_shape.value == "T: 1, C: 1, Z: 1, Y: 1440, X: 1920, S: 3"
     assert container._squeezed_dims_order == "YX"
     assert container._channel_names.value == "['red', 'green', 'blue']"
 
@@ -295,9 +286,7 @@ def test_batch_cancel_button(tmp_path: Path, resources_dir: Path, qtbot):
     container._concatenate_batch_button.clicked()
 
     # Wait for cancellation to complete
-    qtbot.waitUntil(
-        lambda: not container._batch_runner.is_running, timeout=10000
-    )
+    qtbot.waitUntil(lambda: not container._batch_runner.is_running, timeout=10000)
 
     # Verify it stopped
     assert not container._batch_runner.is_running
@@ -392,9 +381,7 @@ def test_extract_and_save_scenes_ome_tiff_specific_scenes(
     save_dir = tmp_path / "ExtractedScenes"
 
     # Extract only scenes 0 and 2
-    results = list(
-        extract_and_save_scenes_ome_tiff(path, save_dir, scenes=[0, 2])
-    )
+    results = list(extract_and_save_scenes_ome_tiff(path, save_dir, scenes=[0, 2]))
 
     assert len(results) == 2
     assert len(list(save_dir.iterdir())) == 2
@@ -408,10 +395,7 @@ def test_open_images(make_napari_viewer, test_rgb_image):
     container._files.value = path
     container.open_images()
 
-    assert (
-        container._dim_shape.value
-        == "T: 1, C: 1, Z: 1, Y: 1440, X: 1920, S: 3"
-    )
+    assert container._dim_shape.value == "T: 1, C: 1, Z: 1, Y: 1440, X: 1920, S: 3"
     assert container._squeezed_dims_order == "YX"
     assert container._channel_names.value == "['red', 'green', 'blue']"
 
