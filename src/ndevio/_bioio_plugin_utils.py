@@ -1,12 +1,12 @@
 """Bioio plugin metadata and extension mapping.
 
-This module contains the BIOIO_PLUGINS registry and low-level utilities for
+This module contains the BIOIO_PLUGINS registry and utilities for
 plugin discovery. The ReaderPluginManager uses these utilities internally.
 
 Public API:
     BIOIO_PLUGINS - Dict of all bioio plugins and their file extensions
     suggest_plugins_for_path() - Get list of suggested plugins by file extension
-    get_reader_priority() - Get reader priority list from BIOIO_PLUGINS order
+    get_reader_by_name() - Import and return Reader class from plugin name
 
 Internal API (used by ReaderPluginManager):
     format_plugin_installation_message() - Generate installation message
@@ -22,15 +22,22 @@ Example:
     >>> manager = ReaderPluginManager("image.czi")
     >>> print(manager.installable_plugins)
     >>> print(manager.get_installation_message())
+    >>>
+    >>> # Direct reader import
+    >>> from ndevio._bioio_plugin_utils import get_reader_by_name
+    >>> reader = get_reader_by_name("bioio-ome-tiff")
 """
 
 from __future__ import annotations
 
+import importlib
 import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from bioio_base.reader import Reader
 
 logger = logging.getLogger(__name__)
 
@@ -124,25 +131,40 @@ for plugin_name, info in BIOIO_PLUGINS.items():
         _EXTENSION_TO_PLUGIN[ext].append(plugin_name)
 
 
-def get_reader_priority() -> list[str]:
-    """Get reader priority list from BIOIO_PLUGINS dictionary order.
+def get_reader_by_name(reader_name: str) -> Reader:
+    """Import and return Reader class from plugin name.
 
-    Returns plugin names in priority order (highest priority first).
-    This order is used by ReaderPluginManager when selecting readers.
+    Converts plugin name (e.g., 'bioio-czi') to module name (e.g., 'bioio_czi')
+    and imports the Reader class.
+
+    Parameters
+    ----------
+    reader_name : str
+        Name of the reader plugin (e.g., 'bioio-czi', 'bioio-ome-tiff')
 
     Returns
     -------
-    list of str
-        Plugin names in priority order
+    Reader
+        The Reader class from the plugin module
+
+    Raises
+    ------
+    ImportError
+        If the reader module cannot be imported (plugin not installed)
+    AttributeError
+        If the module doesn't have a Reader attribute
 
     Examples
     --------
-    >>> from ndevio._bioio_plugin_utils import get_reader_priority
-    >>> priority = get_reader_priority()
-    >>> print(priority[0])  # Highest priority reader
-    'bioio-ome-zarr'
+    >>> from ndevio._bioio_plugin_utils import get_reader_by_name
+    >>> reader = get_reader_by_name('bioio-ome-tiff')
+    >>> from ndevio import nImage
+    >>> img = nImage('image.tif', reader=reader)
     """
-    return list(BIOIO_PLUGINS.keys())
+    # Convert plugin name to module name (bioio-czi -> bioio_czi)
+    module_name = reader_name.replace('-', '_')
+    module = importlib.import_module(module_name)
+    return module.Reader
 
 
 def format_plugin_installation_message(

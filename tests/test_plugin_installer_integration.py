@@ -209,7 +209,7 @@ class TestPluginInstallerWidgetIntegration:
         widget = PluginInstallerWidget()
 
         # Should have all plugins from manager's available_plugins
-        plugin_names = widget.manager.available_plugins
+        plugin_names = widget.manager.known_plugins
         expected_names = list(BIOIO_PLUGINS.keys())
 
         assert set(plugin_names) == set(expected_names)
