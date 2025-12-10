@@ -1,169 +1,67 @@
-"""Tests for _bioio_plugin_utils module."""
+"""Tests for _bioio_plugin_utils module.
 
-import logging
+This module tests:
+- suggest_plugins_for_path: maps file extensions to bioio plugin names
+- format_plugin_installation_message: formats installation instructions
+- BIOIO_PLUGINS: the plugin metadata registry
+"""
+
+import pytest
 
 
 class TestSuggestPluginsForPath:
     """Test suggest_plugins_for_path function."""
 
-    def test_czi_file(self):
-        """Test that CZI file suggests bioio-czi."""
+    @pytest.mark.parametrize(
+        ('filename', 'expected_plugins'),
+        [
+            ('test.czi', ['bioio-czi']),
+            ('test.lif', ['bioio-lif']),
+            ('test.nd2', ['bioio-nd2']),
+            ('test.dv', ['bioio-dv']),
+            ('test.xyz', []),  # Unsupported returns empty
+        ],
+    )
+    def test_extension_to_plugin_mapping(self, filename, expected_plugins):
+        """Test that file extensions map to correct plugin suggestions."""
         from ndevio._bioio_plugin_utils import suggest_plugins_for_path
 
-        plugins = suggest_plugins_for_path('test.czi')
+        plugins = suggest_plugins_for_path(filename)
+        assert plugins == expected_plugins
 
-        assert len(plugins) == 1
-        assert plugins[0] == 'bioio-czi'
-
-    def test_lif_file(self):
-        """Test that LIF file suggests bioio-lif."""
-        from ndevio._bioio_plugin_utils import suggest_plugins_for_path
-
-        plugins = suggest_plugins_for_path('test.lif')
-
-        assert len(plugins) == 1
-        assert plugins[0] == 'bioio-lif'
-
-    def test_tiff_file_suggests_all(self):
+    def test_tiff_suggests_multiple_plugins(self):
         """Test that TIFF files suggest all TIFF-compatible plugins."""
         from ndevio._bioio_plugin_utils import suggest_plugins_for_path
 
         plugins = suggest_plugins_for_path('test.tiff')
 
-        # Should get bioio-ome-tiff, bioio-tifffile, bioio-tiff-glob
+        # TIFF has multiple compatible readers
         assert 'bioio-ome-tiff' in plugins
         assert 'bioio-tifffile' in plugins
         assert 'bioio-tiff-glob' in plugins
-
-    def test_unsupported_extension(self):
-        """Test that unsupported extensions return empty list."""
-        from ndevio._bioio_plugin_utils import suggest_plugins_for_path
-
-        plugins = suggest_plugins_for_path('test.xyz')
-
-        assert len(plugins) == 0
-
-
-class TestReaderPluginManager:
-    """Test ReaderPluginManager class."""
-
-    def test_manager_filters_installed_plugins(self):
-        """Test that manager correctly identifies installable plugins."""
-        from unittest.mock import Mock, patch
-
-        from ndevio._plugin_manager import ReaderPluginManager
-
-        # Mock feasibility report showing bioio-czi as installed
-        with patch('bioio.plugin_feasibility_report') as mock_report:
-            mock_report.return_value = {
-                'bioio-czi': Mock(supported=False),
-                'ArrayLike': Mock(supported=False),
-            }
-
-            manager = ReaderPluginManager('test.czi')
-
-            # bioio-czi should be in installed_plugins
-            assert 'bioio-czi' in manager.installed_plugins
-
-            # bioio-czi should NOT be in installable_plugins (already installed)
-            assert 'bioio-czi' not in manager.installable_plugins
-
-    def test_manager_suggests_uninstalled_plugins(self):
-        """Test that manager suggests uninstalled plugins."""
-        from unittest.mock import Mock, patch
-
-        from ndevio._plugin_manager import ReaderPluginManager
-
-        # Mock feasibility report with no bioio-lif installed
-        with patch('bioio.plugin_feasibility_report') as mock_report:
-            mock_report.return_value = {
-                'bioio-ome-tiff': Mock(supported=False),
-                'ArrayLike': Mock(supported=False),
-            }
-
-            manager = ReaderPluginManager('test.lif')
-
-            # bioio-lif should be in suggested_plugins
-            assert 'bioio-lif' in manager.suggested_plugins
-
-            # bioio-lif should also be in installable_plugins
-            assert 'bioio-lif' in manager.installable_plugins
-
-    def test_manager_excludes_core_plugins_from_installable(self):
-        """Test that core plugins are excluded from installable list."""
-        from unittest.mock import Mock, patch
-
-        from ndevio._plugin_manager import ReaderPluginManager
-
-        # Mock report showing no plugins installed
-        with patch('bioio.plugin_feasibility_report') as mock_report:
-            mock_report.return_value = {
-                'ArrayLike': Mock(supported=False),
-            }
-
-            manager = ReaderPluginManager('test.tiff')
-
-            # Core plugins should not be in installable
-            installable_plugins = manager.installable_plugins
-
-            # These are core plugins, shouldn't need installation
-            core_plugins = [
-                'bioio-ome-tiff',
-                'bioio-imageio',
-                'bioio-ome-zarr',
-                'bioio-tifffile',
-            ]
-            for core in core_plugins:
-                assert core not in installable_plugins
-
-            # bioio-tiff-glob is not core, should be installable
-            assert 'bioio-tiff-glob' in installable_plugins
-
-    def test_get_working_reader_no_path_(self, caplog):
-        from ndevio._plugin_manager import ReaderPluginManager
-
-        manager = ReaderPluginManager()  # No path
-
-        with caplog.at_level(logging.WARNING):
-            result = manager.get_working_reader()
-
-        assert result is None
-        assert 'Cannot get working reader without a path' in caplog.text
-
-    def test_get_installation_message_no_path_returns_empty(self):
-        """Test that get_installation_message returns empty string without path."""
-        from ndevio._plugin_manager import ReaderPluginManager
-
-        manager = ReaderPluginManager()  # No path
-
-        install_msg = manager.get_installation_message()
-
-        assert install_msg == ''
 
 
 class TestFormatPluginInstallationMessage:
     """Test format_plugin_installation_message function."""
 
-    def test_czi_message_basic(self):
-        """Test message generation for CZI file."""
+    def test_message_with_installable_plugins(self):
+        """Test message includes plugin name and install command."""
         from ndevio._bioio_plugin_utils import (
             format_plugin_installation_message,
-            suggest_plugins_for_path,
         )
 
-        suggested = suggest_plugins_for_path('test.czi')
         message = format_plugin_installation_message(
-            filename='test.czi',
-            suggested_plugins=suggested,
-            installed_plugins=set(),
-            installable_plugins=suggested,
+            filename='test.nd2',
+            suggested_plugins=['bioio-nd2'],
+            installed_plugins=set(),  # Not installed
+            installable_plugins=['bioio-nd2'],
         )
 
-        assert 'bioio-czi' in message
+        assert 'bioio-nd2' in message
         assert 'pip install' in message or 'conda install' in message
 
-    def test_unsupported_extension_message(self):
-        """Test message for completely unsupported extension."""
+    def test_message_for_unsupported_extension(self):
+        """Test message for extension with no known plugins."""
         from ndevio._bioio_plugin_utils import (
             format_plugin_installation_message,
         )

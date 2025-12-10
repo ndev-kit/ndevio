@@ -4925,8 +4925,8 @@ packages:
   requires_python: '>=3.10'
 - pypi: ./
   name: ndevio
-  version: 0.5.1.dev0+g6b347af8b.d20251205
-  sha256: 165deea7b03f51ad0dd372f6cfc0669323dbd86483fc56e466e87649a2706d68
+  version: 0.6.1.dev2+g3b37a3718.d20251210
+  sha256: 51f84d28b03da8af6312c90e5d121a2fd208a31382b40a6db800234b545e8cf2
   requires_dist:
   - bioio-base
   - bioio-imageio
@@ -4941,6 +4941,7 @@ packages:
   - natsort
   - nbatch>=0.0.4
   - ndev-settings>=0.4.0
+  - pooch
   - xarray
   - zarr>=3.1.3
   - napari[all] ; extra == 'all'
