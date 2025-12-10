@@ -94,7 +94,7 @@ class PluginInstallerWidget(Container):
         self.append(self._info_label)
 
         # Get all available plugin names from manager
-        plugin_names = self.manager.available_plugins
+        plugin_names = self.manager.known_plugins
 
         self._plugin_select = ComboBox(
             label='Plugin',

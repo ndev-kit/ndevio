@@ -1,5 +1,7 @@
 """Tests for _bioio_plugin_utils module."""
 
+import logging
+
 
 class TestSuggestPluginsForPath:
     """Test suggest_plugins_for_path function."""
@@ -116,6 +118,27 @@ class TestReaderPluginManager:
 
             # bioio-tiff-glob is not core, should be installable
             assert 'bioio-tiff-glob' in installable_plugins
+
+    def test_get_working_reader_no_path_(self, caplog):
+        from ndevio._plugin_manager import ReaderPluginManager
+
+        manager = ReaderPluginManager()  # No path
+
+        with caplog.at_level(logging.WARNING):
+            result = manager.get_working_reader()
+
+        assert result is None
+        assert 'Cannot get working reader without a path' in caplog.text
+
+    def test_get_installation_message_no_path_returns_empty(self):
+        """Test that get_installation_message returns empty string without path."""
+        from ndevio._plugin_manager import ReaderPluginManager
+
+        manager = ReaderPluginManager()  # No path
+
+        install_msg = manager.get_installation_message()
+
+        assert install_msg == ''
 
 
 class TestFormatPluginInstallationMessage:

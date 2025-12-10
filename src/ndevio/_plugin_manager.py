@@ -32,8 +32,8 @@ Example:
 
 from __future__ import annotations
 
-import importlib
 import logging
+from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -91,31 +91,21 @@ class ReaderPluginManager:
             standalone mode.
         """
         self.path = Path(path) if path is not None else None
-        self._feasibility_report = None  # Cached
-        self._available_plugins = None  # Cached
 
     @property
-    def available_plugins(self) -> list[str]:
+    def known_plugins(self) -> list[str]:
         """Get all known bioio plugin names from BIOIO_PLUGINS.
 
         Returns
         -------
         list of str
             List of plugin names (e.g., ['bioio-czi', 'bioio-ome-tiff', ...]).
-
-        Examples
-        --------
-        >>> manager = ReaderPluginManager()
-        >>> print(manager.available_plugins)
-        ['bioio-czi', 'bioio-dv', 'bioio-imageio', ...]
         """
-        if self._available_plugins is None:
-            from ._bioio_plugin_utils import BIOIO_PLUGINS
+        from ._bioio_plugin_utils import BIOIO_PLUGINS
 
-            self._available_plugins = list(BIOIO_PLUGINS.keys())
-        return self._available_plugins
+        return list(BIOIO_PLUGINS.keys())
 
-    @property
+    @cached_property
     def feasibility_report(self) -> dict[str, PluginSupport]:
         """Get cached feasibility report for current path.
 
@@ -128,18 +118,13 @@ class ReaderPluginManager:
         dict
             Mapping of plugin names to PluginSupport objects. Empty dict if
             no path is set.
-
-        Notes
-        -----
-        The report is only generated once per manager instance. Create a new
-        manager to refresh the report.
         """
-        if self._feasibility_report is None and self.path:
-            from bioio import plugin_feasibility_report
+        if not self.path:
+            return {}
 
-            logger.debug('Generating feasibility report for: %s', self.path)
-            self._feasibility_report = plugin_feasibility_report(self.path)
-        return self._feasibility_report or {}
+        from bioio import plugin_feasibility_report
+
+        return plugin_feasibility_report(self.path)
 
     @property
     def installed_plugins(self) -> set[str]:
@@ -149,19 +134,6 @@ class ReaderPluginManager:
         -------
         set of str
             Set of installed plugin names (excludes "ArrayLike").
-            Empty set if no path is set.
-
-        Notes
-        -----
-        A plugin appearing in the feasibility report indicates it's installed,
-        regardless of whether it can read the specific file (the 'supported'
-        field indicates that).
-
-        Examples
-        --------
-        >>> manager = ReaderPluginManager("image.tif")
-        >>> if "bioio-ome-tiff" in manager.installed_plugins:
-        ...     print("OME-TIFF reader is available")
         """
         report = self.feasibility_report
         return {name for name in report if name != 'ArrayLike'}
@@ -176,13 +148,7 @@ class ReaderPluginManager:
         Returns
         -------
         list of str
-            List of plugin names (e.g., ['bioio-czi']). Empty list if no path.
-
-        Examples
-        --------
-        >>> manager = ReaderPluginManager("image.czi")
-        >>> print(manager.suggested_plugins)
-        ['bioio-czi']
+            List of plugin names (e.g., ['bioio-czi']).
         """
         if not self.path:
             return []
@@ -203,12 +169,6 @@ class ReaderPluginManager:
         list of str
             List of plugin names that should be installed.
             Empty list if no path is set or all suitable plugins are installed.
-
-        Examples
-        --------
-        >>> manager = ReaderPluginManager("image.czi")
-        >>> if manager.installable_plugins:
-        ...     print(f"Install: pip install {manager.installable_plugins[0]}")
         """
         from ._bioio_plugin_utils import BIOIO_PLUGINS
 
@@ -250,15 +210,9 @@ class ReaderPluginManager:
         The priority order is determined by the ordering of BIOIO_PLUGINS
         in _bioio_plugin_utils.py, which prioritizes readers based on
         metadata preservation quality, reliability, and known issues.
-
-        Examples
-        --------
-        >>> manager = ReaderPluginManager("image.tif")
-        >>> reader = manager.get_working_reader(preferred_reader="bioio-ome-tiff")
-        >>> if reader:
-        ...     from bioio import BioImage
-        ...     img = BioImage("image.tif", reader=reader)
         """
+        from ._bioio_plugin_utils import get_reader_by_name
+
         if not self.path:
             logger.warning(
                 'Cannot get working reader without a path. '
@@ -279,19 +233,17 @@ class ReaderPluginManager:
                 preferred_reader,
                 self.path,
             )
-            return self._get_reader_module(preferred_reader)
+            return get_reader_by_name(preferred_reader)
 
         # Try readers in priority order from BIOIO_PLUGINS
-        from ._bioio_plugin_utils import get_reader_priority
-
-        for reader_name in get_reader_priority():
+        for reader_name in self.known_plugins:
             if reader_name in report and report[reader_name].supported:
                 logger.info(
                     'Using reader: %s for %s (from priority list)',
                     reader_name,
                     self.path,
                 )
-                return self._get_reader_module(reader_name)
+                return get_reader_by_name(reader_name)
 
         # Try any other installed reader that supports the file
         for name, support in report.items():
@@ -301,7 +253,7 @@ class ReaderPluginManager:
                     name,
                     self.path,
                 )
-                return self._get_reader_module(name)
+                return get_reader_by_name(name)
 
         logger.warning('No working reader found for: %s', self.path)
         return None
@@ -315,14 +267,7 @@ class ReaderPluginManager:
         Returns
         -------
         str
-            Formatted message with installation suggestions. Empty string if
-            no path is set.
-
-        Examples
-        --------
-        >>> manager = ReaderPluginManager("image.czi")
-        >>> if not manager.get_working_reader():
-        ...     print(manager.get_installation_message())
+            Formatted message with installation suggestions.
         """
         if not self.path:
             return ''
@@ -335,28 +280,3 @@ class ReaderPluginManager:
             installed_plugins=self.installed_plugins,
             installable_plugins=self.installable_plugins,
         )
-
-    @staticmethod
-    def _get_reader_module(reader_name: str) -> Reader:
-        """Import and return reader class.
-
-        Parameters
-        ----------
-        reader_name : str
-            Name of the reader plugin (e.g., "bioio-czi")
-
-        Returns
-        -------
-        Reader
-            The Reader class from the plugin module
-
-        Raises
-        ------
-        ImportError
-            If the reader module cannot be imported
-        """
-        # Convert plugin name to module name (bioio-czi -> bioio_czi)
-        module_name = reader_name.replace('-', '_')
-        logger.debug('Importing reader module: %s', module_name)
-        module = importlib.import_module(module_name)
-        return module.Reader

@@ -88,7 +88,7 @@ class TestPluginInstallerWidget:
         widget = PluginInstallerWidget()
 
         # Should have ALL plugins available via manager
-        assert len(widget.manager.available_plugins) > 0
+        assert len(widget.manager.known_plugins) > 0
 
         # Should not have path
         assert widget.manager.path is None
@@ -115,7 +115,7 @@ class TestPluginInstallerWidget:
             widget = PluginInstallerWidget(plugin_manager=manager)
 
         # Should have ALL plugins available
-        assert len(widget.manager.available_plugins) > 0
+        assert len(widget.manager.known_plugins) > 0
 
         # Should have installable plugins
         installable = widget.manager.installable_plugins
@@ -148,7 +148,7 @@ class TestPluginInstallerWidget:
             widget = PluginInstallerWidget(plugin_manager=manager)
 
         # Should still have ALL plugins available
-        assert len(widget.manager.available_plugins) > 0
+        assert len(widget.manager.known_plugins) > 0
 
         # No installable plugins (core already installed or unsupported format)
         # So no pre-selection or pre-select first available
@@ -162,7 +162,7 @@ class TestPluginInstallerWidget:
         widget = PluginInstallerWidget()
 
         # Widget should have all plugins via manager
-        assert len(widget.manager.available_plugins) > 0
+        assert len(widget.manager.known_plugins) > 0
 
 
 class TestInstallPlugin:
