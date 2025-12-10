@@ -1,73 +1,62 @@
 """Tests for PluginInstallerWidget.
 
-This module tests the PluginInstallerWidget in _plugin_installer.py.
-Widget unit tests do NOT require make_napari_viewer.
-
-For napari integration tests (docking widgets into viewer),
-see test_plugin_installer_integration.py
+This module tests:
+- PluginInstallerWidget behavior (unit tests, no viewer needed)
+- _open_plugin_installer integration with napari viewer (needs viewer)
 """
 
+from pathlib import Path
 from unittest.mock import Mock, patch
 
+import pytest
 
-class TestPluginInstallerWidgetUnit:
-    """Unit tests for PluginInstallerWidget - no napari viewer required."""
 
-    def test_standalone_mode_default_state(self):
-        """Test widget creation in standalone mode (no path)."""
-        from ndevio.widgets import PluginInstallerWidget
+class TestPluginInstallerWidget:
+    """Tests for PluginInstallerWidget behavior."""
 
-        widget = PluginInstallerWidget()
-
-        # Should have plugins available via manager
-        assert len(widget.manager.known_plugins) > 0
-        assert widget.manager.path is None
-        assert 'Install BioIO Reader Plugin' in widget._title_label.value
-
-    def test_error_mode_with_manager(self):
-        """Test widget creation with a manager (error mode)."""
-        from ndevio._plugin_manager import ReaderPluginManager
-        from ndevio.widgets import PluginInstallerWidget
-
-        with patch('bioio.plugin_feasibility_report') as mock_report:
-            mock_report.return_value = {'ArrayLike': Mock(supported=False)}
-
-            manager = ReaderPluginManager('test.czi')
-            widget = PluginInstallerWidget(plugin_manager=manager)
-
-        # Should show filename in title
-        assert 'test.czi' in widget._title_label.value
-        # Should have installable plugins
-        assert 'bioio-czi' in widget.manager.installable_plugins
-        # First installable should be pre-selected
-        assert widget._plugin_select.value == 'bioio-czi'
-
-    def test_preselects_first_installable_plugin(self):
-        """Test that first installable plugin is pre-selected."""
-        from ndevio._plugin_manager import ReaderPluginManager
-        from ndevio.widgets import PluginInstallerWidget
-
-        with patch('bioio.plugin_feasibility_report') as mock_report:
-            mock_report.return_value = {'ArrayLike': Mock(supported=False)}
-
-            manager = ReaderPluginManager('test.lif')
-            widget = PluginInstallerWidget(plugin_manager=manager)
-
-        installable = widget.manager.installable_plugins
-        assert len(installable) > 0
-        assert widget._plugin_select.value == installable[0]
-
-    def test_shows_all_known_plugins(self):
-        """Test that all known plugins are available for selection."""
+    def test_standalone_mode(self):
+        """Test widget in standalone mode - no path, shows all plugins."""
         from ndevio._bioio_plugin_utils import BIOIO_PLUGINS
         from ndevio.widgets import PluginInstallerWidget
 
         widget = PluginInstallerWidget()
 
+        # Standalone mode: no path, generic title, all plugins available
+        assert widget.manager.path is None
+        assert 'Install BioIO Reader Plugin' in widget._title_label.value
         assert set(widget.manager.known_plugins) == set(BIOIO_PLUGINS.keys())
 
-    def test_no_plugin_selected_shows_error(self):
-        """Test clicking install with no selection shows error."""
+    def test_error_mode_with_path(self):
+        """Test widget in error mode - has path, preselects suggested plugin."""
+        from ndevio._plugin_manager import ReaderPluginManager
+        from ndevio.widgets import PluginInstallerWidget
+
+        with patch('bioio.plugin_feasibility_report') as mock_report:
+            mock_report.return_value = {'ArrayLike': Mock(supported=False)}
+            manager = ReaderPluginManager('test.czi')
+            widget = PluginInstallerWidget(plugin_manager=manager)
+
+        # Error mode: has path, shows filename, preselects installable plugin
+        assert 'test.czi' in widget._title_label.value
+        assert 'bioio-czi' in widget.manager.installable_plugins
+        assert widget._plugin_select.value == 'bioio-czi'
+
+    def test_install_button_behavior(self):
+        """Test install button: queues installation and updates status."""
+        from ndevio.widgets import PluginInstallerWidget
+
+        widget = PluginInstallerWidget()
+        widget._plugin_select.value = 'bioio-imageio'
+
+        with patch('ndevio._plugin_installer.install_plugin') as mock_install:
+            mock_install.return_value = 123
+            widget._on_install_clicked()
+
+            mock_install.assert_called_once_with('bioio-imageio')
+            assert 'Installing' in widget._status_label.value
+
+    def test_install_without_selection_shows_error(self):
+        """Test that clicking install with no selection shows error."""
         from ndevio.widgets import PluginInstallerWidget
 
         widget = PluginInstallerWidget()
@@ -77,30 +66,47 @@ class TestPluginInstallerWidgetUnit:
 
         assert 'No plugin selected' in widget._status_label.value
 
-    def test_install_button_queues_installation(self):
-        """Test that install button triggers installation."""
-        from ndevio.widgets import PluginInstallerWidget
 
-        widget = PluginInstallerWidget()
-        widget._plugin_select.value = 'bioio-imageio'
+class TestOpenPluginInstallerIntegration:
+    """Integration tests for _open_plugin_installer with napari viewer."""
 
-        with patch('ndevio._plugin_installer.install_plugin') as mock_install:
-            mock_install.return_value = 123
+    @pytest.fixture
+    def viewer_with_plugin_installer(self, make_napari_viewer):
+        """Fixture that creates viewer and opens plugin installer for .czi."""
+        from bioio_base.exceptions import UnsupportedFileFormatError
 
-            widget._on_install_clicked()
+        import ndevio._napari_reader as reader_module
 
-            mock_install.assert_called_once_with('bioio-imageio')
+        viewer = make_napari_viewer()
+        test_path = Path('path/to/test.czi')
+        error = UnsupportedFileFormatError(
+            reader_name='test', path=str(test_path), msg_extra=''
+        )
 
-    def test_install_updates_status_label(self):
-        """Test that status label updates during installation."""
-        from ndevio.widgets import PluginInstallerWidget
+        with patch('bioio.plugin_feasibility_report') as mock_report:
+            mock_report.return_value = {'ArrayLike': Mock(supported=False)}
+            reader_module._open_plugin_installer(test_path, error)
 
-        widget = PluginInstallerWidget()
-        widget._plugin_select.value = 'bioio-imageio'
+        # Find the widget
+        widget = None
+        for name, w in viewer.window.dock_widgets.items():
+            if 'Install BioIO Plugin' in name:
+                widget = w
+                break
 
-        with patch('ndevio._plugin_installer.install_plugin') as mock_install:
-            mock_install.return_value = 123
+        return viewer, widget, test_path
 
-            widget._on_install_clicked()
+    def test_docks_widget_with_correct_state(
+        self, viewer_with_plugin_installer
+    ):
+        """Test that _open_plugin_installer docks widget with correct state."""
+        viewer, widget, test_path = viewer_with_plugin_installer
 
-            assert 'Installing' in widget._status_label.value
+        # Widget is docked
+        assert len(viewer.window.dock_widgets) > 0
+        assert widget is not None
+
+        # Widget has correct path and suggestions
+        assert widget.manager.path == test_path
+        assert test_path.name in widget._title_label.value
+        assert 'bioio-czi' in widget.manager.installable_plugins
