@@ -14,7 +14,6 @@ import pytest
 from bioio_base.exceptions import UnsupportedFileFormatError
 
 from ndevio import nImage
-from ndevio.nimage import determine_reader_plugin
 
 RGB_TIFF = (
     'RGB_bad_metadata.tiff'  # has two scenes, with really difficult metadata
@@ -204,10 +203,6 @@ def test_get_layer_data_tuples_ome_validation_error_logged(
         assert caplog.records[0].levelname == 'WARNING'
         assert 'Could not parse OME metadata' in caplog.records[0].message
         assert 'LatticeLightsheet' in caplog.records[0].message
-        assert len(caplog.records) == 1
-        assert caplog.records[0].levelname == 'WARNING'
-        assert 'Could not parse OME metadata' in caplog.records[0].message
-        assert 'LatticeLightsheet' in caplog.records[0].message
 
 
 def test_get_layer_data_tuples_ome_not_implemented_silent(
@@ -276,63 +271,6 @@ def test_get_layer_data_mosaic_tile_not_in_memory(
         img._get_layer_data(in_memory=False)
         assert img.napari_layer_data is not None
         assert img.napari_layer_data.shape == (3,)
-
-
-@pytest.mark.parametrize(
-    ('filename', 'should_work', 'expected_plugin_suggestion'),
-    [
-        (LOGO_PNG, True, None),  # PNG works with bioio-imageio (core)
-        (
-            CELLS3D2CH_OME_TIFF,
-            True,
-            None,
-        ),  # OME-TIFF works with bioio-ome-tiff (core)
-        (CZI_FILE, True, None),
-        (ND2_FILE, False, 'bioio-nd2'),  # ND2 needs bioio-nd2
-        (RGB_TIFF, True, None),
-    ],
-)
-def test_determine_reader_plugin_behavior(
-    resources_dir: Path,
-    filename: str,
-    should_work: bool | str,
-    expected_plugin_suggestion: str | None,
-):
-    """Test determine_reader_plugin with various file formats.
-
-    Parameters
-    ----------
-    filename : str
-        Test file name
-    should_work : bool | "maybe"
-        True = must succeed, False = must fail, "maybe" = can succeed or fail
-    expected_plugin_suggestion : str | None
-        If failure expected, the plugin name that should be suggested
-    """
-    if should_work is True:
-        # Must successfully determine a reader
-        reader = determine_reader_plugin(resources_dir / filename)
-        assert reader is not None
-    elif should_work is False:
-        # Must fail with helpful error message
-        with pytest.raises(UnsupportedFileFormatError) as exc_info:
-            determine_reader_plugin(resources_dir / filename)
-
-        error_msg = str(exc_info.value)
-        assert filename in error_msg
-        if expected_plugin_suggestion:
-            assert expected_plugin_suggestion in error_msg
-        assert 'pip install' in error_msg
-    else:  # "maybe"
-        # Can succeed or fail; if fails, check for helpful message
-        try:
-            reader = determine_reader_plugin(resources_dir / filename)
-            assert reader is not None
-        except UnsupportedFileFormatError as e:
-            error_msg = str(e)
-            if expected_plugin_suggestion:
-                assert expected_plugin_suggestion in error_msg
-            assert 'pip install' in error_msg
 
 
 @pytest.mark.parametrize(

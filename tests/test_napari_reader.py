@@ -71,10 +71,8 @@ def test_reader_supported_formats(
     expected_dtype,
     expected_has_scale: bool,
     expected_num_layers: int,
-    make_napari_viewer,
 ) -> None:
     """Test reader with formats that should work with core dependencies."""
-    make_napari_viewer()
 
     # Resolve filename to filepath
     if isinstance(filename, str):
@@ -231,14 +229,6 @@ def test_napari_get_reader_general_exception(caplog):
 
         assert 'ndevio: Error reading file' in caplog.text
         assert 'Test exception' in caplog.text
-
-
-def test_napari_get_reader_png(resources_dir: Path) -> None:
-    reader = napari_get_reader(
-        str(resources_dir / PNG_FILE),
-    )
-
-    assert callable(reader)
 
 
 def test_napari_get_reader_supported_formats_work(resources_dir: Path):

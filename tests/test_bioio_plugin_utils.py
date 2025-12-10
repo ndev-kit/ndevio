@@ -51,13 +51,13 @@ class TestFormatPluginInstallationMessage:
         )
 
         message = format_plugin_installation_message(
-            filename='test.czi',
-            suggested_plugins=['bioio-czi'],
+            filename='test.nd2',
+            suggested_plugins=['bioio-nd2'],
             installed_plugins=set(),  # Not installed
-            installable_plugins=['bioio-czi'],
+            installable_plugins=['bioio-nd2'],
         )
 
-        assert 'bioio-czi' in message
+        assert 'bioio-nd2' in message
         assert 'pip install' in message or 'conda install' in message
 
     def test_message_for_unsupported_extension(self):
