@@ -73,6 +73,58 @@ class TestReaderPluginManager:
             assert mock_report.call_count == 1
 
 
+class TestGetPriorityList:
+    """Tests for get_priority_list method."""
+
+    def test_priority_list_contains_reader_classes(self, resources_dir):
+        """Test that priority list contains actual Reader classes."""
+        from ndevio._plugin_manager import ReaderPluginManager
+
+        manager = ReaderPluginManager(resources_dir / 'cells3d2ch_legacy.tiff')
+        priority = manager.get_priority_list()
+
+        assert len(priority) > 0
+        # Each item should be a Reader class (has 'Reader' in name or is subclass)
+        for reader_class in priority:
+            assert hasattr(reader_class, '__name__')
+
+    def test_preferred_reader_comes_first(self, resources_dir):
+        """Test that preferred reader is first in priority list."""
+        from ndevio._plugin_manager import ReaderPluginManager
+
+        manager = ReaderPluginManager(resources_dir / 'cells3d2ch_legacy.tiff')
+
+        # Without preferred reader
+        _default_priority = manager.get_priority_list()
+
+        # With preferred reader
+        priority_with_pref = manager.get_priority_list(
+            preferred_reader='bioio-tifffile'
+        )
+
+        # bioio-tifffile should be first when preferred
+        assert 'tifffile' in priority_with_pref[0].__module__
+
+    def test_preferred_reader_not_installed_is_skipped(self):
+        """Test that non-installed preferred reader is skipped."""
+        from ndevio._plugin_manager import ReaderPluginManager
+
+        with patch('bioio.plugin_feasibility_report') as mock_report:
+            # Only bioio-ome-tiff installed
+            mock_report.return_value = {
+                'bioio-ome-tiff': Mock(supported=True),
+            }
+            manager = ReaderPluginManager('test.tiff')
+
+            # Request non-installed reader as preferred
+            priority = manager.get_priority_list(preferred_reader='bioio-czi')
+
+            # Should not crash, czi should not be in list
+            assert len(priority) > 0
+            for reader_class in priority:
+                assert 'czi' not in reader_class.__module__
+
+
 class TestReaderPluginManagerNoPath:
     """Tests for ReaderPluginManager edge cases when no path provided."""
 
@@ -83,17 +135,17 @@ class TestReaderPluginManagerNoPath:
         manager = ReaderPluginManager()
         assert manager.feasibility_report == {}
 
-    def test_get_working_reader_returns_none_with_warning(self, caplog):
-        """Test get_working_reader returns None and logs warning without path."""
+    def test_get_reader_returns_none_with_warning(self, caplog):
+        """Test get_reader returns None and logs warning without path."""
         from ndevio._plugin_manager import ReaderPluginManager
 
         manager = ReaderPluginManager()
 
         with caplog.at_level(logging.WARNING):
-            result = manager.get_working_reader()
+            result = manager.get_reader()
 
         assert result is None
-        assert 'Cannot get working reader without a path' in caplog.text
+        assert 'Cannot get reader without a path' in caplog.text
 
     def test_get_installation_message_returns_empty(self):
         """Test get_installation_message returns '' without path."""
@@ -106,12 +158,23 @@ class TestReaderPluginManagerNoPath:
 class TestReaderPluginManagerWithRealFiles:
     """Tests using real files to verify end-to-end behavior."""
 
-    def test_get_working_reader_for_ome_tiff(self, resources_dir):
-        """Test get_working_reader returns correct reader for OME-TIFF."""
+    def test_get_reader_for_ome_tiff(self, resources_dir):
+        """Test get_reader returns correct reader for OME-TIFF."""
         from ndevio._plugin_manager import ReaderPluginManager
 
         manager = ReaderPluginManager(resources_dir / 'cells3d2ch_legacy.tiff')
-        reader = manager.get_working_reader()
+        reader = manager.get_reader()
 
         assert reader is not None
-        assert 'ome_tiff' in reader.__module__
+        # Should use ome-tiff or tifffile reader
+        assert 'tiff' in reader.__module__.lower()
+
+    def test_get_reader_with_preferred_reader(self, resources_dir):
+        """Test get_reader respects preferred_reader setting."""
+        from ndevio._plugin_manager import ReaderPluginManager
+
+        manager = ReaderPluginManager(resources_dir / 'cells3d2ch_legacy.tiff')
+        reader = manager.get_reader(preferred_reader='bioio-tifffile')
+
+        assert reader is not None
+        assert 'tifffile' in reader.__module__

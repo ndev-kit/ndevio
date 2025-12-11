@@ -29,17 +29,16 @@ def determine_reader_plugin(
     """
     Determine the reader plugin to use for loading an image.
 
-    Convenience wrapper that integrates ReaderPluginManager with ndevio settings.
-    For file paths, uses the priority system (DEFAULT_READER_PRIORITY).
-    For arrays, uses bioio's default plugin detection.
+    Uses ReaderPluginManager to build a priority list from BIOIO_PLUGINS
+    and delegates reader selection to bioio's native plugin_priority system.
 
     Parameters
     ----------
     image : ImageLike
         Image to be loaded (file path, numpy array, or xarray DataArray).
     preferred_reader : str, optional
-        Preferred reader name. If None, uses ndevio_reader.preferred_reader
-        from settings.
+        Preferred reader name (e.g., "bioio-ome-tiff"). If None, uses
+        BIOIO_PLUGINS order without any preference override.
 
     Returns
     -------
@@ -51,23 +50,25 @@ def determine_reader_plugin(
     UnsupportedFileFormatError
         If no suitable reader can be found. Error message includes
         installation suggestions for missing plugins.
-
     """
     from bioio_base.exceptions import UnsupportedFileFormatError
     from ndev_settings import get_settings
 
     from ._plugin_manager import ReaderPluginManager
 
-    # For file paths: use ReaderPluginManager
+    # For file paths: use ReaderPluginManager with priority list
     if isinstance(image, str | Path):
         settings = get_settings()
 
-        # Get preferred reader from settings if not provided
+        # Get preferred reader from settings if not explicitly provided
         if preferred_reader is None:
-            preferred_reader = settings.ndevio_reader.preferred_reader  # type: ignore
+            pref = settings.ndevio_reader.preferred_reader  # type: ignore
+            # Only use settings value if it's not None/empty
+            if pref:
+                preferred_reader = pref
 
         manager = ReaderPluginManager(image)
-        reader = manager.get_working_reader(preferred_reader)
+        reader = manager.get_reader(preferred_reader)
 
         if reader:
             return reader
