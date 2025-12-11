@@ -131,7 +131,24 @@ for plugin_name, info in BIOIO_PLUGINS.items():
         _EXTENSION_TO_PLUGIN[ext].append(plugin_name)
 
 
-def get_reader_by_name(reader_name: str) -> Reader:
+def get_installed_plugins() -> set[str]:
+    """Get names of installed bioio reader plugins.
+
+    Uses importlib.metadata entry_points which is fast and doesn't
+    require loading any plugins.
+
+    Returns
+    -------
+    set of str
+        Set of installed plugin names (e.g., {'bioio-ome-tiff', 'bioio-czi'}).
+    """
+    from importlib.metadata import entry_points
+
+    eps = entry_points(group='bioio.readers')
+    return {ep.name for ep in eps}
+
+
+def get_reader_by_name(reader_name: str) -> type[Reader]:
     """Import and return Reader class from plugin name.
 
     Converts plugin name (e.g., 'bioio-czi') to module name (e.g., 'bioio_czi')
@@ -144,7 +161,7 @@ def get_reader_by_name(reader_name: str) -> Reader:
 
     Returns
     -------
-    Reader
+    type[Reader]
         The Reader class from the plugin module
 
     Raises
