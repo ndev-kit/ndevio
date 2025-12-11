@@ -8,7 +8,7 @@ ndevio_reader:
     dynamic_choices:
       fallback_message: No readers found
       provider: bioio.readers
-    tooltip: Preferred reader to try first when opening images. If null, uses BIOIO_PLUGINS priority order.
+    tooltip: Preferred reader to try first when opening images.
     value: null
   scene_handling:
     choices:

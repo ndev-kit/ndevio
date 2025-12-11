@@ -51,6 +51,17 @@ def napari_get_reader(
     """
     from ._bioio_plugin_utils import suggest_plugins_for_path
 
+    if isinstance(path, list):
+        logger.info('Bioio: Expected a single path, got a list of paths.')
+        return None
+
+    # Quick extension check - if no plugins recognize this extension, return None
+    # This allows other napari readers to try the file
+    suggested = suggest_plugins_for_path(path)
+    if not suggested:
+        logger.debug('ndevio: No bioio plugins for extension: %s', path)
+        return None
+
     settings = get_settings()
 
     open_first_scene_only = (
@@ -64,17 +75,6 @@ def napari_get_reader(
         if open_all_scenes is not None
         else settings.ndevio_reader.scene_handling == 'View All Scenes'  # type: ignore
     ) or False
-
-    if isinstance(path, list):
-        logger.info('Bioio: Expected a single path, got a list of paths.')
-        return None
-
-    # Quick extension check - if no plugins recognize this extension, return None
-    # This allows other napari readers to try the file
-    suggested = suggest_plugins_for_path(path)
-    if not suggested:
-        logger.debug('ndevio: No bioio plugins for extension: %s', path)
-        return None
 
     # Extension is recognized - return a reader function
     # The actual reading happens in napari_reader_function
@@ -93,7 +93,10 @@ def napari_reader_function(
     open_all_scenes: bool = False,
 ) -> list[LayerDataTuple] | None:
     """
-    Read a file using bioio with priority-based reader selection.
+    Read a file using bioio.
+
+    nImage handles reader selection: if a preferred_reader is set in settings,
+    it's tried first with automatic fallback to bioio's default plugin ordering.
 
     Parameters
     ----------
@@ -114,7 +117,16 @@ def napari_reader_function(
         List containing image data, metadata, and layer type
 
     """
-    img = nImage(path)  # nImage handles priority list internally
+    from bioio_base.exceptions import UnsupportedFileFormatError
+
+    try:
+        img = nImage(path)  # nImage handles preferred reader and fallback
+    except UnsupportedFileFormatError:
+        # Try to open plugin installer widget
+        # If no viewer available, this will re-raise
+        _open_plugin_installer(path)
+        return None
+
     logger.info('Bioio: Reading file with %d scenes', len(img.scenes))
 
     # open first scene only
@@ -151,18 +163,24 @@ def _open_scene_container(
     )
 
 
-def _open_plugin_installer(path: PathLike, message: str) -> None:
+def _open_plugin_installer(path: PathLike) -> None:
     """Open the plugin installer widget for an unsupported file.
+
+    If no napari viewer is available, re-raises the UnsupportedFileFormatError
+    with installation suggestions so programmatic users get a helpful message.
 
     Parameters
     ----------
     path : PathLike
         Path to the file that couldn't be read
-    message : str
-        Installation suggestion message to display
-    """
 
+    Raises
+    ------
+    UnsupportedFileFormatError
+        If no napari viewer is available (programmatic usage)
+    """
     import napari
+    from bioio_base.exceptions import UnsupportedFileFormatError
 
     from ._plugin_manager import ReaderPluginManager
     from .widgets import PluginInstallerWidget
@@ -170,12 +188,17 @@ def _open_plugin_installer(path: PathLike, message: str) -> None:
     # Get viewer, handle case where no viewer available
     viewer = napari.current_viewer()
 
-    # Don't try to open widget if no viewer available (e.g., in tests)
+    # If no viewer, re-raise with helpful message for programmatic users
     if viewer is None:
-        logger.warning(
-            'Cannot open plugin installer widget: No napari viewer available'
+        logger.debug(
+            'No napari viewer available, raising exception with suggestions'
         )
-        return
+        manager = ReaderPluginManager(path)
+        raise UnsupportedFileFormatError(
+            reader_name='ndevio',
+            path=str(path),
+            msg_extra=manager.get_installation_message(),
+        )
 
     # Create plugin manager for this file
     manager = ReaderPluginManager(path)
