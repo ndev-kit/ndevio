@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
 
 import dask.array as da
 
@@ -199,36 +198,24 @@ def test_napari_get_reader_ome_override(resources_dir: Path) -> None:
 
 def test_napari_get_reader_unsupported(resources_dir: Path):
     """Test that unsupported file extension returns None per napari reader spec."""
-    # Mock the widget opener since we don't have a viewer in this test
-    with patch('ndevio._napari_reader._open_plugin_installer') as mock_opener:
-        reader = napari_get_reader(
-            str(resources_dir / 'measure_props_Labels.abcdefg'),
-        )
+    reader = napari_get_reader(
+        str(resources_dir / 'measure_props_Labels.abcdefg'),
+    )
 
-        # Should return None for unsupported formats (per napari spec)
-        assert reader is None
-
-        # Plugin installer widget should have been called
-        assert mock_opener.called
-        # Check the error message contains the extension
-        error_arg = mock_opener.call_args[0][1]
-        error_msg = str(error_arg)
-        assert '.abcdefg' in error_msg or 'abcdefg' in error_msg
+    # Should return None for unsupported formats (per napari spec)
+    # Unknown extensions are quickly rejected via suggest_plugins_for_path()
+    assert reader is None
 
 
 def test_napari_get_reader_general_exception(caplog):
-    """Test that general exceptions in determine_reader_plugin are handled correctly."""
+    """Test that unrecognized extension returns None without error."""
+    # Extension .xyz is not recognized by any bioio plugin
     test_path = 'non_existent_file.xyz'
 
-    # Mock determine_reader_plugin to raise an exception
-    with patch('ndevio._napari_reader.determine_reader_plugin') as mock_reader:
-        mock_reader.side_effect = Exception('Test exception')
+    reader = napari_get_reader(test_path)
 
-        reader = napari_get_reader(test_path)
-        assert reader is None
-
-        assert 'ndevio: Error reading file' in caplog.text
-        assert 'Test exception' in caplog.text
+    # Should return None for unrecognized extensions
+    assert reader is None
 
 
 def test_napari_get_reader_supported_formats_work(resources_dir: Path):
@@ -257,26 +244,24 @@ def test_napari_get_reader_supported_formats_work(resources_dir: Path):
         (ND2_FILE, 'bioio-nd2'),  # ND2 needs bioio-nd2
     ],
 )
-def test_napari_get_reader_unsupported_formats_helpful_errors(
+def test_napari_reader_missing_plugin_error(
     resources_dir: Path, filename: str, expected_plugin_in_error: str
 ):
-    """Test that unsupported formats return None per napari reader spec.
+    """Test that reading a file without the required plugin raises helpful error.
 
-    napari readers should return None (not raise) when they can't read a file.
-    The plugin installer widget should be shown via settings if enabled.
+    When extension is recognized but required plugin isn't installed,
+    nImage raises UnsupportedFileFormatError with installation suggestions.
     """
-    # Mock the widget opener since we don't have a viewer in this test
-    with patch('ndevio._napari_reader._open_plugin_installer') as mock_opener:
-        reader = napari_get_reader(str(resources_dir / filename))
+    from bioio_base.exceptions import UnsupportedFileFormatError
 
-        # Should return None for unsupported formats (per napari spec)
-        assert reader is None
+    # napari_get_reader returns a reader function since extension is known
+    reader = napari_get_reader(str(resources_dir / filename))
+    assert callable(reader)
 
-        # Plugin installer widget should have been called with error info
-        assert mock_opener.called
-        call_args = mock_opener.call_args
-        # Check the UnsupportedFileFormatError message contains plugin suggestion
-        error_arg = call_args[0][1]  # Second argument is the exception
-        error_msg = str(error_arg)
-        assert expected_plugin_in_error in error_msg
-        assert 'pip install' in error_msg or 'conda install' in error_msg
+    # But actually reading fails with helpful error message
+    with pytest.raises(UnsupportedFileFormatError) as exc_info:
+        reader(str(resources_dir / filename))
+
+    error_msg = str(exc_info.value)
+    assert expected_plugin_in_error in error_msg
+    assert 'pip install' in error_msg or 'conda install' in error_msg

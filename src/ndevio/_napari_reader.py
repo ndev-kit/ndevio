@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 from functools import partial
 from typing import TYPE_CHECKING
 
-from bioio_base.exceptions import UnsupportedFileFormatError
 from ndev_settings import get_settings
 
-from .nimage import determine_reader_plugin, nImage
+from .nimage import nImage
 
 if TYPE_CHECKING:
     from napari.types import LayerDataTuple, PathLike, ReaderFunction
@@ -24,6 +22,10 @@ def napari_get_reader(
 ) -> ReaderFunction | None:
     """
     Get the appropriate reader function for a single given path.
+
+    Uses a quick extension check to determine if any bioio plugin might
+    support this file. If so, returns a reader function that will use
+    bioio's priority system to try each installed reader.
 
     Parameters
     ----------
@@ -42,10 +44,13 @@ def napari_get_reader(
 
     Returns
     -------
-    ReaderFunction
-        The reader function for the given path
+    ReaderFunction or None
+        The reader function for the given path, or None if extension
+        is not recognized by any bioio plugin.
 
     """
+    from ._bioio_plugin_utils import suggest_plugins_for_path
+
     settings = get_settings()
 
     open_first_scene_only = (
@@ -64,47 +69,36 @@ def napari_get_reader(
         logger.info('Bioio: Expected a single path, got a list of paths.')
         return None
 
-    try:
-        reader = determine_reader_plugin(path)
-        return partial(
-            napari_reader_function,
-            reader=reader,  # type: ignore
-            in_memory=in_memory,
-            open_first_scene_only=open_first_scene_only,
-            open_all_scenes=open_all_scenes,
-        )
-
-    except UnsupportedFileFormatError as e:
-        # determine_reader_plugin() already enhanced the error message
-        logger.error('ndevio: Unsupported file format: %s', path)
-        # Show plugin installer widget if enabled in settings
-        if settings.ndevio_reader.suggest_reader_plugins:  # type: ignore
-            _open_plugin_installer(path, e)
-
-        # Return None per napari reader spec - don't raise exception
+    # Quick extension check - if no plugins recognize this extension, return None
+    # This allows other napari readers to try the file
+    suggested = suggest_plugins_for_path(path)
+    if not suggested:
+        logger.debug('ndevio: No bioio plugins for extension: %s', path)
         return None
 
-    except Exception as e:  # noqa: BLE001
-        logger.warning('ndevio: Error reading file: %s', e)
-        return None
+    # Extension is recognized - return a reader function
+    # The actual reading happens in napari_reader_function
+    return partial(
+        napari_reader_function,
+        in_memory=in_memory,
+        open_first_scene_only=open_first_scene_only,
+        open_all_scenes=open_all_scenes,
+    )
 
 
 def napari_reader_function(
     path: PathLike,
-    reader: Callable,
     in_memory: bool | None = None,
     open_first_scene_only: bool = False,
     open_all_scenes: bool = False,
 ) -> list[LayerDataTuple] | None:
     """
-    Read a file using the given reader function.
+    Read a file using bioio with priority-based reader selection.
 
     Parameters
     ----------
     path : PathLike
         Path to the file to be read
-    reader : Callable
-        Bioio Reader class to be used to read the file.
     in_memory : bool, optional
         Whether to read the file in memory, by default None.
     open_first_scene_only : bool, optional
@@ -120,7 +114,7 @@ def napari_reader_function(
         List containing image data, metadata, and layer type
 
     """
-    img = nImage(path, reader=reader)
+    img = nImage(path)  # nImage handles priority list internally
     logger.info('Bioio: Reading file with %d scenes', len(img.scenes))
 
     # open first scene only
@@ -137,11 +131,11 @@ def napari_reader_function(
 
     # else: open scene widget
     _open_scene_container(path=path, img=img, in_memory=in_memory)
-    return [(None,)]
+    return [(None,)]  # type: ignore[return-value]
 
 
 def _open_scene_container(
-    path: PathLike, img: nImage, in_memory: bool
+    path: PathLike, img: nImage, in_memory: bool | None
 ) -> None:
     from pathlib import Path
 
@@ -157,17 +151,15 @@ def _open_scene_container(
     )
 
 
-def _open_plugin_installer(
-    path: PathLike, error: UnsupportedFileFormatError
-) -> None:
+def _open_plugin_installer(path: PathLike, message: str) -> None:
     """Open the plugin installer widget for an unsupported file.
 
     Parameters
     ----------
     path : PathLike
         Path to the file that couldn't be read
-    error : UnsupportedFileFormatError
-        The error that was raised
+    message : str
+        Installation suggestion message to display
     """
 
     import napari

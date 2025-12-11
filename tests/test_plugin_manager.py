@@ -4,7 +4,6 @@ Note: Extension-to-plugin mapping is tested in test_bioio_plugin_utils.py
 via TestSuggestPluginsForPath. We trust those unit tests and don't duplicate here.
 """
 
-import logging
 from unittest.mock import Mock, patch
 
 
@@ -135,17 +134,14 @@ class TestReaderPluginManagerNoPath:
         manager = ReaderPluginManager()
         assert manager.feasibility_report == {}
 
-    def test_get_reader_returns_none_with_warning(self, caplog):
-        """Test get_reader returns None and logs warning without path."""
+    def test_get_priority_list_returns_empty_without_path(self):
+        """Test get_priority_list returns empty list without path."""
         from ndevio._plugin_manager import ReaderPluginManager
 
         manager = ReaderPluginManager()
+        result = manager.get_priority_list()
 
-        with caplog.at_level(logging.WARNING):
-            result = manager.get_reader()
-
-        assert result is None
-        assert 'Cannot get reader without a path' in caplog.text
+        assert result == []
 
     def test_get_installation_message_returns_empty(self):
         """Test get_installation_message returns '' without path."""
@@ -158,23 +154,26 @@ class TestReaderPluginManagerNoPath:
 class TestReaderPluginManagerWithRealFiles:
     """Tests using real files to verify end-to-end behavior."""
 
-    def test_get_reader_for_ome_tiff(self, resources_dir):
-        """Test get_reader returns correct reader for OME-TIFF."""
+    def test_get_priority_list_returns_installed_readers(self, resources_dir):
+        """Test get_priority_list returns installed readers in BIOIO_PLUGINS order."""
         from ndevio._plugin_manager import ReaderPluginManager
 
         manager = ReaderPluginManager(resources_dir / 'cells3d2ch_legacy.tiff')
-        reader = manager.get_reader()
+        priority = manager.get_priority_list()
 
-        assert reader is not None
-        # Should use ome-tiff or tifffile reader
-        assert 'tiff' in reader.__module__.lower()
+        # Should have at least one reader (core plugins are always installed)
+        assert len(priority) > 0
+        # Each item should be a Reader class
+        for reader_class in priority:
+            assert hasattr(reader_class, '__name__')
 
-    def test_get_reader_with_preferred_reader(self, resources_dir):
-        """Test get_reader respects preferred_reader setting."""
+    def test_get_priority_list_with_preferred_reader(self, resources_dir):
+        """Test get_priority_list respects preferred_reader."""
         from ndevio._plugin_manager import ReaderPluginManager
 
         manager = ReaderPluginManager(resources_dir / 'cells3d2ch_legacy.tiff')
-        reader = manager.get_reader(preferred_reader='bioio-tifffile')
+        priority = manager.get_priority_list(preferred_reader='bioio-tifffile')
 
-        assert reader is not None
-        assert 'tifffile' in reader.__module__
+        assert len(priority) > 0
+        # bioio-tifffile should be first when preferred
+        assert 'tifffile' in priority[0].__module__

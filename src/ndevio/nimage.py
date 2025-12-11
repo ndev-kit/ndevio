@@ -23,70 +23,49 @@ DELIM = ' :: '
 LABEL_KEYWORDS = ['label', 'mask', 'segmentation', 'seg', 'roi']
 
 
-def determine_reader_plugin(
+def get_reader_priority(
     image: ImageLike, preferred_reader: str | None = None
-) -> Reader:
+) -> list[type[Reader]]:
     """
-    Determine the reader plugin to use for loading an image.
+    Get a priority-ordered list of Reader classes for loading an image.
 
-    Uses ReaderPluginManager to build a priority list from BIOIO_PLUGINS
-    and delegates reader selection to bioio's native plugin_priority system.
+    Uses ReaderPluginManager to build a priority list from BIOIO_PLUGINS.
+    This list can be passed directly to BioImage(reader=[...]) and bioio
+    will try each reader in order until one succeeds.
 
     Parameters
     ----------
     image : ImageLike
         Image to be loaded (file path, numpy array, or xarray DataArray).
     preferred_reader : str, optional
-        Preferred reader name (e.g., "bioio-ome-tiff"). If None, uses
-        BIOIO_PLUGINS order without any preference override.
+        Preferred reader name (e.g., "bioio-ome-tiff"). If provided and
+        installed, it will be first in the priority list.
 
     Returns
     -------
-    Reader
-        Reader class to use for loading the image.
-
-    Raises
-    ------
-    UnsupportedFileFormatError
-        If no suitable reader can be found. Error message includes
-        installation suggestions for missing plugins.
+    list[type[Reader]]
+        Ordered list of Reader classes. Empty list if image is not a file
+        path or no suitable readers are installed.
     """
-    from bioio_base.exceptions import UnsupportedFileFormatError
     from ndev_settings import get_settings
 
     from ._plugin_manager import ReaderPluginManager
 
-    # For file paths: use ReaderPluginManager with priority list
-    if isinstance(image, str | Path):
-        settings = get_settings()
+    # Only works for file paths
+    if not isinstance(image, str | Path):
+        return []
 
-        # Get preferred reader from settings if not explicitly provided
-        if preferred_reader is None:
-            pref = settings.ndevio_reader.preferred_reader  # type: ignore
-            # Only use settings value if it's not None/empty
-            if pref:
-                preferred_reader = pref
+    settings = get_settings()
 
-        manager = ReaderPluginManager(image)
-        reader = manager.get_reader(preferred_reader)
+    # Get preferred reader from settings if not explicitly provided
+    if preferred_reader is None:
+        pref = settings.ndevio_reader.preferred_reader  # type: ignore
+        # Only use settings value if it's not None/empty
+        if pref:
+            preferred_reader = pref
 
-        if reader:
-            return reader
-
-        # No reader found - raise error with installation suggestions
-        if settings.ndevio_reader.suggest_reader_plugins:  # type: ignore
-            msg_extra = manager.get_installation_message()
-        else:
-            msg_extra = None
-
-        raise UnsupportedFileFormatError(
-            reader_name='ndevio',
-            path=str(image),
-            msg_extra=msg_extra,
-        )
-
-    # For arrays: use bioio's built-in plugin determination
-    return nImage.determine_plugin(image).metadata.get_reader()
+    manager = ReaderPluginManager(image)
+    return manager.get_priority_list(preferred_reader)
 
 
 class nImage(BioImage):
@@ -98,9 +77,9 @@ class nImage(BioImage):
     image : ImageLike
         Image to be loaded. Can be a path to an image file, a numpy array,
         or an xarray DataArray.
-    reader : Reader, optional
-        Reader to be used to load the image. If not provided, a reader will be
-        determined based on the image type.
+    reader : Reader or list[Reader], optional
+        Reader or priority-ordered list of readers to use. If not provided,
+        a priority list is built from BIOIO_PLUGINS order.
 
     Attributes
     ----------
@@ -109,33 +88,69 @@ class nImage(BioImage):
     See BioImage for inherited attributes.
     """
 
-    def __init__(self, image: ImageLike, reader: Reader | None = None) -> None:
+    def __init__(
+        self,
+        image: ImageLike,
+        reader: type[Reader] | list[type[Reader]] | None = None,
+    ) -> None:
         """
         Initialize an nImage with an image, and optionally a reader.
 
-        If a reader is not provided, a reader will be determined by bioio.
-        However, if the image is supported by the preferred reader, the reader
-        will be set to preferred_reader.Reader to override the softer decision
-        made by bioio.BioImage.determine_plugin().
+        If no reader is provided, a priority list is built from BIOIO_PLUGINS
+        using get_reader_priority() and passed to BioImage. bioio will try
+        each reader in order until one succeeds.
 
-        Note: The issue here is that bioio.BioImage.determine_plugin() will
-        sort by install time and choose the first plugin that supports the
-        image. This is not always the desired behavior, because bioio-tifffile
-        can take precedence over bioio-ome-tiff, even if the image was saved
-        as an OME-TIFF via bioio.writers.OmeTiffWriter (which is the case
-        for napari-ndev).
-
-        Note: If no suitable reader can be found, an UnsupportedFileFormatError
-        will be raised, with installation suggestions for missing plugins.
+        This ensures consistent priority ordering (OME formats first, then
+        format-specific readers, then generic fallbacks) rather than relying
+        on bioio's default install-time ordering.
         """
+        from bioio_base.exceptions import UnsupportedFileFormatError
         from ndev_settings import get_settings
 
         self.settings = get_settings()
 
-        if reader is None:
-            reader = determine_reader_plugin(image)
+        # If no reader provided and we have a file path, build priority list
+        if reader is None and isinstance(image, str | Path):
+            reader = get_reader_priority(image)
 
-        super().__init__(image=image, reader=reader)  # type: ignore
+            # If no readers available at all, provide helpful error
+            if not reader:
+                from ._plugin_manager import ReaderPluginManager
+
+                manager = ReaderPluginManager(image)
+                if self.settings.ndevio_reader.suggest_reader_plugins:  # type: ignore
+                    msg_extra = manager.get_installation_message()
+                else:
+                    msg_extra = None
+
+                raise UnsupportedFileFormatError(
+                    reader_name='ndevio',
+                    path=str(image),
+                    msg_extra=msg_extra,
+                )
+
+        # Try to initialize with the reader/priority list
+        # If bioio fails, enhance the error with installation suggestions
+        try:
+            super().__init__(image=image, reader=reader)  # type: ignore
+        except UnsupportedFileFormatError:
+            # bioio couldn't read with any of the readers - add suggestions
+            if isinstance(image, str | Path):
+                from ._plugin_manager import ReaderPluginManager
+
+                manager = ReaderPluginManager(image)
+                if self.settings.ndevio_reader.suggest_reader_plugins:  # type: ignore
+                    msg_extra = manager.get_installation_message()
+                else:
+                    msg_extra = None
+
+                raise UnsupportedFileFormatError(
+                    reader_name='ndevio',
+                    path=str(image),
+                    msg_extra=msg_extra,
+                ) from None
+            raise
+
         self.napari_layer_data: xr.DataArray | None = None
         self.layer_data_tuples: list[tuple] | None = None
         self.path = image if isinstance(image, str | Path) else None

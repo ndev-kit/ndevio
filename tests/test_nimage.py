@@ -291,7 +291,7 @@ def test_nimage_init_with_various_formats(
 ):
     """Test nImage initialization with various file formats.
 
-    This tests the complete workflow: file → determine_reader_plugin → nImage init
+    This tests the complete workflow: file → get_reader_priority → nImage init
     """
     if should_work is True:
         # Must successfully initialize

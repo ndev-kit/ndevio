@@ -5,8 +5,8 @@ This module provides a unified interface for managing bioio reader plugins:
 2. Installed plugins - Plugins currently installed in the environment
 3. Installable plugins - Plugins that could read a file but aren't installed
 
-The ReaderPluginManager builds a priority list from BIOIO_PLUGINS and delegates
-reader selection to bioio's native plugin_priority system (bioio#162).
+The ReaderPluginManager builds a priority list from BIOIO_PLUGINS that can be
+passed directly to BioImage(reader=[...]) for priority-based reader selection.
 
 Public API:
     ReaderPluginManager - Main class for plugin management
@@ -17,11 +17,9 @@ Example:
     >>> # Create manager for a specific file
     >>> manager = ReaderPluginManager("image.czi")
     >>>
-    >>> # Get priority list of Reader classes (for bioio's plugin_priority)
+    >>> # Get priority list of Reader classes to pass to BioImage
     >>> priority = manager.get_priority_list()
-    >>>
-    >>> # Get a working reader using bioio's priority system
-    >>> reader = manager.get_reader()
+    >>> img = BioImage("image.czi", reader=priority)
     >>>
     >>> # Check what plugins could be installed
     >>> print(manager.installable_plugins)
@@ -35,8 +33,6 @@ from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from bioio import BioImage
-
 if TYPE_CHECKING:
     from bioio.plugins import PluginSupport
     from bioio_base.reader import Reader
@@ -48,9 +44,9 @@ logger = logging.getLogger(__name__)
 class ReaderPluginManager:
     """Centralized manager for bioio reader plugin detection and recommendations.
 
-    This class builds a priority list from BIOIO_PLUGINS and delegates reader
-    selection to bioio's native plugin_priority system. It also provides
-    installation suggestions for missing plugins.
+    This class builds a priority list from BIOIO_PLUGINS that can be passed
+    directly to BioImage(reader=[...]) for priority-based reader selection.
+    It also provides installation suggestions for missing plugins.
 
     Parameters
     ----------
@@ -67,13 +63,11 @@ class ReaderPluginManager:
     --------
     >>> # For a specific file
     >>> manager = ReaderPluginManager("image.czi")
-    >>> reader = manager.get_reader()
-    >>> if reader is None:
-    ...     print(manager.get_installation_message())
-    >>>
-    >>> # Get priority list for bioio's plugin_priority parameter
     >>> priority = manager.get_priority_list()
-    >>> img = BioImage("file.tiff", reader=priority)
+    >>> if priority:
+    ...     img = BioImage("image.czi", reader=priority)
+    ... else:
+    ...     print(manager.get_installation_message())
     """
 
     def __init__(self, path: PathLike | None = None):
@@ -181,14 +175,14 @@ class ReaderPluginManager:
     def get_priority_list(
         self, preferred_reader: str | None = None
     ) -> list[type[Reader]]:
-        """Build priority list of Reader classes for bioio's plugin_priority.
+        """Build priority list of installed Reader classes for bioio.
 
         Creates an ordered list of Reader classes based on:
         1. Preferred reader (if specified and installed)
         2. BIOIO_PLUGINS order (filtered to installed plugins)
 
-        This list can be passed directly to BioImage's reader parameter
-        or to BioImage.determine_plugin's plugin_priority parameter.
+        bioio will try each reader in order until one works. We don't
+        pre-filter to "supported" readers - that's bioio's job.
 
         Parameters
         ----------
@@ -199,7 +193,8 @@ class ReaderPluginManager:
         Returns
         -------
         list of Reader classes
-            Ordered list of Reader classes. Empty if no plugins installed.
+            Ordered list of installed Reader classes.
+            Empty if no plugins installed.
 
         Examples
         --------
@@ -231,56 +226,6 @@ class ReaderPluginManager:
                     logger.debug('Plugin %s not importable', plugin_name)
 
         return priority
-
-    def get_reader(
-        self, preferred_reader: str | None = None
-    ) -> type[Reader] | None:
-        """Get a Reader class that can read this file using bioio's priority.
-
-        Delegates to bioio's BioImage.determine_plugin with a priority list
-        built from BIOIO_PLUGINS order.
-
-        Parameters
-        ----------
-        preferred_reader : str, optional
-            Name of preferred reader to try first (e.g., "bioio-ome-tiff")
-
-        Returns
-        -------
-        Reader class or None
-            Reader class that can read the file, or None if no suitable
-            reader is installed.
-        """
-        if not self.path:
-            logger.warning(
-                'Cannot get reader without a path. '
-                'Initialize ReaderPluginManager with a file path.'
-            )
-            return None
-
-        priority_list = self.get_priority_list(preferred_reader)
-
-        if not priority_list:
-            logger.warning('No installed plugins found for: %s', self.path)
-            return None
-
-        # Use bioio's determine_plugin with our priority list
-        try:
-            plugin = BioImage.determine_plugin(
-                self.path, plugin_priority=priority_list
-            )
-            reader = plugin.metadata.get_reader()
-            logger.info(
-                'Using reader: %s for %s',
-                reader.__module__.split('.')[0].replace('_', '-'),
-                self.path,
-            )
-            return reader
-        except Exception as e:  # noqa
-            logger.warning(
-                'Failed to determine plugin for %s: %s', self.path, e
-            )
-            return None
 
     def get_installation_message(self) -> str:
         """Generate helpful message for missing plugins.
