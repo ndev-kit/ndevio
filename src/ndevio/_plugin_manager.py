@@ -10,6 +10,7 @@ This module focuses on user-friendly installation suggestions.
 
 Public API:
     ReaderPluginManager - Main class for plugin management
+    get_installed_plugins - Fast detection of installed bioio plugins
 
 Example:
     >>> from ndevio._plugin_manager import ReaderPluginManager

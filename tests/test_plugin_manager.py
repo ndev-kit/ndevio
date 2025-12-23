@@ -12,7 +12,7 @@ class TestGetInstalledPlugins:
 
     def test_returns_set_of_strings(self):
         """Test that get_installed_plugins returns a set of strings."""
-        from ndevio._plugin_manager import get_installed_plugins
+        from ndevio._bioio_plugin_utils import get_installed_plugins
 
         result = get_installed_plugins()
 
@@ -22,7 +22,7 @@ class TestGetInstalledPlugins:
 
     def test_includes_core_plugins(self):
         """Test that installed plugins include core bioio plugins."""
-        from ndevio._plugin_manager import get_installed_plugins
+        from ndevio._bioio_plugin_utils import get_installed_plugins
 
         result = get_installed_plugins()
 
@@ -45,10 +45,8 @@ class TestReaderPluginManager:
 
     def test_installed_plugins_matches_module_function(self):
         """Test installed_plugins matches get_installed_plugins()."""
-        from ndevio._plugin_manager import (
-            ReaderPluginManager,
-            get_installed_plugins,
-        )
+        from ndevio._bioio_plugin_utils import get_installed_plugins
+        from ndevio._plugin_manager import ReaderPluginManager
 
         manager = ReaderPluginManager('test.tiff')
 

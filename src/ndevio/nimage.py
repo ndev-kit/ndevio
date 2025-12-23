@@ -80,8 +80,9 @@ class nImage(BioImage):
         except UnsupportedFileFormatError:
             # Only add installation suggestions for file paths
             # For arrays/other types, just let bioio's error propagate
-            if isinstance(image, (str | Path)):
+            if isinstance(image, (str, Path)):
                 self._raise_with_suggestions(image)
+            # For non-path inputs, re-raise the original error
             raise
 
         self.napari_layer_data: xr.DataArray | None = None
@@ -95,8 +96,10 @@ class nImage(BioImage):
         When returned, __init__ will try this reader first and fall back
         to bioio's default priority if it fails.
         """
-        from ._bioio_plugin_utils import get_reader_by_name
-        from ._plugin_manager import get_installed_plugins
+        from ._bioio_plugin_utils import (
+            get_installed_plugins,
+            get_reader_by_name,
+        )
 
         pref = self.settings.ndevio_reader.preferred_reader  # type: ignore
         if not pref:
