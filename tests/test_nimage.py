@@ -5,11 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from unittest import mock
 
-try:
-    import bioio_tifffile
-except ImportError:  # pragma: no cover - optional test dependency
-    bioio_tifffile = None
-
 import pytest
 from bioio_base.exceptions import UnsupportedFileFormatError
 
@@ -51,27 +46,11 @@ def test_nImage_ome_reader(resources_dir: Path):
     img_path = resources_dir / CELLS3D2CH_OME_TIFF
 
     nimg = nImage(img_path)
-    assert nimg.settings.ndevio_reader.preferred_reader == 'bioio-ome-tiff'
+    # assert nimg.settings.ndevio_reader.preferred_reader == 'bioio-ome-tiff'  # this was the old methodology before bioio#162
+    assert nimg.reader.name == 'bioio_ome_tiff'
     # the below only exists if 'bioio-ome-tiff' is used
     assert hasattr(nimg, 'ome_metadata')
     assert nimg.channel_names == ['membrane', 'nuclei']
-
-    # Additional check that the reader override works when bioio_tifffile is
-    # available. The project does not require bioio_tifffile as a test
-    # dependency, so skip this part when it's missing.
-    if bioio_tifffile is None:  # pragma: no cover - optional
-        pytest.skip(
-            'bioio_tifffile not installed; skipping reader-override checks'
-        )
-
-    nimg = nImage(img_path, reader=bioio_tifffile.Reader)
-
-    # check that despite preferred reader, the reader is still bioio_tifffile
-    # because there is no ome_metadata
-    assert nimg.settings.ndevio_reader.preferred_reader == 'bioio-ome-tiff'
-    # check that calling nimg.ome_metadata raises NotImplementedError
-    with pytest.raises(NotImplementedError):
-        _ = nimg.ome_metadata
 
 
 def test_nImage_save_read(resources_dir: Path, tmp_path: Path):

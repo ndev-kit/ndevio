@@ -35,8 +35,9 @@ class nImage(BioImage):
         or an xarray DataArray.
     reader : type[Reader] or Sequence[type[Reader]], optional
         Reader class or priority list of readers. If not provided, checks
-        settings for preferred_reader and passes that (as a list for fallback),
-        otherwise lets bioio auto-select.
+        settings for preferred_reader and tries that first. If the preferred
+        reader fails, falls back to bioio's default priority. If no preferred
+        reader is set, uses bioio's deterministic plugin ordering directly.
     **kwargs
         Additional arguments passed to BioImage.
 
@@ -64,9 +65,23 @@ class nImage(BioImage):
             reader = self._get_preferred_reader_list()
 
         try:
-            super().__init__(image=image, reader=reader, **kwargs)
+            if reader is not None:
+                # Try preferred/explicit reader first
+                try:
+                    super().__init__(image=image, reader=reader, **kwargs)
+                except UnsupportedFileFormatError:
+                    # Preferred reader failed, fall back to bioio's default
+                    # errors in this will propagate to outer except, bubbling
+                    # up the suggestion error message
+                    super().__init__(image=image, reader=None, **kwargs)
+            else:
+                # No preferred reader, use bioio's default priority
+                super().__init__(image=image, reader=None, **kwargs)
         except UnsupportedFileFormatError:
-            self._raise_with_suggestions(image)
+            # Only add installation suggestions for file paths
+            # For arrays/other types, just let bioio's error propagate
+            if isinstance(image, PathLike):
+                self._raise_with_suggestions(image)
             raise
 
         self.napari_layer_data: xr.DataArray | None = None
@@ -76,8 +91,9 @@ class nImage(BioImage):
     def _get_preferred_reader_list(self) -> list[type[Reader]] | None:
         """Get preferred reader as a list (for fallback) or None.
 
-        Returns [PreferredReader] if set and installed, else None.
-        Passing as a list allows bioio to fall back to default ordering.
+        Returns the Reader class if set and installed, else None.
+        When returned, __init__ will try this reader first and fall back
+        to bioio's default priority if it fails.
         """
         from ._bioio_plugin_utils import get_reader_by_name
         from ._plugin_manager import get_installed_plugins
@@ -117,8 +133,8 @@ class nImage(BioImage):
     def _determine_in_memory(
         self,
         path=None,
-        max_in_mem_bytes: int = 4e9,
-        max_in_mem_percent: int = 0.3,
+        max_in_mem_bytes: float = 4e9,
+        max_in_mem_percent: float = 0.3,
     ) -> bool:
         """
         Determine whether the image should be loaded into memory or not.

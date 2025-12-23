@@ -57,6 +57,7 @@ def napari_get_reader(
 
     # Quick extension check - if no plugins recognize this extension, return None
     # This allows other napari readers to try the file
+    # TODO: This is probably legacy cruft before starting to autopopulate the filename_patterns in napari.yaml
     suggested = suggest_plugins_for_path(path)
     if not suggested:
         logger.debug('ndevio: No bioio plugins for extension: %s', path)

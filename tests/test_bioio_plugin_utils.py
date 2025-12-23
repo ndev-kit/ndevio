@@ -15,10 +15,10 @@ class TestSuggestPluginsForPath:
     @pytest.mark.parametrize(
         ('filename', 'expected_plugins'),
         [
-            ('test.czi', ['bioio-czi']),
-            ('test.lif', ['bioio-lif']),
-            ('test.nd2', ['bioio-nd2']),
-            ('test.dv', ['bioio-dv']),
+            ('test.czi', ['bioio-czi', 'bioio-bioformats']),
+            ('test.lif', ['bioio-lif', 'bioio-bioformats']),
+            ('test.nd2', ['bioio-nd2', 'bioio-bioformats']),
+            ('test.dv', ['bioio-dv', 'bioio-bioformats']),
             ('test.xyz', []),  # Unsupported returns empty
         ],
     )

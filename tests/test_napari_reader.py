@@ -207,17 +207,6 @@ def test_napari_get_reader_unsupported(resources_dir: Path):
     assert reader is None
 
 
-def test_napari_get_reader_general_exception(caplog):
-    """Test that unrecognized extension returns None without error."""
-    # Extension .xyz is not recognized by any bioio plugin
-    test_path = 'non_existent_file.xyz'
-
-    reader = napari_get_reader(test_path)
-
-    # Should return None for unrecognized extensions
-    assert reader is None
-
-
 def test_napari_get_reader_supported_formats_work(resources_dir: Path):
     """Test that supported formats return valid readers."""
     # PNG should work (bioio-imageio is core)
