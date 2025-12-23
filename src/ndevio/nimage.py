@@ -61,7 +61,7 @@ class nImage(BioImage):
         self.settings = get_settings()
 
         # If no explicit reader and we have a file path, check for preferred
-        if reader is None and isinstance(image, PathLike):
+        if reader is None and isinstance(image, (str | Path)):
             reader = self._get_preferred_reader_list()
 
         try:
@@ -80,13 +80,13 @@ class nImage(BioImage):
         except UnsupportedFileFormatError:
             # Only add installation suggestions for file paths
             # For arrays/other types, just let bioio's error propagate
-            if isinstance(image, PathLike):
+            if isinstance(image, (str | Path)):
                 self._raise_with_suggestions(image)
             raise
 
         self.napari_layer_data: xr.DataArray | None = None
         self.layer_data_tuples: list[tuple] | None = None
-        self.path = image if isinstance(image, PathLike) else None
+        self.path = image if isinstance(image, (str | Path)) else None
 
     def _get_preferred_reader_list(self) -> list[type[Reader]] | None:
         """Get preferred reader as a list (for fallback) or None.
