@@ -329,7 +329,7 @@ wheels = [
 
 [[package]]
 name = "bioio"
-version = "3.0.0"
+version = "3.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "bioio-base" },
@@ -338,25 +338,26 @@ dependencies = [
     { name = "ome-types", extra = ["lxml"] },
     { name = "semver" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f1/95/0f9c15d0e329da74d63ad8495ddb6563d53ee27bc4eea9dc471f59648015/bioio-3.0.0.tar.gz", hash = "sha256:8be25df70b611e62d1f1c3b11b47e039f3626e08e17e0dc792d824be3e4aeb89", size = 59699, upload-time = "2025-07-03T17:55:48.525Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/21/29/0534e35d8bcbe24b7626625352acb2d606fb3f290c2e39fa0e1085f08b67/bioio-3.2.0.tar.gz", hash = "sha256:731211b43b3c5438cbf597f915a98dcd1be29814b0a67e5a1e89ab38fe746538", size = 60876, upload-time = "2025-12-22T20:02:40.715Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a1/02/c6713b1d38fdf6b705265e8def466ed22f62c0684b8ee030809ad396924e/bioio-3.0.0-py3-none-any.whl", hash = "sha256:c8a796d2ddf0b60fb240603c51c6b7e48fa1b3d8d2da9ade137f67d04f0707c0", size = 56626, upload-time = "2025-07-03T17:55:47.088Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/5f/96a446d850b19d1bdb5bbb0d49eec2efa6b396cd5efb6d1e5d84cf03cad9/bioio-3.2.0-py3-none-any.whl", hash = "sha256:b25b424de47b877de184c14b0d0836f2a9c678b0c36a338eb6e526f0f74fa359", size = 58721, upload-time = "2025-12-22T20:02:39.245Z" },
 ]
 
 [[package]]
 name = "bioio-base"
-version = "3.0.0"
+version = "3.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dask", extra = ["array", "distributed"] },
     { name = "fsspec" },
     { name = "numpy" },
-    { name = "ome-types" },
+    { name = "ome-types", extra = ["pint"] },
+    { name = "pint" },
     { name = "xarray" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f6/fd/5fc014f5ca15579bbeaf3bebb15b49efc9e743a4877d078bcc4ba500479b/bioio_base-3.0.0.tar.gz", hash = "sha256:47ba5aa50b9c068116b0b505f8c5816c346fc7ad1c65116052c6a734e662d680", size = 95694, upload-time = "2025-06-27T21:30:46.166Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3a/05/64a855e25b89384b703255e10c12f0ccaa9862e58f1f73b642d8fbdb696e/bioio_base-3.2.0.tar.gz", hash = "sha256:f935e19ae243e9cdb1c46ae9c5ac2a19343345f6be7a74255e292c7188a37c68", size = 96797, upload-time = "2025-12-08T22:35:38.617Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/63/68e0e98001f5572c8734c7c99950a803aeeba72249f180ef1d5796bb0141/bioio_base-3.0.0-py3-none-any.whl", hash = "sha256:278f44aa79bbd50217521d8a4347716d5b07123f892ba7b7d1a6709c86021724", size = 99966, upload-time = "2025-06-27T21:30:44.875Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/44/178363ad21c93bb94ac5d9abf03c39fb3a43d5849c97d6a213efbb77f318/bioio_base-3.2.0-py3-none-any.whl", hash = "sha256:ae37c33bfc5fe7efa89603ea678c6ba1a2e0b9c67a7e64377d4c5d1f0a75724a", size = 100971, upload-time = "2025-12-08T22:35:37.076Z" },
 ]
 
 [[package]]
@@ -1224,7 +1225,7 @@ name = "importlib-metadata"
 version = "8.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp", marker = "python_full_version < '3.13'" },
+    { name = "zipp", marker = "python_full_version < '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/66/650a33bd90f786193e4de4b3ad86ea60b53c89b669a5c7be931fac31cdb0/importlib_metadata-8.7.0.tar.gz", hash = "sha256:d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000", size = 56641, upload-time = "2025-04-27T15:29:01.736Z" }
 wheels = [
@@ -2136,6 +2137,7 @@ dependencies = [
     { name = "natsort" },
     { name = "nbatch" },
     { name = "ndev-settings" },
+    { name = "pooch" },
     { name = "xarray" },
     { name = "zarr" },
 ]
@@ -2157,7 +2159,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "bioio", specifier = ">=2" },
+    { name = "bioio", specifier = ">=3.2.0" },
     { name = "bioio-base" },
     { name = "bioio-imageio" },
     { name = "bioio-ome-tiff", specifier = ">=1.2.0" },
@@ -2171,6 +2173,7 @@ requires-dist = [
     { name = "natsort" },
     { name = "nbatch", specifier = ">=0.0.4" },
     { name = "ndev-settings", specifier = ">=0.4.0" },
+    { name = "pooch" },
     { name = "xarray" },
     { name = "zarr", specifier = ">=3.1.3" },
 ]
@@ -2393,6 +2396,9 @@ wheels = [
 [package.optional-dependencies]
 lxml = [
     { name = "lxml" },
+]
+pint = [
+    { name = "pint" },
 ]
 
 [[package]]
