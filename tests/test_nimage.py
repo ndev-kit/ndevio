@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from unittest import mock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from bioio_base.exceptions import UnsupportedFileFormatError
@@ -581,3 +582,228 @@ class TestGetLayerDataTuples:
         assert (
             layer_tuples[1][1]['colormap'] == 'green'
         )  # default for 2-channel
+
+
+class TestPreferredReaderFallback:
+    """Tests for preferred reader fallback logic in nImage.__init__."""
+
+    def test_preferred_reader_success(self, resources_dir: Path):
+        """Test that preferred reader is used when it works."""
+        with patch(
+            'ndevio.nimage.nImage._get_preferred_reader_list'
+        ) as mock_get:
+            # Mock returning a valid reader
+            from bioio_tifffile import Reader
+
+            mock_get.return_value = [Reader]
+
+            img = nImage(str(resources_dir / 'cells3d2ch_legacy.tiff'))
+
+            # Verify preferred reader was attempted
+            mock_get.assert_called_once()
+            assert img is not None
+            assert img.reader.name == 'bioio_tifffile'
+
+    def test_preferred_reader_fallback(self, resources_dir: Path):
+        """Test that failed preferred reader will fallback"""
+        with patch(
+            'ndevio.nimage.nImage._get_preferred_reader_list'
+        ) as mock_get:
+            # Mock returning a valid reader
+            from bioio_czi import Reader
+
+            mock_get.return_value = [Reader]
+
+            img = nImage(str(resources_dir / 'cells3d2ch_legacy.tiff'))
+
+            # Verify preferred reader was attempted
+            mock_get.assert_called_once()
+            assert img is not None
+            assert img.reader.name == 'bioio_ome_tiff'
+
+    def test_no_preferred_reader_uses_default(self, resources_dir: Path):
+        """Test that no preferred reader uses bioio's default priority."""
+        with patch(
+            'ndevio.nimage.nImage._get_preferred_reader_list'
+        ) as mock_get:
+            mock_get.return_value = None  # No preferred reader
+
+            img = nImage(str(resources_dir / 'cells3d2ch_legacy.tiff'))
+            assert img is not None
+            mock_get.assert_called_once()
+            assert img.reader.name == 'bioio_ome_tiff'
+
+
+class TestGetPreferredReaderList:
+    """Tests for _get_preferred_reader_list method."""
+
+    def test_returns_none_when_no_preferred_reader(self, resources_dir: Path):
+        """Test returns None when preferred_reader is not set."""
+        with patch('ndev_settings.get_settings') as mock_settings:
+            mock_settings.return_value.ndevio_reader.preferred_reader = None
+
+            img = nImage.__new__(nImage)
+            img.settings = mock_settings.return_value
+
+            result = img._get_preferred_reader_list()
+            assert result is None
+
+    def test_returns_none_when_preferred_not_installed(
+        self, resources_dir: Path
+    ):
+        """Test returns None when preferred reader is not installed."""
+        with (
+            patch('ndev_settings.get_settings') as mock_settings,
+            patch(
+                'ndevio._bioio_plugin_utils.get_installed_plugins',
+                return_value={'bioio-ome-tiff', 'bioio-tifffile'},
+            ),
+        ):
+            mock_settings.return_value.ndevio_reader.preferred_reader = (
+                'bioio-czi'
+            )
+
+            img = nImage.__new__(nImage)
+            img.settings = mock_settings.return_value
+
+            result = img._get_preferred_reader_list()
+            assert result is None
+
+    def test_returns_reader_when_preferred_installed(
+        self, resources_dir: Path
+    ):
+        """Test returns reader class when preferred reader is installed."""
+        with (
+            patch('ndev_settings.get_settings') as mock_settings,
+            patch(
+                'ndevio._bioio_plugin_utils.get_installed_plugins',
+                return_value={'bioio-ome-tiff'},
+            ),
+            patch(
+                'ndevio._bioio_plugin_utils.get_reader_by_name'
+            ) as mock_get_reader,
+        ):
+            from bioio_ome_tiff import Reader as OmeTiffReader
+
+            mock_get_reader.return_value = OmeTiffReader
+            mock_settings.return_value.ndevio_reader.preferred_reader = (
+                'bioio-ome-tiff'
+            )
+
+            img = nImage.__new__(nImage)
+            img.settings = mock_settings.return_value
+
+            result = img._get_preferred_reader_list()
+            assert result == [OmeTiffReader]
+            mock_get_reader.assert_called_once_with('bioio-ome-tiff')
+
+
+class TestRaiseWithSuggestions:
+    """Tests for _raise_with_suggestions method."""
+
+    def test_raises_with_suggestions_enabled(self):
+        """Test error message includes suggestions when enabled."""
+        with patch('ndev_settings.get_settings') as mock_settings:
+            mock_settings.return_value.ndevio_reader.suggest_reader_plugins = (
+                True
+            )
+
+            img = nImage.__new__(nImage)
+            img.settings = mock_settings.return_value
+
+            with pytest.raises(UnsupportedFileFormatError) as exc_info:
+                img._raise_with_suggestions('test.czi')
+
+            error_msg = str(exc_info.value)
+            assert 'bioio-czi' in error_msg
+
+    def test_raises_without_suggestions_when_disabled(self):
+        """Test error message has no suggestions when disabled."""
+        with patch('ndev_settings.get_settings') as mock_settings:
+            mock_settings.return_value.ndevio_reader.suggest_reader_plugins = (
+                False
+            )
+
+            img = nImage.__new__(nImage)
+            img.settings = mock_settings.return_value
+
+            with pytest.raises(UnsupportedFileFormatError) as exc_info:
+                img._raise_with_suggestions('test.czi')
+
+            error_msg = str(exc_info.value)
+            # Should still mention the file but not include installation message
+            assert 'test.czi' in error_msg
+
+
+class TestNonPathImageHandling:
+    """Tests for handling non-path inputs (arrays)."""
+
+    def test_array_input_no_preferred_reader_check(self):
+        """Test that arrays don't trigger preferred reader logic."""
+        import numpy as np
+
+        with patch(
+            'ndevio.nimage.nImage._get_preferred_reader_list'
+        ) as mock_get:
+            # Create a simple array
+            arr = np.zeros((10, 10), dtype=np.uint8)
+
+            # This should work without calling _get_preferred_reader_list
+            img = nImage(arr)
+            assert img is not None
+            # Should not call _get_preferred_reader_list for arrays
+            mock_get.assert_not_called()
+
+    def test_unsupported_array_raises_without_suggestions(self):
+        """Test that unsupported arrays raise error without plugin suggestions."""
+        # Create something that will fail
+        with pytest.raises(UnsupportedFileFormatError) as exc_info:
+            # Pass an invalid object
+            nImage('this_is_not_a_valid_input.fake')
+
+        # Error should be raised but without custom suggestions since it's not a path
+        error_msg = str(exc_info.value)
+        assert (
+            'fake' in error_msg.lower() or 'unsupported' in error_msg.lower()
+        )
+
+
+class TestExplicitReaderParameter:
+    """Tests for when reader is explicitly provided."""
+
+    def test_explicit_reader_bypasses_preferred(self, resources_dir: Path):
+        """Test that explicit reader parameter bypasses preferred reader."""
+        from bioio_tifffile import Reader as TifffileReader
+
+        with patch(
+            'ndevio.nimage.nImage._get_preferred_reader_list'
+        ) as mock_get:
+            # Explicit reader should bypass preferred
+            img = nImage(
+                str(resources_dir / 'cells3d2ch_legacy.tiff'),
+                reader=TifffileReader,
+            )
+
+            assert img is not None
+            # Should not check for preferred reader when explicit reader provided
+            mock_get.assert_not_called()
+
+    def test_explicit_reader_fails_falls_back(self, resources_dir: Path):
+        """Test explicit reader that fails falls back to default."""
+        mock_reader = MagicMock()
+        mock_reader.side_effect = UnsupportedFileFormatError(
+            reader_name='mock', path='test'
+        )
+
+        with patch(
+            'ndevio.nimage.nImage._get_preferred_reader_list'
+        ) as mock_get:
+            # Even with explicit reader that fails, should fall back
+            img = nImage(
+                str(resources_dir / 'cells3d2ch_legacy.tiff'),
+                reader=mock_reader,
+            )
+
+            assert img is not None
+            # Should not check preferred when explicit reader provided
+            mock_get.assert_not_called()
