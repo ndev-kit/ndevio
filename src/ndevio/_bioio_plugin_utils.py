@@ -225,8 +225,8 @@ def format_plugin_installation_message(
     # No plugins found for this extension
     if not suggested_plugins:
         return (
-            f"\n\nNo bioio plugins found identified for reading '{filename}'.\n"
-            'See https://github.com/bioio-devs/bioio for known available plugins.'
+            f"\n\nNo bioio plugins known for reading '{filename}'.\n"
+            'See https://github.com/bioio-devs/bioio for available plugins.'
         )
 
     # Format the plugin list (filters out core plugins automatically)
