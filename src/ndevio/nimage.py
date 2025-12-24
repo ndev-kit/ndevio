@@ -80,9 +80,8 @@ class nImage(BioImage):
         except UnsupportedFileFormatError:
             # Only add installation suggestions for file paths
             # For arrays/other types, just let bioio's error propagate
-            if isinstance(image, (str, Path)):
+            if isinstance(image, (str | Path)):
                 self._raise_with_suggestions(image)
-            # For non-path inputs, re-raise the original error
             raise
 
         self.napari_layer_data: xr.DataArray | None = None
@@ -105,15 +104,12 @@ class nImage(BioImage):
         if not pref:
             return None
 
+        # in case a legacy settings file exists with a plugin that is not present in a new environment
         if pref not in get_installed_plugins():
             logger.debug('Preferred reader %s not installed', pref)
             return None
 
-        try:
-            return [get_reader_by_name(pref)]
-        except ImportError:
-            logger.warning('Preferred reader %s not importable', pref)
-            return None
+        return [get_reader_by_name(pref)]
 
     def _raise_with_suggestions(self, path: PathLike) -> None:
         """Raise UnsupportedFileFormatError with installation suggestions."""
