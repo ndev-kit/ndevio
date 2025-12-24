@@ -34,6 +34,11 @@ import importlib
 import logging
 from typing import TYPE_CHECKING
 
+from ._bioio_extensions import (
+    BIOIO_BIOFORMATS_EXTENSIONS,
+    BIOIO_IMAGEIO_EXTENSIONS,
+)
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -44,14 +49,15 @@ logger = logging.getLogger(__name__)
 # Bioio plugins and their supported extensions
 # Source: https://github.com/bioio-devs/bioio
 #
-# ORDERING MATTERS: Plugins are listed in priority order (highest priority first).
-# This order is used by ReaderPluginManager when selecting readers.
-# Priority is based on:
-# 1. Metadata preservation quality (OME formats preserve most metadata)
-# 2. Reliability and performance for specific formats
-# 3. Known issues or limitations
+# NOTE: This registry is used for:
+# - Installation suggestions (which plugins to install for a file type)
+# - Plugin metadata (descriptions, repository links, notes)
+# - Identifying core plugins (bundled with bioio)
+#
+# Reader PRIORITY/ORDERING is handled by bioio itself (see bioio#162).
+# bioio uses a deterministic ordering based on extension specificity.
 BIOIO_PLUGINS = {
-    # Highest priority: OME formats with excellent metadata preservation
+    # OME formats with excellent metadata preservation
     'bioio-ome-zarr': {
         'extensions': ['.zarr'],
         'description': 'OME-Zarr files',
@@ -69,7 +75,7 @@ BIOIO_PLUGINS = {
         'description': 'Tiled OME-TIFF files',
         'repository': 'https://github.com/bioio-devs/bioio-ome-tiled-tiff',
     },
-    # High priority: Format-specific readers with good metadata support
+    # Format-specific readers with good metadata support
     'bioio-tifffile': {
         'extensions': ['.tif', '.tiff'],
         'description': 'TIFF files (including those without OME metadata)',
@@ -101,21 +107,21 @@ BIOIO_PLUGINS = {
         'description': '3i SlideBook files',
         'repository': 'https://github.com/bioio-devs/bioio-sldy',
     },
-    # Lower priority: Generic/fallback readers
+    # Generic/fallback readers
     'bioio-imageio': {
-        'extensions': ['.bmp', '.gif', '.jpg', '.jpeg', '.png'],
+        'extensions': BIOIO_IMAGEIO_EXTENSIONS,
         'description': 'Generic image formats (PNG, JPG, etc.)',
         'repository': 'https://github.com/bioio-devs/bioio-imageio',
         'core': True,
     },
     'bioio-tiff-glob': {
-        'extensions': ['.tiff'],
+        'extensions': ['.tif', '.tiff'],
         'description': 'TIFF sequences (glob patterns)',
         'repository': 'https://github.com/bioio-devs/bioio-tiff-glob',
     },
-    # Lowest priority: Requires external dependencies (Java)
+    # Requires external dependencies (Java)
     'bioio-bioformats': {
-        'extensions': ['.oib', '.oif', '.vsi', '.ims', '.lsm', '.stk'],
+        'extensions': BIOIO_BIOFORMATS_EXTENSIONS,
         'description': 'Proprietary microscopy formats (requires Java)',
         'repository': 'https://github.com/bioio-devs/bioio-bioformats',
         'note': 'Requires Java Runtime Environment',
@@ -131,7 +137,24 @@ for plugin_name, info in BIOIO_PLUGINS.items():
         _EXTENSION_TO_PLUGIN[ext].append(plugin_name)
 
 
-def get_reader_by_name(reader_name: str) -> Reader:
+def get_installed_plugins() -> set[str]:
+    """Get names of installed bioio reader plugins.
+
+    Uses importlib.metadata entry_points which is fast and doesn't
+    require loading any plugins.
+
+    Returns
+    -------
+    set of str
+        Set of installed plugin names (e.g., {'bioio-ome-tiff', 'bioio-czi'}).
+    """
+    from importlib.metadata import entry_points
+
+    eps = entry_points(group='bioio.readers')
+    return {ep.name for ep in eps}
+
+
+def get_reader_by_name(reader_name: str) -> type[Reader]:
     """Import and return Reader class from plugin name.
 
     Converts plugin name (e.g., 'bioio-czi') to module name (e.g., 'bioio_czi')
@@ -144,7 +167,7 @@ def get_reader_by_name(reader_name: str) -> Reader:
 
     Returns
     -------
-    Reader
+    type[Reader]
         The Reader class from the plugin module
 
     Raises
@@ -202,7 +225,7 @@ def format_plugin_installation_message(
     # No plugins found for this extension
     if not suggested_plugins:
         return (
-            f"\n\nNo bioio plugins found for '{filename}'.\n"
+            f"\n\nNo bioio plugins known for reading '{filename}'.\n"
             'See https://github.com/bioio-devs/bioio for available plugins.'
         )
 

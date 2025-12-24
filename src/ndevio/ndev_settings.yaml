@@ -4,12 +4,12 @@ ndevio_reader:
     tooltip: Whether to suggest plugins to install when no reader can be found
     value: true
   preferred_reader:
-    default: bioio-ome-tiff
+    default: null
     dynamic_choices:
       fallback_message: No readers found
       provider: bioio.readers
-    tooltip: Preferred reader to use when opening images
-    value: bioio-ome-tiff
+    tooltip: Preferred reader to try first when opening images.
+    value: null
   scene_handling:
     choices:
     - Open Scene Widget

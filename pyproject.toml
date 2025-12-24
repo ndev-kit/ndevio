@@ -36,7 +36,7 @@ dependencies = [
     "magic-class",
     "xarray",
     "bioio-base",
-    "bioio>=2",  # migrates writers to plugins
+    "bioio>=3.2.0",  # migrates writers to plugins
     "bioio-ome-zarr>=3",  # Pin to v3.x for zarr 3.x compatibility
     "bioio-ome-tiff>=1.2.0",  # minimum for migrated writer
     "bioio-tifffile",  # a backup tifffile reader with better performance than imageio

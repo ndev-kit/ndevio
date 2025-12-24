@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING
 
 from magicgui.widgets import ComboBox, Container, Label, PushButton
 
+from .._bioio_plugin_utils import BIOIO_PLUGINS
+
 if TYPE_CHECKING:
     from .._plugin_manager import ReaderPluginManager
 
@@ -93,8 +95,7 @@ class PluginInstallerWidget(Container):
         self._info_label = Label(value='Select a plugin to install:')
         self.append(self._info_label)
 
-        # Get all available plugin names from manager
-        plugin_names = self.manager.known_plugins
+        plugin_names = list(BIOIO_PLUGINS.keys())
 
         self._plugin_select = ComboBox(
             label='Plugin',
