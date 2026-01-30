@@ -27,7 +27,10 @@ def test_nImage_init(resources_dir: Path):
     assert img.reader is not None
     # Shape is (T, C, Z, Y, X) = (1, 2, 60, 66, 85)
     assert img.data.shape == (1, 2, 60, 66, 85)
-    assert img.napari_layer_data is None
+    # napari_layer_data should not be loaded until accessed
+    assert img._napari_layer_data is None
+    # Accessing the property triggers lazy loading
+    assert img.napari_layer_data is not None
 
 
 def test_nImage_ome_reader(resources_dir: Path):
@@ -112,7 +115,7 @@ def test_nImage_determine_in_memory_large_file(resources_dir: Path):
 def test_get_layer_data(resources_dir: Path):
     """Test loading napari layer data in memory."""
     img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-    img._get_layer_data()
+    img._load_napari_layer_data()
     # napari_layer_data will be squeezed
     # Original shape (1, 2, 60, 66, 85) -> (2, 60, 66, 85)
     assert img.napari_layer_data.shape == (2, 60, 66, 85)
@@ -124,7 +127,7 @@ def test_get_layer_data_not_in_memory(resources_dir: Path):
     import dask
 
     img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-    img._get_layer_data(in_memory=False)
+    img._load_napari_layer_data(in_memory=False)
     assert img.napari_layer_data is not None
     # check that the data is a dask array
     assert isinstance(img.napari_layer_data.data, dask.array.core.Array)
@@ -230,7 +233,7 @@ def test_get_layer_data_mosaic_tile_in_memory(resources_dir: Path):
             [1, 2, 3]
         )
         img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-        img._get_layer_data(in_memory=True)
+        img._load_napari_layer_data(in_memory=True)
         assert img.napari_layer_data is not None
         assert img.napari_layer_data.shape == (3,)
 
@@ -248,7 +251,7 @@ def test_get_layer_data_mosaic_tile_not_in_memory(
             xr.DataArray([1, 2, 3])
         )
         img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-        img._get_layer_data(in_memory=False)
+        img._load_napari_layer_data(in_memory=False)
         assert img.napari_layer_data is not None
         assert img.napari_layer_data.shape == (3,)
 
@@ -407,14 +410,12 @@ class TestGetLayerDataTuples:
         import numpy as np
         import xarray as xr
 
-        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-
-        # Mock single channel data (no Channel dimension)
+        # Create nImage directly with single channel data (no Channel dimension)
         mock_data = xr.DataArray(
             np.zeros((10, 10)),
             dims=['Y', 'X'],
         )
-        img.napari_layer_data = mock_data
+        img = nImage(mock_data)
 
         layer_tuples = img.get_layer_data_tuples()
         assert len(layer_tuples) == 1
@@ -430,15 +431,13 @@ class TestGetLayerDataTuples:
 
         from ndevio._colormap_utils import MULTI_CHANNEL_CYCLE
 
-        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-
-        # Mock 4 channel data
+        # Create nImage directly with 4 channel data
         mock_data = xr.DataArray(
             np.zeros((4, 10, 10)),
             dims=[DimensionNames.Channel, 'Y', 'X'],
             coords={DimensionNames.Channel: ['ch0', 'ch1', 'ch2', 'ch3']},
         )
-        img.napari_layer_data = mock_data
+        img = nImage(mock_data)
 
         layer_tuples = img.get_layer_data_tuples()
         colormaps = [meta.get('colormap') for _, meta, _ in layer_tuples]
@@ -455,17 +454,14 @@ class TestGetLayerDataTuples:
         import xarray as xr
         from bioio_base.dimensions import DimensionNames
 
-        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-
-        # Mock napari_layer_data with a channel named "mask"
+        # Create nImage directly with a channel named "mask"
         mock_data = xr.DataArray(
             np.zeros((2, 10, 10)),
             dims=[DimensionNames.Channel, 'Y', 'X'],
             coords={DimensionNames.Channel: ['intensity', 'mask']},
         )
-        img.napari_layer_data = mock_data
+        img = nImage(mock_data)
 
-        # Call the method (skip loading since we set napari_layer_data manually)
         layer_tuples = img.get_layer_data_tuples()
 
         # First channel "intensity" should be image
@@ -479,15 +475,13 @@ class TestGetLayerDataTuples:
         import xarray as xr
         from bioio_base.dimensions import DimensionNames
 
-        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-
-        # Set up mock data
+        # Create nImage directly with mock data
         mock_data = xr.DataArray(
             np.zeros((2, 10, 10)),
             dims=[DimensionNames.Channel, 'Y', 'X'],
             coords={DimensionNames.Channel: ['intensity', 'mask']},
         )
-        img.napari_layer_data = mock_data
+        img = nImage(mock_data)
 
         # Override: set both channels to labels
         layer_tuples = img.get_layer_data_tuples(
@@ -504,15 +498,13 @@ class TestGetLayerDataTuples:
         import xarray as xr
         from bioio_base.dimensions import DimensionNames
 
-        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-
-        # Mock data with a labels channel
+        # Create nImage directly with a labels channel
         mock_data = xr.DataArray(
             np.zeros((1, 10, 10)),
             dims=[DimensionNames.Channel, 'Y', 'X'],
             coords={DimensionNames.Channel: ['segmentation']},
         )
-        img.napari_layer_data = mock_data
+        img = nImage(mock_data)
 
         layer_tuples = img.get_layer_data_tuples()
 
@@ -539,14 +531,13 @@ class TestGetLayerDataTuples:
         import xarray as xr
         from bioio_base.dimensions import DimensionNames
 
-        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-
+        # Create nImage directly with mock data
         mock_data = xr.DataArray(
             np.zeros((2, 10, 10)),
             dims=[DimensionNames.Channel, 'Y', 'X'],
             coords={DimensionNames.Channel: ['intensity', 'mask']},
         )
-        img.napari_layer_data = mock_data
+        img = nImage(mock_data)
 
         # Even though channel_types says "intensity" should be image,
         # layer_type="labels" should override everything
