@@ -241,41 +241,47 @@ class nImage(BioImage):
         return 'image'
 
     @property
-    def napari_scale(self) -> tuple | None:
+    def napari_scale(self) -> tuple[float, ...] | None:
         """
-        Scale values for napari layers.
+        Physical scale for dimensions present in napari layer data.
 
-        Extracts scale from physical_pixel_sizes for spatial dimensions only,
-        in the order they appear in napari_layer_data.dims.
+        Uses napari_axis_labels to determine which dimensions are actually
+        present after squeezing, then extracts scale values from BioImage.scale.
+        Defaults to 1.0 for dimensions without scale metadata.
 
         Returns
         -------
-        tuple | None
-            Scale tuple for spatial dimensions, or None if no scale info.
+        tuple[float, ...] | None
+            Scale tuple matching dimensions in napari_axis_labels, or None
+            if no dimensions present. Each value is either the physical scale
+            or 1.0 if scale metadata is unavailable.
 
         Examples
         --------
-        >>> img = nImage("image.tiff")
+        >>> img = nImage("timelapse.tiff")  # T=3, Z=1, Y=10, X=10
+        >>> # After squeezing, Z is removed
+        >>> img.napari_axis_labels
+        ('T', 'Y', 'X')
         >>> img.napari_scale
-        (0.5, 0.2, 0.2)  # (Z, Y, X) scales in microns
+        (2.0, 0.2, 0.2)  # T in seconds, Y/X in microns
+
+        Notes
+        -----
+        Uses napari_axis_labels as source of truth - only returns scale for
+        dimensions actually present in the squeezed napari_layer_data.
 
         """
-        if self.napari_layer_data is None or self.physical_pixel_sizes is None:
+        axis_labels = self.napari_axis_labels
+        if not axis_labels:
             return None
 
-        scale = [
-            getattr(self.physical_pixel_sizes, dim)
-            for dim in self.napari_layer_data.dims
-            if dim
-            in {
-                DimensionNames.SpatialX,
-                DimensionNames.SpatialY,
-                DimensionNames.SpatialZ,
-            }
-            and getattr(self.physical_pixel_sizes, dim) is not None
-        ]
+        # From BioImage.scale get the value for each dim present, default to 1.0 if None
+        scale_values = []
+        for dim in axis_labels:
+            scale_val = getattr(self.scale, dim, None)
+            scale_values.append(scale_val if scale_val is not None else 1.0)
 
-        return tuple(scale) if scale else None
+        return tuple(scale_values)
 
     @property
     def napari_axis_labels(self) -> tuple[str, ...]:
@@ -306,6 +312,55 @@ class nImage(BioImage):
             for dim in self.napari_layer_data.dims
             if dim != DimensionNames.Channel and dim != DimensionNames.Samples
         )
+
+    @property
+    def napari_axis_units(self) -> tuple[str | None, ...] | None:
+        """
+        Physical units for dimensions present in napari layer data.
+
+        Uses napari_axis_labels to determine which dimensions are actually
+        present after squeezing, then extracts units from dimension_properties.
+        Common units: µm (spatial), s (time).
+
+        Returns
+        -------
+        tuple[str | None, ...] | None
+            Unit strings matching napari_axis_labels order, or None if no
+            dimensions present. Elements can be None for dimensions without
+            unit metadata.
+
+        Examples
+        --------
+        >>> img = nImage("timelapse.tiff")  # T=3, Z=1, Y=10, X=10
+        >>> # After squeezing, Z is removed
+        >>> img.napari_axis_labels
+        ('T', 'Y', 'X')
+        >>> img.napari_axis_units
+        ('s', 'µm', 'µm')  # seconds for T, microns for spatial
+
+        Notes
+        -----
+        Uses napari_axis_labels as source of truth - only returns units for
+        dimensions actually present in the squeezed napari_layer_data.
+
+        """
+        axis_labels = self.napari_axis_labels
+        if not axis_labels:
+            return None
+
+        try:
+            dim_props = self.dimension_properties
+        except AttributeError:
+            return None
+
+        # Get unit for each dimension present
+        units = []
+        for dim in axis_labels:
+            dim_prop = getattr(dim_props, dim, None)
+            unit = dim_prop.unit if dim_prop else None
+            units.append(unit)
+
+        return tuple(units)
 
     @property
     def napari_metadata(self) -> dict:
