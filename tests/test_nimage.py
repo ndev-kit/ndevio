@@ -27,10 +27,10 @@ def test_nImage_init(resources_dir: Path):
     assert img.reader is not None
     # Shape is (T, C, Z, Y, X) = (1, 2, 60, 66, 85)
     assert img.data.shape == (1, 2, 60, 66, 85)
-    # napari_layer_data should not be loaded until accessed
-    assert img._napari_layer_data is None
+    # layer_data should not be loaded until accessed
+    assert img._layer_data is None
     # Accessing the property triggers lazy loading
-    assert img.napari_layer_data is not None
+    assert img.layer_data is not None
 
 
 def test_nImage_ome_reader(resources_dir: Path):
@@ -115,11 +115,11 @@ def test_nImage_determine_in_memory_large_file(resources_dir: Path):
 def test_get_layer_data(resources_dir: Path):
     """Test loading napari layer data in memory."""
     img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-    img._load_napari_layer_data()
-    # napari_layer_data will be squeezed
+    img._load_layer_data()
+    # layer_data will be squeezed
     # Original shape (1, 2, 60, 66, 85) -> (2, 60, 66, 85)
-    assert img.napari_layer_data.shape == (2, 60, 66, 85)
-    assert img.napari_layer_data.dims == ('C', 'Z', 'Y', 'X')
+    assert img.layer_data.shape == (2, 60, 66, 85)
+    assert img.layer_data.dims == ('C', 'Z', 'Y', 'X')
 
 
 def test_get_layer_data_not_in_memory(resources_dir: Path):
@@ -127,10 +127,10 @@ def test_get_layer_data_not_in_memory(resources_dir: Path):
     import dask
 
     img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-    img._load_napari_layer_data(in_memory=False)
-    assert img.napari_layer_data is not None
+    img._load_layer_data(in_memory=False)
+    assert img.layer_data is not None
     # check that the data is a dask array
-    assert isinstance(img.napari_layer_data.data, dask.array.core.Array)
+    assert isinstance(img.layer_data.data, dask.array.core.Array)
 
 
 def test_get_layer_data_tuples_basic(resources_dir: Path):
@@ -233,9 +233,9 @@ def test_get_layer_data_mosaic_tile_in_memory(resources_dir: Path):
             [1, 2, 3]
         )
         img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-        img._load_napari_layer_data(in_memory=True)
-        assert img.napari_layer_data is not None
-        assert img.napari_layer_data.shape == (3,)
+        img._load_layer_data(in_memory=True)
+        assert img.layer_data is not None
+        assert img.layer_data.shape == (3,)
 
 
 def test_get_layer_data_mosaic_tile_not_in_memory(
@@ -251,9 +251,9 @@ def test_get_layer_data_mosaic_tile_not_in_memory(
             xr.DataArray([1, 2, 3])
         )
         img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-        img._load_napari_layer_data(in_memory=False)
-        assert img.napari_layer_data is not None
-        assert img.napari_layer_data.shape == (3,)
+        img._load_layer_data(in_memory=False)
+        assert img.layer_data is not None
+        assert img.layer_data.shape == (3,)
 
 
 @pytest.mark.parametrize(

@@ -43,8 +43,6 @@ class nImage(BioImage):
 
     Attributes
     ----------
-    layer_data_tuples : list[tuple] | None
-        Cached layer data tuples from get_layer_data_tuples().
     See BioImage for inherited attributes.
     """
 
@@ -85,7 +83,7 @@ class nImage(BioImage):
             raise
 
         # Private cache attributes (accessed via properties)
-        self._napari_layer_data: xr.DataArray | None = None
+        self._layer_data: xr.DataArray | None = None
         self.path = image if isinstance(image, (str | Path)) else None
 
     def _get_preferred_reader_list(self) -> list[type[Reader]] | None:
@@ -178,7 +176,7 @@ class nImage(BioImage):
         )
 
     @property
-    def napari_layer_data(self) -> xr.DataArray | None:
+    def layer_data(self) -> xr.DataArray | None:
         """
         Image data as xarray DataArray for napari layer creation.
 
@@ -191,11 +189,11 @@ class nImage(BioImage):
             Squeezed image data, or None if loading failed.
 
         """
-        if self._napari_layer_data is None:
-            self._load_napari_layer_data(in_memory=None)
-        return self._napari_layer_data
+        if self._layer_data is None:
+            self._load_layer_data(in_memory=None)
+        return self._layer_data
 
-    def _load_napari_layer_data(self, in_memory: bool | None = None) -> None:
+    def _load_layer_data(self, in_memory: bool | None = None) -> None:
         """
         Load and cache the image data as an xarray DataArray.
 
@@ -212,11 +210,9 @@ class nImage(BioImage):
         if DimensionNames.MosaicTile in self.reader.dims.order:
             try:
                 if in_memory:
-                    self._napari_layer_data = (
-                        self.reader.mosaic_xarray_data.squeeze()
-                    )
+                    self._layer_data = self.reader.mosaic_xarray_data.squeeze()
                 else:
-                    self._napari_layer_data = (
+                    self._layer_data = (
                         self.reader.mosaic_xarray_dask_data.squeeze()
                     )
 
@@ -224,14 +220,12 @@ class nImage(BioImage):
                 logger.warning(
                     'Bioio: Mosaic tile switching not supported for this reader'
                 )
-                self._napari_layer_data = None
+                self._layer_data = None
         else:
             if in_memory:
-                self._napari_layer_data = self.reader.xarray_data.squeeze()
+                self._layer_data = self.reader.xarray_data.squeeze()
             else:
-                self._napari_layer_data = (
-                    self.reader.xarray_dask_data.squeeze()
-                )
+                self._layer_data = self.reader.xarray_dask_data.squeeze()
 
     def _infer_layer_type(self, channel_name: str) -> str:
         """Infer layer type from channel name."""
@@ -241,129 +235,93 @@ class nImage(BioImage):
         return 'image'
 
     @property
-    def napari_scale(self) -> tuple[float, ...] | None:
+    def layer_scale(self) -> tuple[float, ...] | None:
         """
         Physical scale for dimensions present in napari layer data.
 
-        Uses napari_axis_labels to determine which dimensions are actually
+        Uses layer_axis_labels to determine which dimensions are actually
         present after squeezing, then extracts scale values from BioImage.scale.
-        Defaults to 1.0 for dimensions without scale metadata.
+        Returns None if scale metadata is unavailable.
 
         Returns
         -------
         tuple[float, ...] | None
-            Scale tuple matching dimensions in napari_axis_labels, or None
-            if no dimensions present. Each value is either the physical scale
-            or 1.0 if scale metadata is unavailable.
-
-        Examples
-        --------
-        >>> img = nImage("timelapse.tiff")  # T=3, Z=1, Y=10, X=10
-        >>> # After squeezing, Z is removed
-        >>> img.napari_axis_labels
-        ('T', 'Y', 'X')
-        >>> img.napari_scale
-        (2.0, 0.2, 0.2)  # T in seconds, Y/X in microns
-
-        Notes
-        -----
-        Uses napari_axis_labels as source of truth - only returns scale for
-        dimensions actually present in the squeezed napari_layer_data.
+            Scale tuple matching dimensions in layer_axis_labels, or None
+            if scale metadata is unavailable.
 
         """
-        axis_labels = self.napari_axis_labels
+        axis_labels = self.layer_axis_labels
         if not axis_labels:
             return None
 
-        # From BioImage.scale get the value for each dim present, default to 1.0 if None
-        scale_values = []
-        for dim in axis_labels:
-            scale_val = getattr(self.scale, dim, None)
-            scale_values.append(scale_val if scale_val is not None else 1.0)
+        # physical_pixel_sizes is the source - if None, scale will fail
+        if self.physical_pixel_sizes is None:
+            return None
 
-        return tuple(scale_values)
+        return tuple(getattr(self.scale, dim, None) for dim in axis_labels)
 
     @property
-    def napari_axis_labels(self) -> tuple[str, ...]:
+    def layer_axis_labels(self) -> tuple[str, ...] | None:
         """
         Axis labels for napari layers (dims without Channel).
 
-        Returns the dimension names from napari_layer_data, excluding
+        Returns the dimension names from layer_data, excluding
         the Channel dimension since channels are split into separate layers.
         Also excludes Samples dimension (for RGB images).
 
         Returns
         -------
-        tuple[str, ...]
-            Tuple of dimension names (e.g., ('Z', 'Y', 'X') for 3D image).
+        tuple[str, ...] | None
+            Tuple of dimension names (e.g., ('Z', 'Y', 'X') for 3D image),
+            or None if layer_data is unavailable.
 
         Examples
         --------
         >>> img = nImage("multichannel.tiff")  # Shape (C=2, Z=10, Y=100, X=100)
-        >>> img.napari_axis_labels
+        >>> img.layer_axis_labels
         ('Z', 'Y', 'X')  # Channel excluded
 
         """
-        if self.napari_layer_data is None:
-            return ()
+        data = self.layer_data
+        if data is None:
+            return None
 
         return tuple(
             dim
-            for dim in self.napari_layer_data.dims
-            if dim != DimensionNames.Channel and dim != DimensionNames.Samples
+            for dim in data.dims
+            if dim not in (DimensionNames.Channel, DimensionNames.Samples)
         )
 
     @property
-    def napari_axis_units(self) -> tuple[str | None, ...] | None:
+    def layer_units(self) -> tuple[str | None, ...] | None:
         """
         Physical units for dimensions present in napari layer data.
 
-        Uses napari_axis_labels to determine which dimensions are actually
-        present after squeezing, then extracts units from dimension_properties.
-        Common units: µm (spatial), s (time).
+        Uses layer_axis_labels to determine which dimensions are present,
+        then extracts units from dimension_properties.
 
         Returns
         -------
         tuple[str | None, ...] | None
-            Unit strings matching napari_axis_labels order, or None if no
-            dimensions present. Elements can be None for dimensions without
-            unit metadata.
-
-        Examples
-        --------
-        >>> img = nImage("timelapse.tiff")  # T=3, Z=1, Y=10, X=10
-        >>> # After squeezing, Z is removed
-        >>> img.napari_axis_labels
-        ('T', 'Y', 'X')
-        >>> img.napari_axis_units
-        ('s', 'µm', 'µm')  # seconds for T, microns for spatial
-
-        Notes
-        -----
-        Uses napari_axis_labels as source of truth - only returns units for
-        dimensions actually present in the squeezed napari_layer_data.
+            Unit strings matching layer_axis_labels order, or None if
+            unavailable.
 
         """
-        axis_labels = self.napari_axis_labels
+        axis_labels = self.layer_axis_labels
         if not axis_labels:
             return None
 
-        try:
-            dim_props = self.dimension_properties
-        except AttributeError:
+        dim_props = getattr(self, 'dimension_properties', None)
+        if dim_props is None:
             return None
 
-        # Get unit for each dimension present
-        units = []
-        for dim in axis_labels:
-            dim_prop = getattr(dim_props, dim, None)
-            unit = dim_prop.unit if dim_prop else None
-            units.append(unit)
-
-        return tuple(units)
+        return tuple(
+            getattr(getattr(dim_props, dim, None), 'unit', None)
+            for dim in axis_labels
+        )
 
     @property
-    def napari_metadata(self) -> dict:
+    def layer_metadata(self) -> dict:
         """
         Base metadata dict for napari layers.
 
@@ -587,15 +545,16 @@ class nImage(BioImage):
         """
         # Load image data if not already loaded
         # or reload if in_memory explicitly specified
-        if self._napari_layer_data is None or in_memory is not None:
-            self._load_napari_layer_data(in_memory=in_memory)
+        if self._layer_data is None or in_memory is not None:
+            self._load_layer_data(in_memory=in_memory)
 
         if layer_type is not None:
             channel_types = None  # Global override ignores per-channel
 
-        base_metadata = self.napari_metadata
-        scale = self.napari_scale
-        axis_labels = self.napari_axis_labels
+        base_metadata = self.layer_metadata
+        scale = self.layer_scale
+        axis_labels = self.layer_axis_labels
+        units = self.layer_units
         channel_dim = DimensionNames.Channel
 
         # Handle RGB images specially (no axis_labels, uses 'rgb' flag)
@@ -609,14 +568,16 @@ class nImage(BioImage):
                 meta['scale'] = scale
             if axis_labels:
                 meta['axis_labels'] = axis_labels
-            return [(self.napari_layer_data.data, meta, 'image')]
+            if units:
+                meta['units'] = units
+            return [(self.layer_data.data, meta, 'image')]
 
         # Single channel image (no channel dimension to split)
-        if channel_dim not in self.napari_layer_data.dims:
+        if channel_dim not in self.layer_data.dims:
             # Try to get channel name from coords for label detection
             channel_name = None
-            if channel_dim in self.napari_layer_data.coords:
-                coord = self.napari_layer_data.coords[channel_dim]
+            if channel_dim in self.layer_data.coords:
+                coord = self.layer_data.coords[channel_dim]
                 if coord.size == 1:
                     channel_name = str(coord.item())
 
@@ -625,7 +586,7 @@ class nImage(BioImage):
             )
             return [
                 self._build_single_layer_tuple(
-                    data=self.napari_layer_data.data,
+                    data=self.layer_data.data,
                     layer_type=effective_type,
                     base_metadata=base_metadata,
                     scale=scale,
@@ -636,11 +597,10 @@ class nImage(BioImage):
 
         # Multichannel image - always split into separate layers
         channel_names = [
-            str(c)
-            for c in self.napari_layer_data.coords[channel_dim].data.tolist()
+            str(c) for c in self.layer_data.coords[channel_dim].data.tolist()
         ]
-        channel_axis = self.napari_layer_data.dims.index(channel_dim)
-        total_channels = self.napari_layer_data.shape[channel_axis]
+        channel_axis = self.layer_data.dims.index(channel_dim)
+        total_channels = self.layer_data.shape[channel_axis]
 
         layer_tuples = []
         for i in range(total_channels):
@@ -652,9 +612,9 @@ class nImage(BioImage):
             )
 
             # Slice data along channel axis to extract single channel
-            slices = [slice(None)] * self.napari_layer_data.ndim
+            slices = [slice(None)] * self.layer_data.ndim
             slices[channel_axis] = i
-            channel_data = self.napari_layer_data.data[tuple(slices)]
+            channel_data = self.layer_data.data[tuple(slices)]
 
             layer_tuples.append(
                 self._build_single_layer_tuple(
