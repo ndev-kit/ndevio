@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from unittest import mock
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from bioio_base.exceptions import UnsupportedFileFormatError
@@ -580,92 +580,85 @@ class TestPreferredReaderFallback:
 
     def test_preferred_reader_success(self, resources_dir: Path):
         """Test that preferred reader is used when it works."""
-        with patch(
-            'ndevio.nimage.nImage._get_preferred_reader_list'
-        ) as mock_get:
+        with patch('ndevio.nimage._resolve_reader') as mock_resolve:
             # Mock returning a valid reader
             from bioio_tifffile import Reader
 
-            mock_get.return_value = [Reader]
+            mock_resolve.return_value = Reader
 
             img = nImage(str(resources_dir / 'cells3d2ch_legacy.tiff'))
 
-            # Verify preferred reader was attempted
-            mock_get.assert_called_once()
+            # Verify _resolve_reader was called
+            mock_resolve.assert_called_once()
             assert img is not None
             assert img.reader.name == 'bioio_tifffile'
 
     def test_preferred_reader_fallback(self, resources_dir: Path):
         """Test that failed preferred reader will fallback"""
-        with patch(
-            'ndevio.nimage.nImage._get_preferred_reader_list'
-        ) as mock_get:
-            # Mock returning a valid reader
+        with patch('ndevio.nimage._resolve_reader') as mock_resolve:
+            # Mock returning a reader that won't work for this file
             from bioio_czi import Reader
 
-            mock_get.return_value = [Reader]
+            mock_resolve.return_value = Reader
 
             img = nImage(str(resources_dir / 'cells3d2ch_legacy.tiff'))
 
-            # Verify preferred reader was attempted
-            mock_get.assert_called_once()
+            # Verify _resolve_reader was called
+            mock_resolve.assert_called_once()
             assert img is not None
+            # Should have fallen back to bioio's default (ome-tiff)
             assert img.reader.name == 'bioio_ome_tiff'
 
     def test_no_preferred_reader_uses_default(self, resources_dir: Path):
         """Test that no preferred reader uses bioio's default priority."""
-        with patch(
-            'ndevio.nimage.nImage._get_preferred_reader_list'
-        ) as mock_get:
-            mock_get.return_value = None  # No preferred reader
+        with patch('ndevio.nimage._resolve_reader') as mock_resolve:
+            mock_resolve.return_value = None  # No preferred reader
 
             img = nImage(str(resources_dir / 'cells3d2ch_legacy.tiff'))
             assert img is not None
-            mock_get.assert_called_once()
+            mock_resolve.assert_called_once()
             assert img.reader.name == 'bioio_ome_tiff'
 
 
-class TestGetPreferredReaderList:
-    """Tests for _get_preferred_reader_list method."""
+class TestResolveReaderFunction:
+    """Tests for _resolve_reader and _get_preferred_reader_for_path functions."""
 
-    def test_returns_none_when_no_preferred_reader(self, resources_dir: Path):
+    def test_returns_none_when_no_preferred_reader(self):
         """Test returns None when preferred_reader is not set."""
-        with patch('ndev_settings.get_settings') as mock_settings:
-            mock_settings.return_value.ndevio_reader.preferred_reader = None
+        from ndevio.nimage import _get_preferred_reader_for_path
 
-            img = nImage.__new__(nImage)
-            img.settings = mock_settings.return_value
+        with patch('ndev_settings.get_settings') as mock_get_settings:
+            mock_get_settings.return_value.ndevio_reader.preferred_reader = (
+                None
+            )
 
-            result = img._get_preferred_reader_list()
+            result = _get_preferred_reader_for_path('test.tiff')
             assert result is None
 
-    def test_returns_none_when_preferred_not_installed(
-        self, resources_dir: Path
-    ):
+    def test_returns_none_when_preferred_not_installed(self):
         """Test returns None when preferred reader is not installed."""
+        from ndevio.nimage import _get_preferred_reader_for_path
+
         with (
-            patch('ndev_settings.get_settings') as mock_settings,
+            patch('ndev_settings.get_settings') as mock_get_settings,
             patch(
                 'ndevio._bioio_plugin_utils.get_installed_plugins',
                 return_value={'bioio-ome-tiff', 'bioio-tifffile'},
             ),
         ):
-            mock_settings.return_value.ndevio_reader.preferred_reader = (
+            mock_get_settings.return_value.ndevio_reader.preferred_reader = (
                 'bioio-czi'
             )
 
-            img = nImage.__new__(nImage)
-            img.settings = mock_settings.return_value
-
-            result = img._get_preferred_reader_list()
+            result = _get_preferred_reader_for_path('test.tiff')
             assert result is None
 
-    def test_returns_reader_when_preferred_installed(
-        self, resources_dir: Path
-    ):
+    def test_returns_reader_when_preferred_installed(self):
         """Test returns reader class when preferred reader is installed."""
+        from ndevio.nimage import _get_preferred_reader_for_path
+
         with (
-            patch('ndev_settings.get_settings') as mock_settings,
+            patch('ndev_settings.get_settings') as mock_get_settings,
             patch(
                 'ndevio._bioio_plugin_utils.get_installed_plugins',
                 return_value={'bioio-ome-tiff'},
@@ -677,16 +670,40 @@ class TestGetPreferredReaderList:
             from bioio_ome_tiff import Reader as OmeTiffReader
 
             mock_get_reader.return_value = OmeTiffReader
-            mock_settings.return_value.ndevio_reader.preferred_reader = (
+            mock_get_settings.return_value.ndevio_reader.preferred_reader = (
                 'bioio-ome-tiff'
             )
 
-            img = nImage.__new__(nImage)
-            img.settings = mock_settings.return_value
-
-            result = img._get_preferred_reader_list()
-            assert result == [OmeTiffReader]
+            result = _get_preferred_reader_for_path('test.tiff')
+            assert result == OmeTiffReader
             mock_get_reader.assert_called_once_with('bioio-ome-tiff')
+
+    def test_explicit_reader_bypasses_settings(self):
+        """Test that explicit reader bypasses settings lookup."""
+        from bioio_tifffile import Reader as TifffileReader
+
+        from ndevio.nimage import _resolve_reader
+
+        with patch('ndevio.nimage._get_preferred_reader_for_path') as mock_get:
+            result = _resolve_reader('test.tiff', TifffileReader)
+
+            # Should return explicit reader without checking settings
+            assert result == TifffileReader
+            mock_get.assert_not_called()
+
+    def test_array_input_returns_none(self):
+        """Test that array inputs don't trigger preferred reader lookup."""
+        import numpy as np
+
+        from ndevio.nimage import _resolve_reader
+
+        with patch('ndevio.nimage._get_preferred_reader_for_path') as mock_get:
+            arr = np.zeros((10, 10), dtype=np.uint8)
+            result = _resolve_reader(arr, None)
+
+            # Should return None without checking settings for arrays
+            assert result is None
+            mock_get.assert_not_called()
 
 
 class TestRaiseWithSuggestions:
@@ -733,17 +750,19 @@ class TestNonPathImageHandling:
         """Test that arrays don't trigger preferred reader logic."""
         import numpy as np
 
-        with patch(
-            'ndevio.nimage.nImage._get_preferred_reader_list'
-        ) as mock_get:
+        with patch('ndevio.nimage._resolve_reader') as mock_resolve:
             # Create a simple array
             arr = np.zeros((10, 10), dtype=np.uint8)
 
-            # This should work without calling _get_preferred_reader_list
+            # This should work
             img = nImage(arr)
             assert img is not None
-            # Should not call _get_preferred_reader_list for arrays
-            mock_get.assert_not_called()
+
+            # _resolve_reader should have been called but returned None
+            mock_resolve.assert_called_once()
+            # First arg is the image, second is explicit_reader (None)
+            call_args = mock_resolve.call_args
+            assert call_args[0][1] is None  # explicit_reader is None
 
     def test_unsupported_array_raises_without_suggestions(self):
         """Test that unsupported arrays raise error without plugin suggestions."""
@@ -766,35 +785,31 @@ class TestExplicitReaderParameter:
         """Test that explicit reader parameter bypasses preferred reader."""
         from bioio_tifffile import Reader as TifffileReader
 
-        with patch(
-            'ndevio.nimage.nImage._get_preferred_reader_list'
-        ) as mock_get:
-            # Explicit reader should bypass preferred
+        with patch('ndevio.nimage._resolve_reader') as mock_resolve:
+            mock_resolve.return_value = TifffileReader
+
+            # Explicit reader should be used directly
             img = nImage(
                 str(resources_dir / 'cells3d2ch_legacy.tiff'),
                 reader=TifffileReader,
             )
 
             assert img is not None
-            # Should not check for preferred reader when explicit reader provided
-            mock_get.assert_not_called()
+            # _resolve_reader should return the explicit reader
+            mock_resolve.assert_called_once()
+            call_args = mock_resolve.call_args
+            assert call_args[0][1] == TifffileReader  # explicit_reader
 
     def test_explicit_reader_fails_falls_back(self, resources_dir: Path):
         """Test explicit reader that fails falls back to default."""
-        mock_reader = MagicMock()
-        mock_reader.side_effect = UnsupportedFileFormatError(
-            reader_name='mock', path='test'
+        from bioio_czi import Reader as CziReader
+
+        # Use CZI reader on a TIFF file - it should fail and fall back
+        img = nImage(
+            str(resources_dir / 'cells3d2ch_legacy.tiff'),
+            reader=CziReader,
         )
 
-        with patch(
-            'ndevio.nimage.nImage._get_preferred_reader_list'
-        ) as mock_get:
-            # Even with explicit reader that fails, should fall back
-            img = nImage(
-                str(resources_dir / 'cells3d2ch_legacy.tiff'),
-                reader=mock_reader,
-            )
-
-            assert img is not None
-            # Should not check preferred when explicit reader provided
-            mock_get.assert_not_called()
+        assert img is not None
+        # Should have fallen back to bioio's default
+        assert img.reader.name == 'bioio_ome_tiff'
