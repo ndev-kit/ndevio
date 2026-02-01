@@ -185,8 +185,8 @@ class nImage(BioImage):
 
         Returns
         -------
-        xr.DataArray | None
-            Squeezed image data, or None if loading failed.
+        xr.DataArray
+            Squeezed image data.
 
         """
         if self._layer_data is None:
@@ -235,33 +235,52 @@ class nImage(BioImage):
         return 'image'
 
     @property
-    def layer_scale(self) -> tuple[float, ...] | None:
+    def layer_scale(self) -> tuple[float, ...]:
         """
         Physical scale for dimensions present in napari layer data.
 
         Uses layer_axis_labels to determine which dimensions are actually
         present after squeezing, then extracts scale values from BioImage.scale.
-        Returns None if scale metadata is unavailable.
+        Defaults to 1.0 for dimensions without scale metadata.
 
         Returns
         -------
-        tuple[float, ...] | None
-            Scale tuple matching dimensions in layer_axis_labels, or None
-            if scale metadata is unavailable.
+        tuple[float, ...]
+            Scale tuple matching dimensions in layer_axis_labels. Each value
+            is either the physical scale or 1.0 if scale metadata is unavailable.
+
+        Examples
+        --------
+        >>> img = nImage("timelapse.tiff")  # T=3, Z=1, Y=10, X=10
+        >>> # After squeezing, Z is removed
+        >>> img.layer_axis_labels
+        ('T', 'Y', 'X')
+        >>> img.layer_scale
+        (2.0, 0.2, 0.2)  # T in seconds, Y/X in microns
+
+        Notes
+        -----
+        Uses layer_axis_labels as source of truth - only returns scale for
+        dimensions actually present in the squeezed layer_data.
 
         """
         axis_labels = self.layer_axis_labels
-        if not axis_labels:
-            return None
 
-        # physical_pixel_sizes is the source - if None, scale will fail
-        if self.physical_pixel_sizes is None:
-            return None
+        # Try to get scale from BioImage - may fail for array-like inputs
+        # where physical_pixel_sizes is None
+        try:
+            bio_scale = self.scale
+        except AttributeError:
+            # No scale metadata available, default to 1.0 for all dimensions
+            return tuple(1.0 for _ in axis_labels)
 
-        return tuple(getattr(self.scale, dim, None) for dim in axis_labels)
+        # From BioImage.scale get the value for each dim present, default to 1.0 if None
+        return tuple(
+            getattr(bio_scale, dim, None) or 1.0 for dim in axis_labels
+        )
 
     @property
-    def layer_axis_labels(self) -> tuple[str, ...] | None:
+    def layer_axis_labels(self) -> tuple[str, ...]:
         """
         Axis labels for napari layers (dims without Channel).
 
@@ -271,9 +290,8 @@ class nImage(BioImage):
 
         Returns
         -------
-        tuple[str, ...] | None
-            Tuple of dimension names (e.g., ('Z', 'Y', 'X') for 3D image),
-            or None if layer_data is unavailable.
+        tuple[str, ...]
+            Tuple of dimension names (e.g., ('Z', 'Y', 'X') for 3D image).
 
         Examples
         --------
@@ -282,18 +300,14 @@ class nImage(BioImage):
         ('Z', 'Y', 'X')  # Channel excluded
 
         """
-        data = self.layer_data
-        if data is None:
-            return None
-
         return tuple(
-            dim
-            for dim in data.dims
+            str(dim)
+            for dim in self.layer_data.dims
             if dim not in (DimensionNames.Channel, DimensionNames.Samples)
         )
 
     @property
-    def layer_units(self) -> tuple[str | None, ...] | None:
+    def layer_units(self) -> tuple[str | None, ...]:
         """
         Physical units for dimensions present in napari layer data.
 
@@ -302,21 +316,38 @@ class nImage(BioImage):
 
         Returns
         -------
-        tuple[str | None, ...] | None
-            Unit strings matching layer_axis_labels order, or None if
-            unavailable.
+        tuple[str | None, ...]
+            Unit strings matching layer_axis_labels order. Elements can be
+            None for dimensions without unit metadata.
+
+        Examples
+        --------
+        >>> img = nImage("timelapse.tiff")  # T=3, Z=1, Y=10, X=10
+        >>> # After squeezing, Z is removed
+        >>> img.layer_axis_labels
+        ('T', 'Y', 'X')
+        >>> img.layer_units
+        ('s', 'µm', 'µm')  # seconds for T, microns for spatial
+
+        Notes
+        -----
+        Uses layer_axis_labels as source of truth - only returns units for
+        dimensions actually present in the squeezed layer_data.
 
         """
         axis_labels = self.layer_axis_labels
-        if not axis_labels:
-            return None
 
-        dim_props = getattr(self, 'dimension_properties', None)
-        if dim_props is None:
-            return None
+        try:
+            dim_props = self.dimension_properties
+        except AttributeError:
+            # No dimension_properties available, return None for each dimension
+            return tuple(None for _ in axis_labels)
 
+        # Get unit for each dimension present
         return tuple(
-            getattr(getattr(dim_props, dim, None), 'unit', None)
+            getattr(dim_props, dim, None).unit
+            if getattr(dim_props, dim, None)
+            else None
             for dim in axis_labels
         )
 
