@@ -600,23 +600,23 @@ class TestPreferredReaderFallback:
 
 
 class TestResolveReaderFunction:
-    """Tests for _resolve_reader and _get_preferred_reader_for_path functions."""
+    """Tests for _resolve_reader function."""
 
     def test_returns_none_when_no_preferred_reader(self):
         """Test returns None when preferred_reader is not set."""
-        from ndevio.nimage import _get_preferred_reader_for_path
+        from ndevio.nimage import _resolve_reader
 
         with patch('ndev_settings.get_settings') as mock_get_settings:
             mock_get_settings.return_value.ndevio_reader.preferred_reader = (
                 None
             )
 
-            result = _get_preferred_reader_for_path('test.tiff')
+            result = _resolve_reader('test.tiff', None)
             assert result is None
 
     def test_returns_none_when_preferred_not_installed(self):
         """Test returns None when preferred reader is not installed."""
-        from ndevio.nimage import _get_preferred_reader_for_path
+        from ndevio.nimage import _resolve_reader
 
         with (
             patch('ndev_settings.get_settings') as mock_get_settings,
@@ -629,12 +629,12 @@ class TestResolveReaderFunction:
                 'bioio-czi'
             )
 
-            result = _get_preferred_reader_for_path('test.tiff')
+            result = _resolve_reader('test.tiff', None)
             assert result is None
 
     def test_returns_reader_when_preferred_installed(self):
         """Test returns reader class when preferred reader is installed."""
-        from ndevio.nimage import _get_preferred_reader_for_path
+        from ndevio.nimage import _resolve_reader
 
         with (
             patch('ndev_settings.get_settings') as mock_get_settings,
@@ -653,7 +653,7 @@ class TestResolveReaderFunction:
                 'bioio-ome-tiff'
             )
 
-            result = _get_preferred_reader_for_path('test.tiff')
+            result = _resolve_reader('test.tiff', None)
             assert result == OmeTiffReader
             mock_get_reader.assert_called_once_with('bioio-ome-tiff')
 
@@ -663,12 +663,12 @@ class TestResolveReaderFunction:
 
         from ndevio.nimage import _resolve_reader
 
-        with patch('ndevio.nimage._get_preferred_reader_for_path') as mock_get:
+        with patch('ndev_settings.get_settings') as mock_get_settings:
             result = _resolve_reader('test.tiff', TifffileReader)
 
             # Should return explicit reader without checking settings
             assert result == TifffileReader
-            mock_get.assert_not_called()
+            mock_get_settings.assert_not_called()
 
     def test_array_input_returns_none(self):
         """Test that array inputs don't trigger preferred reader lookup."""
@@ -676,13 +676,13 @@ class TestResolveReaderFunction:
 
         from ndevio.nimage import _resolve_reader
 
-        with patch('ndevio.nimage._get_preferred_reader_for_path') as mock_get:
+        with patch('ndev_settings.get_settings') as mock_get_settings:
             arr = np.zeros((10, 10), dtype=np.uint8)
             result = _resolve_reader(arr, None)
 
             # Should return None without checking settings for arrays
             assert result is None
-            mock_get.assert_not_called()
+            mock_get_settings.assert_not_called()
 
 
 class TestNonPathImageHandling:

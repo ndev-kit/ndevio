@@ -27,39 +27,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _get_preferred_reader_for_path(
-    path: str | Path,
-) -> type[Reader] | None:
-    """Get preferred reader for a file path from settings.
-
-    Parameters
-    ----------
-    path : str | Path
-        Path to check preferred reader for.
-
-    Returns
-    -------
-    type[Reader] | None
-        Reader class if preferred is set and installed, else None.
-
-    """
-    from ndev_settings import get_settings
-
-    from ._bioio_plugin_utils import get_installed_plugins, get_reader_by_name
-
-    settings = get_settings()
-    preferred = settings.ndevio_reader.preferred_reader  # type: ignore
-
-    if not preferred:
-        return None
-
-    if preferred not in get_installed_plugins():
-        logger.debug('Preferred reader %s not installed', preferred)
-        return None
-
-    return get_reader_by_name(preferred)
-
-
 def _resolve_reader(
     image: ImageLike,
     explicit_reader: type[Reader] | Sequence[type[Reader]] | None,
@@ -91,7 +58,22 @@ def _resolve_reader(
     if not isinstance(image, str | Path):
         return None
 
-    return _get_preferred_reader_for_path(image)
+    # Get preferred reader from settings
+    from ndev_settings import get_settings
+
+    from ._bioio_plugin_utils import get_installed_plugins, get_reader_by_name
+
+    settings = get_settings()
+    preferred = settings.ndevio_reader.preferred_reader  # type: ignore
+
+    if not preferred:
+        return None
+
+    if preferred not in get_installed_plugins():
+        logger.debug('Preferred reader %s not installed', preferred)
+        return None
+
+    return get_reader_by_name(preferred)
 
 
 class nImage(BioImage):
