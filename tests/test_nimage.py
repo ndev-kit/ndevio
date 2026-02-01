@@ -91,27 +91,6 @@ def test_nImage_save_read(resources_dir: Path, tmp_path: Path):
     assert new_img.channel_names == ['test1', 'test2']
 
 
-def test_determine_in_memory(resources_dir: Path):
-    """Test in-memory determination for small files."""
-    img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-    assert img._determine_in_memory() is True
-
-
-def test_nImage_determine_in_memory_large_file(resources_dir: Path):
-    """Test in-memory determination for large files."""
-    img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-    with (
-        mock.patch(
-            'psutil.virtual_memory', return_value=mock.Mock(available=1e9)
-        ),
-        mock.patch(
-            'bioio_base.io.pathlike_to_fs',
-            return_value=(mock.Mock(size=lambda x: 5e9), ''),
-        ),
-    ):
-        assert img._determine_in_memory() is False
-
-
 def test_get_layer_data(resources_dir: Path):
     """Test loading napari layer data in memory."""
     img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
@@ -704,43 +683,6 @@ class TestResolveReaderFunction:
             # Should return None without checking settings for arrays
             assert result is None
             mock_get.assert_not_called()
-
-
-class TestRaiseWithSuggestions:
-    """Tests for _raise_with_suggestions method."""
-
-    def test_raises_with_suggestions_enabled(self):
-        """Test error message includes suggestions when enabled."""
-        with patch('ndev_settings.get_settings') as mock_settings:
-            mock_settings.return_value.ndevio_reader.suggest_reader_plugins = (
-                True
-            )
-
-            img = nImage.__new__(nImage)
-            img.settings = mock_settings.return_value
-
-            with pytest.raises(UnsupportedFileFormatError) as exc_info:
-                img._raise_with_suggestions('test.czi')
-
-            error_msg = str(exc_info.value)
-            assert 'bioio-czi' in error_msg
-
-    def test_raises_without_suggestions_when_disabled(self):
-        """Test error message has no suggestions when disabled."""
-        with patch('ndev_settings.get_settings') as mock_settings:
-            mock_settings.return_value.ndevio_reader.suggest_reader_plugins = (
-                False
-            )
-
-            img = nImage.__new__(nImage)
-            img.settings = mock_settings.return_value
-
-            with pytest.raises(UnsupportedFileFormatError) as exc_info:
-                img._raise_with_suggestions('test.czi')
-
-            error_msg = str(exc_info.value)
-            # Should still mention the file but not include installation message
-            assert 'test.czi' in error_msg
 
 
 class TestNonPathImageHandling:

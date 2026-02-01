@@ -11,7 +11,14 @@ import xarray as xr
 from bioio import BioImage
 from bioio_base.dimensions import DimensionNames
 from bioio_base.reader import Reader
-from bioio_base.types import ImageLike, PathLike
+from bioio_base.types import ImageLike
+
+from ._layer_utils import (
+    build_layer_tuple,
+    determine_in_memory,
+    resolve_layer_type,
+)
+from ._plugin_manager import raise_unsupported_with_suggestions
 
 if TYPE_CHECKING:
     from napari.types import LayerDataTuple
@@ -19,9 +26,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 DELIM = ' :: '
-
-# Keywords that indicate a channel contains labels/segmentation data
-LABEL_KEYWORDS = frozenset({'label', 'mask', 'segmentation', 'seg', 'roi'})
 
 
 def _get_preferred_reader_for_path(
@@ -157,82 +161,19 @@ class nImage(BioImage):
                     super().__init__(image=image, reader=None, **kwargs)
                 except UnsupportedFileFormatError:
                     if isinstance(image, str | Path):
-                        self._raise_with_suggestions(image)
+                        raise_unsupported_with_suggestions(image)
                     raise
         else:
             try:
                 super().__init__(image=image, reader=None, **kwargs)
             except UnsupportedFileFormatError:
                 if isinstance(image, str | Path):
-                    self._raise_with_suggestions(image)
+                    raise_unsupported_with_suggestions(image)
                 raise
 
         # Instance state
         self._layer_data = None
         self.path = Path(image) if isinstance(image, str | Path) else None
-
-    def _raise_with_suggestions(self, path: PathLike) -> None:
-        """Raise UnsupportedFileFormatError with installation suggestions."""
-        from bioio_base.exceptions import UnsupportedFileFormatError
-        from ndev_settings import get_settings
-
-        from ._plugin_manager import ReaderPluginManager
-
-        settings = get_settings()
-        manager = ReaderPluginManager(path)
-        msg_extra = (
-            manager.get_installation_message()
-            if settings.ndevio_reader.suggest_reader_plugins  # type: ignore
-            else None
-        )
-
-        raise UnsupportedFileFormatError(
-            reader_name='ndevio',
-            path=str(path),
-            msg_extra=msg_extra,
-        ) from None
-
-    # -------------------------------------------------------------------------
-    # Memory Management
-    # -------------------------------------------------------------------------
-
-    def _determine_in_memory(
-        self,
-        max_in_mem_bytes: float = 4e9,
-        max_in_mem_percent: float = 0.3,
-    ) -> bool:
-        """Determine whether to load image data in memory or as dask array.
-
-        Parameters
-        ----------
-        max_in_mem_bytes : float
-            Maximum file size in bytes for in-memory loading.
-            Default is 4 GB (4e9 bytes).
-        max_in_mem_percent : float
-            Maximum percentage of available memory for in-memory loading.
-            Default is 30%.
-
-        Returns
-        -------
-        bool
-            True if image should be loaded in memory, False for dask array.
-
-        """
-        from bioio_base.io import pathlike_to_fs
-        from psutil import virtual_memory
-
-        # No file path means array data - always in memory
-        if self.path is None:
-            return True
-
-        fs, path_str = pathlike_to_fs(self.path)
-        filesize: int = fs.size(path_str)  # type: ignore[assignment]
-        available_mem = virtual_memory().available
-
-        return (
-            filesize <= max_in_mem_bytes
-            and filesize < max_in_mem_percent * available_mem
-        )
 
     # -------------------------------------------------------------------------
     # Layer Data (cached)
@@ -268,7 +209,7 @@ class nImage(BioImage):
 
         """
         if in_memory is None:
-            in_memory = self._determine_in_memory()
+            in_memory = determine_in_memory(self.path)
 
         if DimensionNames.MosaicTile in self.reader.dims.order:
             try:
@@ -293,15 +234,6 @@ class nImage(BioImage):
     # -------------------------------------------------------------------------
     # Layer Properties (derived from layer_data)
     # -------------------------------------------------------------------------
-
-    def _infer_layer_type(self, channel_name: str) -> str:
-        """Infer layer type from channel name keywords."""
-        name_lower = channel_name.lower()
-        return (
-            'labels'
-            if any(kw in name_lower for kw in LABEL_KEYWORDS)
-            else 'image'
-        )
 
     @property
     def layer_scale(self) -> tuple[float, ...]:
@@ -355,6 +287,8 @@ class nImage(BioImage):
 
         """
         layer_data = self.layer_data
+        if layer_data is None:
+            return ()
 
         return tuple(
             str(dim)
@@ -452,98 +386,6 @@ class nImage(BioImage):
 
         return DELIM.join(parts)
 
-    def _build_single_layer_tuple(
-        self,
-        data,
-        layer_type: str,
-        base_metadata: dict,
-        scale: tuple[float, ...],
-        axis_labels: tuple[str, ...],
-        units: tuple[str | None, ...] | None = None,
-        channel_name: str | None = None,
-        channel_idx: int = 0,
-        total_channels: int = 1,
-        channel_kwargs: dict[str, dict] | None = None,
-        rgb: bool = False,
-    ) -> LayerDataTuple:
-        """Build a single LayerDataTuple for napari.
-
-        Parameters
-        ----------
-        data : ArrayLike
-            Image data for this layer.
-        layer_type : str
-            Layer type ('image', 'labels', etc.).
-        base_metadata : dict
-            Base metadata dict (bioimage, raw_metadata, etc.).
-        scale : tuple[float, ...]
-            Scale for each dimension.
-        axis_labels : tuple[str, ...]
-            Dimension labels.
-        units : tuple[str | None, ...], optional
-            Physical units for each dimension.
-        channel_name : str, optional
-            Channel name for layer naming.
-        channel_idx : int
-            Channel index (for colormap/blending selection). Default 0.
-        total_channels : int
-            Total channels (for colormap selection). Default 1.
-        channel_kwargs : dict[str, dict], optional
-            Per-channel metadata overrides. Maps channel name to dict of
-            napari layer kwargs to override defaults.
-        rgb : bool
-            Whether this is an RGB image (sets rgb=True in metadata).
-
-        Returns
-        -------
-        LayerDataTuple
-            (data, metadata, layer_type) tuple.
-
-        """
-        meta: dict = {
-            'name': self._build_layer_name(channel_name),
-            'metadata': base_metadata,
-            'scale': scale,
-            'axis_labels': axis_labels,
-        }
-
-        if units:
-            meta['units'] = units
-
-        if rgb:
-            meta['rgb'] = True
-        elif layer_type == 'image':
-            # Add colormap/blending for non-RGB images
-            from ._colormap_utils import get_colormap_for_channel
-
-            meta['colormap'] = get_colormap_for_channel(
-                channel_idx, total_channels
-            )
-            meta['blending'] = (
-                'additive'
-                if channel_idx > 0 and total_channels > 1
-                else 'translucent_no_depth'
-            )
-
-        # Apply per-channel overrides
-        if channel_kwargs and channel_name and channel_name in channel_kwargs:
-            meta.update(channel_kwargs[channel_name])
-
-        return (data, meta, layer_type)  # type: ignore[return-value]
-
-    def _resolve_layer_type(
-        self,
-        channel_name: str,
-        layer_type_override: str | None,
-        channel_types: dict[str, str] | None,
-    ) -> str:
-        """Resolve layer type: global override > per-channel > auto-detect."""
-        if layer_type_override is not None:
-            return layer_type_override
-        if channel_types and channel_name in channel_types:
-            return channel_types[channel_name]
-        return self._infer_layer_type(channel_name)
-
     # -------------------------------------------------------------------------
     # Public API
     # -------------------------------------------------------------------------
@@ -615,6 +457,9 @@ class nImage(BioImage):
         if layer_type is not None:
             channel_types = None  # Global override ignores per-channel
 
+        # At this point layer_data is guaranteed to be loaded
+        assert layer_data is not None, 'layer_data should be loaded by now'
+
         base_metadata = self.layer_metadata
         scale = self.layer_scale
         axis_labels = self.layer_axis_labels
@@ -623,14 +468,14 @@ class nImage(BioImage):
         # Handle RGB images (Samples dimension)
         if DimensionNames.Samples in self.reader.dims.order:
             return [
-                self._build_single_layer_tuple(
-                    data=layer_data.data,
+                build_layer_tuple(
+                    layer_data.data,
                     layer_type='image',
-                    base_metadata=base_metadata,
+                    name=self._build_layer_name(),
+                    metadata=base_metadata,
                     scale=scale,
                     axis_labels=axis_labels,
                     units=units,
-                    channel_kwargs=channel_kwargs,
                     rgb=True,
                 )
             ]
@@ -642,19 +487,24 @@ class nImage(BioImage):
             channel_name = self._get_single_channel_name(
                 layer_data, channel_dim
             )
-            effective_type = self._resolve_layer_type(
+            effective_type = resolve_layer_type(
                 channel_name or '', layer_type, channel_types
             )
+            extra_kwargs = (
+                channel_kwargs.get(channel_name)
+                if channel_kwargs and channel_name
+                else None
+            )
             return [
-                self._build_single_layer_tuple(
-                    data=layer_data.data,
+                build_layer_tuple(
+                    layer_data.data,
                     layer_type=effective_type,
-                    base_metadata=base_metadata,
+                    name=self._build_layer_name(channel_name),
+                    metadata=base_metadata,
                     scale=scale,
                     axis_labels=axis_labels,
                     units=units,
-                    channel_name=channel_name,
-                    channel_kwargs=channel_kwargs,
+                    extra_kwargs=extra_kwargs,
                 )
             ]
 
@@ -705,7 +555,7 @@ class nImage(BioImage):
             channel_name = (
                 channel_names[i] if i < len(channel_names) else f'channel_{i}'
             )
-            effective_type = self._resolve_layer_type(
+            effective_type = resolve_layer_type(
                 channel_name, layer_type, channel_types
             )
 
@@ -714,18 +564,22 @@ class nImage(BioImage):
             slices[channel_axis] = i
             channel_data = layer_data.data[tuple(slices)]
 
+            extra_kwargs = (
+                channel_kwargs.get(channel_name) if channel_kwargs else None
+            )
+
             tuples.append(
-                self._build_single_layer_tuple(
-                    data=channel_data,
+                build_layer_tuple(
+                    channel_data,
                     layer_type=effective_type,
-                    base_metadata=base_metadata,
+                    name=self._build_layer_name(channel_name),
+                    metadata=base_metadata,
                     scale=scale,
                     axis_labels=axis_labels,
                     units=units,
-                    channel_name=channel_name,
                     channel_idx=i,
                     total_channels=total_channels,
-                    channel_kwargs=channel_kwargs,
+                    extra_kwargs=extra_kwargs,
                 )
             )
 
