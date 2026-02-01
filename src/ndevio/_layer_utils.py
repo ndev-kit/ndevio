@@ -7,12 +7,48 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import xarray as xr
     from napari.types import LayerDataTuple
 
 logger = logging.getLogger(__name__)
 
 # Keywords that indicate a channel contains labels/segmentation data
 LABEL_KEYWORDS = frozenset({'label', 'mask', 'segmentation', 'seg', 'roi'})
+
+
+def get_single_channel_name(
+    layer_data: xr.DataArray,
+    channel_dim: str,
+) -> str | None:
+    """Extract channel name from coords for single-channel image.
+
+    When an image has been squeezed and no longer has a Channel dimension,
+    the channel name may still be available in the coordinates.
+
+    Parameters
+    ----------
+    layer_data : xr.DataArray
+        The image data array.
+    channel_dim : str
+        Name of the channel dimension (e.g., 'C').
+
+    Returns
+    -------
+    str | None
+        The channel name if found, else None.
+
+    Examples
+    --------
+    >>> # For a squeezed single-channel image with coords
+    >>> get_single_channel_name(data, 'C')
+    'DAPI'
+
+    """
+    if channel_dim in layer_data.coords:
+        coord = layer_data.coords[channel_dim]
+        if coord.size == 1:
+            return str(coord.item())
+    return None
 
 
 def infer_layer_type(channel_name: str) -> str:

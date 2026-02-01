@@ -16,6 +16,7 @@ from bioio_base.types import ImageLike
 from ._layer_utils import (
     build_layer_tuple,
     determine_in_memory,
+    get_single_channel_name,
     resolve_layer_type,
 )
 from ._plugin_manager import raise_unsupported_with_suggestions
@@ -24,8 +25,6 @@ if TYPE_CHECKING:
     from napari.types import LayerDataTuple
 
 logger = logging.getLogger(__name__)
-
-DELIM = ' :: '
 
 
 def _get_preferred_reader_for_path(
@@ -363,28 +362,37 @@ class nImage(BioImage):
         return meta
 
     # -------------------------------------------------------------------------
-    # Layer Tuple Building
+    # Private Helpers
     # -------------------------------------------------------------------------
 
-    def _build_layer_name(
-        self,
-        channel_name: str | None = None,
-        include_scene: bool = True,
-    ) -> str:
-        """Build layer name from channel, scene, and file path."""
-        path_stem = self.path.stem if self.path is not None else 'unknown path'
+    def _build_layer_name(self, channel_name: str | None = None) -> str:
+        """Build layer name from channel, scene, and file path.
 
-        # Skip scene info if only one scene with default name
-        no_scene = len(self.scenes) == 1 and self.current_scene == 'Image:0'
+        Parameters
+        ----------
+        channel_name : str, optional
+            Name of the channel to include in the layer name.
 
+        Returns
+        -------
+        str
+            Formatted layer name like "channel :: 0 :: Image:0 :: filename".
+
+        """
+        delim = ' :: '
         parts: list[str] = []
+
         if channel_name:
             parts.append(channel_name)
-        if include_scene and not no_scene:
+
+        # Include scene info if multi-scene or non-default scene name
+        if len(self.scenes) > 1 or self.current_scene != 'Image:0':
             parts.extend([str(self.current_scene_index), self.current_scene])
+
+        path_stem = self.path.stem if self.path is not None else 'unknown path'
         parts.append(path_stem)
 
-        return DELIM.join(parts)
+        return delim.join(parts)
 
     # -------------------------------------------------------------------------
     # Public API
@@ -484,9 +492,7 @@ class nImage(BioImage):
 
         # Single channel (no C dimension to split)
         if channel_dim not in layer_data.dims:
-            channel_name = self._get_single_channel_name(
-                layer_data, channel_dim
-            )
+            channel_name = get_single_channel_name(layer_data, channel_dim)
             effective_type = resolve_layer_type(
                 channel_name or '', layer_type, channel_types
             )
@@ -509,41 +515,6 @@ class nImage(BioImage):
             ]
 
         # Multichannel - split into separate layers
-        return self._build_multichannel_tuples(
-            layer_data=layer_data,
-            channel_dim=channel_dim,
-            layer_type=layer_type,
-            channel_types=channel_types,
-            channel_kwargs=channel_kwargs,
-            base_metadata=base_metadata,
-            scale=scale,
-            axis_labels=axis_labels,
-            units=units,
-        )
-
-    def _get_single_channel_name(
-        self, layer_data: xr.DataArray, channel_dim: str
-    ) -> str | None:
-        """Extract channel name from coords for single-channel image."""
-        if channel_dim in layer_data.coords:
-            coord = layer_data.coords[channel_dim]
-            if coord.size == 1:
-                return str(coord.item())
-        return None
-
-    def _build_multichannel_tuples(
-        self,
-        layer_data: xr.DataArray,
-        channel_dim: str,
-        layer_type: str | None,
-        channel_types: dict[str, str] | None,
-        channel_kwargs: dict[str, dict] | None,
-        base_metadata: dict,
-        scale: tuple[float, ...],
-        axis_labels: tuple[str, ...],
-        units: tuple[str | None, ...],
-    ) -> list[LayerDataTuple]:
-        """Build layer tuples for each channel in a multichannel image."""
         channel_names = [
             str(c) for c in layer_data.coords[channel_dim].data.tolist()
         ]
