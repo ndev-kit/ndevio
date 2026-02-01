@@ -426,10 +426,12 @@ class nImage(BioImage):
         base_metadata: dict,
         scale: tuple | None,
         axis_labels: tuple[str, ...],
+        units: tuple[str | None, ...] | None = None,
         channel_name: str | None = None,
         channel_idx: int | None = None,
         total_channels: int = 1,
         channel_kwargs: dict[str, dict] | None = None,
+        rgb: bool = False,
     ) -> tuple:
         """
         Build a single layer tuple with appropriate metadata.
@@ -446,6 +448,8 @@ class nImage(BioImage):
             Physical pixel scale, or None.
         axis_labels : tuple[str, ...]
             Dimension labels for this layer (e.g., ('Z', 'Y', 'X')).
+        units : tuple[str | None, ...], optional
+            Physical units for each dimension.
         channel_name : str, optional
             Channel name for layer naming.
         channel_idx : int, optional
@@ -456,6 +460,8 @@ class nImage(BioImage):
         channel_kwargs : dict[str, dict], optional
             Per-channel metadata overrides. Maps channel name to dict of
             napari layer kwargs to override defaults.
+        rgb : bool
+            Whether this is an RGB image (sets rgb=True in metadata).
 
         Returns
         -------
@@ -474,8 +480,14 @@ class nImage(BioImage):
         if axis_labels:
             meta['axis_labels'] = axis_labels
 
-        # Add image-specific metadata
-        if layer_type == 'image':
+        if units:
+            meta['units'] = units
+
+        if rgb:
+            meta['rgb'] = True
+
+        # Add image-specific metadata (colormap/blending) for non-RGB images
+        if layer_type == 'image' and not rgb:
             from ._colormap_utils import get_colormap_for_channel
 
             # Use channel_idx if provided, otherwise default to 0
@@ -588,20 +600,20 @@ class nImage(BioImage):
         units = self.layer_units
         channel_dim = DimensionNames.Channel
 
-        # Handle RGB images specially (no axis_labels, uses 'rgb' flag)
+        # Handle RGB images specially (uses 'rgb' flag)
         if DimensionNames.Samples in self.reader.dims.order:
-            meta = {
-                'name': self._build_layer_name(),
-                'rgb': True,
-                'metadata': base_metadata,
-            }
-            if scale:
-                meta['scale'] = scale
-            if axis_labels:
-                meta['axis_labels'] = axis_labels
-            if units:
-                meta['units'] = units
-            return [(self.layer_data.data, meta, 'image')]
+            return [
+                self._build_single_layer_tuple(
+                    data=self.layer_data.data,
+                    layer_type='image',
+                    base_metadata=base_metadata,
+                    scale=scale,
+                    axis_labels=axis_labels,
+                    units=units,
+                    channel_kwargs=channel_kwargs,
+                    rgb=True,
+                )
+            ]
 
         # Single channel image (no channel dimension to split)
         if channel_dim not in self.layer_data.dims:
@@ -622,6 +634,8 @@ class nImage(BioImage):
                     base_metadata=base_metadata,
                     scale=scale,
                     axis_labels=axis_labels,
+                    units=units,
+                    channel_name=channel_name,
                     channel_kwargs=channel_kwargs,
                 )
             ]
@@ -654,6 +668,7 @@ class nImage(BioImage):
                     base_metadata=base_metadata,
                     scale=scale,
                     axis_labels=axis_labels,
+                    units=units,
                     channel_name=channel_name,
                     channel_idx=i,
                     total_channels=total_channels,
