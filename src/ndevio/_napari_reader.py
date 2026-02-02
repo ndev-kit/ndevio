@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 def napari_get_reader(
     path: PathLike,
-    in_memory: bool | None = None,
     open_first_scene_only: bool | None = None,
     open_all_scenes: bool | None = None,
 ) -> ReaderFunction | None:
@@ -31,8 +30,6 @@ def napari_get_reader(
     ----------
     path : PathLike
         Path to the file to be read
-    in_memory : bool, optional
-        Whether to read the file in memory, by default None
     open_first_scene_only : bool, optional
         Whether to ignore multi-scene files and just open the first scene,
         by default None, which uses the setting
@@ -81,7 +78,6 @@ def napari_get_reader(
     # The actual reading happens in napari_reader_function
     return partial(
         napari_reader_function,
-        in_memory=in_memory,
         open_first_scene_only=open_first_scene_only,
         open_all_scenes=open_all_scenes,
     )
@@ -89,7 +85,6 @@ def napari_get_reader(
 
 def napari_reader_function(
     path: PathLike,
-    in_memory: bool | None = None,
     open_first_scene_only: bool = False,
     open_all_scenes: bool = False,
 ) -> list[LayerDataTuple] | None:
@@ -103,8 +98,6 @@ def napari_reader_function(
     ----------
     path : PathLike
         Path to the file to be read
-    in_memory : bool, optional
-        Whether to read the file in memory, by default None.
     open_first_scene_only : bool, optional
         Whether to ignore multi-scene files and just open the first scene,
         by default False.
@@ -132,24 +125,22 @@ def napari_reader_function(
 
     # open first scene only
     if len(img.scenes) == 1 or open_first_scene_only:
-        return img.get_layer_data_tuples(in_memory=in_memory)
+        return img.get_layer_data_tuples()
 
     # open all scenes as layers
     if open_all_scenes:
         layer_list = []
         for scene in img.scenes:
             img.set_scene(scene)
-            layer_list.extend(img.get_layer_data_tuples(in_memory=in_memory))
+            layer_list.extend(img.get_layer_data_tuples())
         return layer_list
 
     # else: open scene widget
-    _open_scene_container(path=path, img=img, in_memory=in_memory)
+    _open_scene_container(path=path, img=img)
     return [(None,)]  # type: ignore[return-value]
 
 
-def _open_scene_container(
-    path: PathLike, img: nImage, in_memory: bool | None
-) -> None:
+def _open_scene_container(path: PathLike, img: nImage) -> None:
     from pathlib import Path
 
     import napari
@@ -158,7 +149,7 @@ def _open_scene_container(
 
     viewer = napari.current_viewer()
     viewer.window.add_dock_widget(
-        nImageSceneWidget(viewer, path, img, in_memory),
+        nImageSceneWidget(viewer, path, img),
         area='right',
         name=f'{Path(path).stem}{DELIMITER}Scenes',
     )
