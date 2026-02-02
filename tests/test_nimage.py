@@ -94,22 +94,12 @@ def test_nImage_save_read(resources_dir: Path, tmp_path: Path):
 def test_get_layer_data(resources_dir: Path):
     """Test loading napari layer data in memory."""
     img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-    img._load_layer_data()
+    # Access layer_data property to trigger loading
+    data = img.layer_data
     # layer_data will be squeezed
     # Original shape (1, 2, 60, 66, 85) -> (2, 60, 66, 85)
-    assert img.layer_data.shape == (2, 60, 66, 85)
-    assert img.layer_data.dims == ('C', 'Z', 'Y', 'X')
-
-
-def test_get_layer_data_not_in_memory(resources_dir: Path):
-    """Test loading napari layer data as dask array."""
-    import dask
-
-    img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-    img._load_layer_data(in_memory=False)
-    assert img.layer_data is not None
-    # check that the data is a dask array
-    assert isinstance(img.layer_data.data, dask.array.core.Array)
+    assert data.shape == (2, 60, 66, 85)
+    assert data.dims == ('C', 'Z', 'Y', 'X')
 
 
 def test_get_layer_data_tuples_basic(resources_dir: Path):
@@ -199,52 +189,6 @@ def test_get_layer_data_tuples_ome_not_implemented_silent(
 
         # No warning should be logged for NotImplementedError
         assert len(caplog.records) == 0
-
-
-def test_get_layer_data_mosaic_tile_in_memory(resources_dir: Path):
-    """Test mosaic tile image data in memory.
-
-    BioImage.xarray_data now automatically handles mosaic tile reconstruction.
-    This test verifies that _load_layer_data properly uses xarray_data.
-    """
-    import numpy as np
-    import xarray as xr
-
-    # Mock xarray_data to return test data
-    test_data = xr.DataArray(np.array([1, 2, 3]))
-    img = nImage(test_data)
-    with mock.patch.object(
-        type(img), 'xarray_data', new_callable=mock.PropertyMock
-    ) as mock_xarray:
-        mock_xarray.return_value.squeeze.return_value = test_data
-        img._load_layer_data(in_memory=True)
-        assert img.layer_data is not None
-        assert img.layer_data.shape == (3,)
-        mock_xarray.assert_called_once()
-
-
-def test_get_layer_data_mosaic_tile_not_in_memory(
-    resources_dir: Path,
-):
-    """Test mosaic tile image data as dask array.
-
-    BioImage.xarray_dask_data now automatically handles mosaic tile reconstruction.
-    This test verifies that _load_layer_data properly uses xarray_dask_data.
-    """
-    import numpy as np
-    import xarray as xr
-
-    # Mock xarray_dask_data to return test data
-    test_data = xr.DataArray(np.array([1, 2, 3]))
-    img = nImage(test_data)
-    with mock.patch.object(
-        type(img), 'xarray_dask_data', new_callable=mock.PropertyMock
-    ) as mock_xarray:
-        mock_xarray.return_value.squeeze.return_value = test_data
-        img._load_layer_data(in_memory=False)
-        assert img.layer_data is not None
-        assert img.layer_data.shape == (3,)
-        mock_xarray.assert_called_once()
 
 
 @pytest.mark.parametrize(
@@ -364,20 +308,6 @@ class TestGetLayerDataTuples:
             assert 'scale' in meta
             # Original has physical pixel sizes, so scale should have values
             assert len(meta['scale']) > 0
-
-    def test_in_memory_parameter_respected(self, resources_dir: Path):
-        """Test that in_memory parameter is passed through correctly."""
-
-        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-
-        # Test with in_memory=True (numpy array)
-        layer_tuples = img.get_layer_data_tuples(in_memory=True)
-
-        import numpy as np
-
-        for data, _, _ in layer_tuples:
-            # Data should be numpy array when in_memory=True
-            assert isinstance(data, np.ndarray)
 
     def test_colormap_cycling_for_images(self, resources_dir: Path):
         """Test that image layers get colormaps based on napari's defaults.

@@ -160,7 +160,7 @@ class nImage(BioImage):
     # -------------------------------------------------------------------------
 
     @property
-    def layer_data(self) -> xr.DataArray | None:
+    def layer_data(self) -> xr.DataArray:
         """
         Image data as xarray DataArray for napari layer creation.
 
@@ -172,21 +172,6 @@ class nImage(BioImage):
         xr.DataArray
             Squeezed image data.
 
-        """
-        if self._layer_data is None:
-            self._load_layer_data(in_memory=None)
-        return self._layer_data
-
-    def _load_layer_data(self, in_memory: bool | None = None) -> None:
-        """
-        Load and cache the image data as an xarray DataArray.
-
-        Parameters
-        ----------
-        in_memory : bool, optional
-            Whether to load the image in memory or as dask array.
-            If None, determined automatically based on file size.
-
         Notes
         -----
         BioImage.xarray_data and BioImage.xarray_dask_data automatically
@@ -194,13 +179,13 @@ class nImage(BioImage):
         (the default). No special mosaic handling needed here.
 
         """
-        if in_memory is None:
+        if self._layer_data is None:
             in_memory = determine_in_memory(self.path)
-
-        if in_memory:
-            self._layer_data = self.xarray_data.squeeze()
-        else:
-            self._layer_data = self.xarray_dask_data.squeeze()
+            if in_memory:
+                self._layer_data = self.xarray_data.squeeze()
+            else:
+                self._layer_data = self.xarray_dask_data.squeeze()
+        return self._layer_data
 
     # -------------------------------------------------------------------------
     # Layer Properties (derived from layer_data)
@@ -258,8 +243,6 @@ class nImage(BioImage):
 
         """
         layer_data = self.layer_data
-        if layer_data is None:
-            return ()
 
         # Exclude Channel and Samples dimensions (RGB/multichannel handled separately)
         return tuple(
@@ -371,7 +354,6 @@ class nImage(BioImage):
 
     def get_layer_data_tuples(
         self,
-        in_memory: bool | None = None,
         layer_type: str | None = None,
         channel_types: dict[str, str] | None = None,
         channel_kwargs: dict[str, dict] | None = None,
@@ -384,9 +366,6 @@ class nImage(BioImage):
 
         Parameters
         ----------
-        in_memory : bool, optional
-            Load in memory (True) or as dask array (False).
-            If None, determined by file size.
         layer_type : str, optional
             Override layer type for ALL channels. Valid values: 'image',
             'labels', 'shapes', 'points', 'surface', 'tracks', 'vectors'.
@@ -427,17 +406,11 @@ class nImage(BioImage):
         https://napari.org/dev/plugins/building_a_plugin/guides.html
 
         """
-        # Load image data if not already loaded
-        # or reload if in_memory explicitly specified
-        if self._layer_data is None or in_memory is not None:
-            self._load_layer_data(in_memory=in_memory)
+        # Access layer_data property to ensure it's loaded
         layer_data = self.layer_data
 
         if layer_type is not None:
             channel_types = None  # Global override ignores per-channel
-
-        # At this point layer_data is guaranteed to be loaded
-        assert layer_data is not None, 'layer_data should be loaded by now'
 
         base_metadata = self.layer_metadata
         scale = self.layer_scale
