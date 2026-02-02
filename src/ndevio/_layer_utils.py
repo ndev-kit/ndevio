@@ -178,7 +178,7 @@ def build_layer_tuple(
         Scale for each dimension.
     axis_labels : tuple[str, ...]
         Dimension labels.
-    units : tuple[str | None, ...], optional
+    units : tuple[str | None, ...]
         Physical units for each dimension.
     channel_idx : int
         Channel index (for colormap/blending selection). Default 0.

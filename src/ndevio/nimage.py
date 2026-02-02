@@ -155,10 +155,6 @@ class nImage(BioImage):
         self._layer_data = None
         self.path = Path(image) if isinstance(image, str | Path) else None
 
-    # -------------------------------------------------------------------------
-    # Layer Data (cached)
-    # -------------------------------------------------------------------------
-
     @property
     def layer_data(self) -> xr.DataArray:
         """
@@ -186,10 +182,6 @@ class nImage(BioImage):
             else:
                 self._layer_data = self.xarray_dask_data.squeeze()
         return self._layer_data
-
-    # -------------------------------------------------------------------------
-    # Layer Properties (derived from layer_data)
-    # -------------------------------------------------------------------------
 
     @property
     def layer_scale(self) -> tuple[float, ...]:
@@ -315,10 +307,6 @@ class nImage(BioImage):
 
         return meta
 
-    # -------------------------------------------------------------------------
-    # Private Helpers
-    # -------------------------------------------------------------------------
-
     def _build_layer_name(self, channel_name: str | None = None) -> str:
         """Build layer name from channel, scene, and file path.
 
@@ -347,10 +335,6 @@ class nImage(BioImage):
         parts.append(path_stem)
 
         return delim.join(parts)
-
-    # -------------------------------------------------------------------------
-    # Public API
-    # -------------------------------------------------------------------------
 
     def get_layer_data_tuples(
         self,
