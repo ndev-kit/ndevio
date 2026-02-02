@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import xarray as xr
+    from bioio_base.types import ArrayLike
     from napari.types import LayerDataTuple
 
 logger = logging.getLogger(__name__)
@@ -149,7 +150,7 @@ def determine_in_memory(
 
 
 def build_layer_tuple(
-    data,
+    data: ArrayLike,
     *,
     layer_type: str,
     name: str,
