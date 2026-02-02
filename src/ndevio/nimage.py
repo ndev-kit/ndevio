@@ -3,14 +3,10 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import xarray as xr
 from bioio import BioImage
-from bioio_base.reader import Reader
-from bioio_base.types import ImageLike
 
 from ._layer_utils import (
     build_layer_tuple,
@@ -21,6 +17,11 @@ from ._layer_utils import (
 from ._plugin_manager import raise_unsupported_with_suggestions
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    import xarray as xr
+    from bioio_base.reader import Reader
+    from bioio_base.types import ImageLike
     from napari.types import LayerDataTuple
 
 logger = logging.getLogger(__name__)
