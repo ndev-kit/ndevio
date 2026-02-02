@@ -15,7 +15,7 @@ class TestInstallPlugin:
 
     def test_returns_job_id(self):
         """Test that install_plugin returns a job ID."""
-        from ndevio._plugin_installer import install_plugin
+        from ndevio.bioio_plugins._installer import install_plugin
 
         # This will queue the installation but not actually run it
         job_id = install_plugin('bioio-imageio')
@@ -28,19 +28,19 @@ class TestVerifyPluginInstalled:
 
     def test_installed_dependency(self):
         """Test verification of an installed package (bioio is a dependency)."""
-        from ndevio._plugin_installer import verify_plugin_installed
+        from ndevio.bioio_plugins._installer import verify_plugin_installed
 
         assert verify_plugin_installed('bioio')
 
     def test_not_installed_plugin(self):
         """Test verification of a plugin that isn't installed."""
-        from ndevio._plugin_installer import verify_plugin_installed
+        from ndevio.bioio_plugins._installer import verify_plugin_installed
 
         assert not verify_plugin_installed('bioio-nonexistent-plugin-12345')
 
     def test_converts_hyphen_to_underscore(self):
         """Test that plugin name is correctly converted to module name."""
-        from ndevio._plugin_installer import verify_plugin_installed
+        from ndevio.bioio_plugins._installer import verify_plugin_installed
 
         # bioio-base should be installed, converts to bioio_base
         result = verify_plugin_installed('bioio-base')
@@ -56,14 +56,14 @@ class TestGetInstallerQueue:
             NapariInstallerQueue,
         )
 
-        from ndevio._plugin_installer import get_installer_queue
+        from ndevio.bioio_plugins._installer import get_installer_queue
 
         queue = get_installer_queue()
         assert isinstance(queue, NapariInstallerQueue)
 
     def test_singleton_behavior(self):
         """Test that get_installer_queue returns the same instance."""
-        from ndevio._plugin_installer import get_installer_queue
+        from ndevio.bioio_plugins._installer import get_installer_queue
 
         queue1 = get_installer_queue()
         queue2 = get_installer_queue()
@@ -72,13 +72,13 @@ class TestGetInstallerQueue:
 
     def test_queue_can_be_reset(self):
         """Test that queue can be reset for testing purposes."""
-        from ndevio import _plugin_installer
-        from ndevio._plugin_installer import get_installer_queue
+        from ndevio.bioio_plugins import _installer
+        from ndevio.bioio_plugins._installer import get_installer_queue
 
         queue1 = get_installer_queue()
 
         # Reset the global
-        _plugin_installer._installer_queue = None
+        _installer._installer_queue = None
 
         queue2 = get_installer_queue()
 

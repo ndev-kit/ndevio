@@ -15,7 +15,9 @@ class TestRaiseWithSuggestions:
 
     def test_raises_with_suggestions_enabled(self):
         """Test error message includes suggestions when enabled."""
-        from ndevio._plugin_manager import raise_unsupported_with_suggestions
+        from ndevio.bioio_plugins._manager import (
+            raise_unsupported_with_suggestions,
+        )
 
         with patch('ndev_settings.get_settings') as mock_settings:
             mock_settings.return_value.ndevio_reader.suggest_reader_plugins = (
@@ -30,7 +32,9 @@ class TestRaiseWithSuggestions:
 
     def test_raises_without_suggestions_when_disabled(self):
         """Test error message has no suggestions when disabled."""
-        from ndevio._plugin_manager import raise_unsupported_with_suggestions
+        from ndevio.bioio_plugins._manager import (
+            raise_unsupported_with_suggestions,
+        )
 
         with patch('ndev_settings.get_settings') as mock_settings:
             mock_settings.return_value.ndevio_reader.suggest_reader_plugins = (
@@ -50,7 +54,7 @@ class TestGetInstalledPlugins:
 
     def test_returns_set_of_strings(self):
         """Test that get_installed_plugins returns a set of strings."""
-        from ndevio._bioio_plugin_utils import get_installed_plugins
+        from ndevio.bioio_plugins._utils import get_installed_plugins
 
         result = get_installed_plugins()
 
@@ -60,7 +64,7 @@ class TestGetInstalledPlugins:
 
     def test_includes_core_plugins(self):
         """Test that installed plugins include core bioio plugins."""
-        from ndevio._bioio_plugin_utils import get_installed_plugins
+        from ndevio.bioio_plugins._utils import get_installed_plugins
 
         result = get_installed_plugins()
 
@@ -74,7 +78,7 @@ class TestReaderPluginManager:
 
     def test_installed_plugins_returns_set(self):
         """Test that installed_plugins returns a set of plugin names."""
-        from ndevio._plugin_manager import ReaderPluginManager
+        from ndevio.bioio_plugins._manager import ReaderPluginManager
 
         manager = ReaderPluginManager('test.tiff')
 
@@ -83,8 +87,8 @@ class TestReaderPluginManager:
 
     def test_installed_plugins_matches_module_function(self):
         """Test installed_plugins matches get_installed_plugins()."""
-        from ndevio._bioio_plugin_utils import get_installed_plugins
-        from ndevio._plugin_manager import ReaderPluginManager
+        from ndevio.bioio_plugins._manager import ReaderPluginManager
+        from ndevio.bioio_plugins._utils import get_installed_plugins
 
         manager = ReaderPluginManager('test.tiff')
 
@@ -92,7 +96,7 @@ class TestReaderPluginManager:
 
     def test_suggested_plugins_for_tiff(self):
         """Test suggested_plugins returns relevant plugins for tiff."""
-        from ndevio._plugin_manager import ReaderPluginManager
+        from ndevio.bioio_plugins._manager import ReaderPluginManager
 
         manager = ReaderPluginManager('test.tiff')
         suggested = manager.suggested_plugins
@@ -102,7 +106,7 @@ class TestReaderPluginManager:
 
     def test_suggested_plugins_for_czi(self):
         """Test suggested_plugins returns bioio-czi for .czi files."""
-        from ndevio._plugin_manager import ReaderPluginManager
+        from ndevio.bioio_plugins._manager import ReaderPluginManager
 
         manager = ReaderPluginManager('test.czi')
         suggested = manager.suggested_plugins
@@ -111,7 +115,7 @@ class TestReaderPluginManager:
 
     def test_installable_excludes_installed_and_core(self):
         """Test installable_plugins excludes installed and core plugins."""
-        from ndevio._plugin_manager import ReaderPluginManager
+        from ndevio.bioio_plugins._manager import ReaderPluginManager
 
         manager = ReaderPluginManager('test.tiff')
         installable = manager.installable_plugins
@@ -129,11 +133,11 @@ class TestReaderPluginManager:
 
     def test_get_installation_message_with_installable(self):
         """Test installation message is generated for installable plugins."""
-        from ndevio._plugin_manager import ReaderPluginManager
+        from ndevio.bioio_plugins._manager import ReaderPluginManager
 
         # Mock installed plugins to NOT include bioio-nd2
         with patch(
-            'ndevio._plugin_manager.get_installed_plugins',
+            'ndevio.bioio_plugins._manager.get_installed_plugins',
             return_value={'bioio-ome-tiff', 'bioio-tifffile'},
         ):
             manager = ReaderPluginManager('test.nd2')
@@ -148,21 +152,21 @@ class TestReaderPluginManagerNoPath:
 
     def test_suggested_plugins_empty_without_path(self):
         """Test suggested_plugins returns [] without path."""
-        from ndevio._plugin_manager import ReaderPluginManager
+        from ndevio.bioio_plugins._manager import ReaderPluginManager
 
         manager = ReaderPluginManager()
         assert manager.suggested_plugins == []
 
     def test_installable_plugins_empty_without_path(self):
         """Test installable_plugins returns [] without path."""
-        from ndevio._plugin_manager import ReaderPluginManager
+        from ndevio.bioio_plugins._manager import ReaderPluginManager
 
         manager = ReaderPluginManager()
         assert manager.installable_plugins == []
 
     def test_get_installation_message_returns_empty(self):
         """Test get_installation_message returns '' without path."""
-        from ndevio._plugin_manager import ReaderPluginManager
+        from ndevio.bioio_plugins._manager import ReaderPluginManager
 
         manager = ReaderPluginManager()
         assert manager.get_installation_message() == ''
@@ -173,7 +177,7 @@ class TestReaderPluginManagerWithRealFiles:
 
     def test_suggested_plugins_for_real_tiff(self, resources_dir):
         """Test suggested_plugins with a real TIFF file."""
-        from ndevio._plugin_manager import ReaderPluginManager
+        from ndevio.bioio_plugins._manager import ReaderPluginManager
 
         manager = ReaderPluginManager(resources_dir / 'cells3d2ch_legacy.tiff')
         suggested = manager.suggested_plugins
@@ -183,7 +187,7 @@ class TestReaderPluginManagerWithRealFiles:
 
     def test_installed_plugins_includes_core(self, resources_dir):
         """Test installed_plugins includes core plugins."""
-        from ndevio._plugin_manager import ReaderPluginManager
+        from ndevio.bioio_plugins._manager import ReaderPluginManager
 
         manager = ReaderPluginManager(resources_dir / 'cells3d2ch_legacy.tiff')
         installed = manager.installed_plugins

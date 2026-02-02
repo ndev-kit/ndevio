@@ -46,7 +46,7 @@ def napari_get_reader(
         is not recognized by any bioio plugin.
 
     """
-    from ._bioio_plugin_utils import suggest_plugins_for_path
+    from .bioio_plugins._utils import suggest_plugins_for_path
 
     if isinstance(path, list):
         logger.info('Bioio: Expected a single path, got a list of paths.')
@@ -174,7 +174,7 @@ def _open_plugin_installer(path: PathLike) -> None:
     import napari
     from bioio_base.exceptions import UnsupportedFileFormatError
 
-    from ._plugin_manager import ReaderPluginManager
+    from .bioio_plugins._manager import ReaderPluginManager
     from .widgets import PluginInstallerWidget
 
     # Get viewer, handle case where no viewer available

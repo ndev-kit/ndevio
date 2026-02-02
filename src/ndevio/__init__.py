@@ -5,7 +5,7 @@ try:  # noqa: D104
 except ImportError:
     __version__ = 'unknown'
 
-from . import helpers
+from .utils import helpers
 
 # Type stub for lazy import - lets type checkers know nImage exists
 if TYPE_CHECKING:

@@ -24,14 +24,14 @@ class TestSuggestPluginsForPath:
     )
     def test_extension_to_plugin_mapping(self, filename, expected_plugins):
         """Test that file extensions map to correct plugin suggestions."""
-        from ndevio._bioio_plugin_utils import suggest_plugins_for_path
+        from ndevio.bioio_plugins._utils import suggest_plugins_for_path
 
         plugins = suggest_plugins_for_path(filename)
         assert plugins == expected_plugins
 
     def test_tiff_suggests_multiple_plugins(self):
         """Test that TIFF files suggest all TIFF-compatible plugins."""
-        from ndevio._bioio_plugin_utils import suggest_plugins_for_path
+        from ndevio.bioio_plugins._utils import suggest_plugins_for_path
 
         plugins = suggest_plugins_for_path('test.tiff')
 
@@ -46,7 +46,7 @@ class TestFormatPluginInstallationMessage:
 
     def test_message_with_installable_plugins(self):
         """Test message includes plugin name and install command."""
-        from ndevio._bioio_plugin_utils import (
+        from ndevio.bioio_plugins._utils import (
             format_plugin_installation_message,
         )
 
@@ -62,7 +62,7 @@ class TestFormatPluginInstallationMessage:
 
     def test_message_for_unsupported_extension(self):
         """Test message for extension with no known plugins."""
-        from ndevio._bioio_plugin_utils import (
+        from ndevio.bioio_plugins._utils import (
             format_plugin_installation_message,
         )
 

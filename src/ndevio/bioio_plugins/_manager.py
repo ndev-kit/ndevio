@@ -29,7 +29,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ._bioio_plugin_utils import get_installed_plugins
+from ._utils import get_installed_plugins
 
 if TYPE_CHECKING:
     from napari.types import PathLike
@@ -90,7 +90,7 @@ class ReaderPluginManager:
         if not self.path:
             return []
 
-        from ._bioio_plugin_utils import suggest_plugins_for_path
+        from ._utils import suggest_plugins_for_path
 
         return suggest_plugins_for_path(self.path)
 
@@ -107,7 +107,7 @@ class ReaderPluginManager:
             List of plugin names that should be installed.
             Empty list if no path is set or all suitable plugins are installed.
         """
-        from ._bioio_plugin_utils import BIOIO_PLUGINS
+        from ._utils import BIOIO_PLUGINS
 
         suggested = self.suggested_plugins
         installed = self.installed_plugins
@@ -134,7 +134,7 @@ class ReaderPluginManager:
         if not self.path:
             return ''
 
-        from ._bioio_plugin_utils import format_plugin_installation_message
+        from ._utils import format_plugin_installation_message
 
         return format_plugin_installation_message(
             filename=self.path.name,

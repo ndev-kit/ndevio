@@ -10,7 +10,7 @@ class TestInferLayerType:
 
     def test_label_keyword_returns_labels(self):
         """Test that label keywords are detected."""
-        from ndevio._layer_utils import infer_layer_type
+        from ndevio.utils._layer_utils import infer_layer_type
 
         assert infer_layer_type('nuclei_mask') == 'labels'
         assert infer_layer_type('cell_labels') == 'labels'
@@ -20,7 +20,7 @@ class TestInferLayerType:
 
     def test_non_label_returns_image(self):
         """Test that non-label names return image."""
-        from ndevio._layer_utils import infer_layer_type
+        from ndevio.utils._layer_utils import infer_layer_type
 
         assert infer_layer_type('DAPI') == 'image'
         assert infer_layer_type('GFP') == 'image'
@@ -28,7 +28,7 @@ class TestInferLayerType:
 
     def test_case_insensitive(self):
         """Test that detection is case-insensitive."""
-        from ndevio._layer_utils import infer_layer_type
+        from ndevio.utils._layer_utils import infer_layer_type
 
         assert infer_layer_type('MASK') == 'labels'
         assert infer_layer_type('Label') == 'labels'
@@ -40,7 +40,7 @@ class TestResolveLayerType:
 
     def test_global_override_takes_precedence(self):
         """Test that global override is used first."""
-        from ndevio._layer_utils import resolve_layer_type
+        from ndevio.utils._layer_utils import resolve_layer_type
 
         result = resolve_layer_type(
             'nuclei_mask',  # Would auto-detect to labels
@@ -51,7 +51,7 @@ class TestResolveLayerType:
 
     def test_channel_types_used_when_no_global(self):
         """Test that channel_types is used when no global override."""
-        from ndevio._layer_utils import resolve_layer_type
+        from ndevio.utils._layer_utils import resolve_layer_type
 
         result = resolve_layer_type(
             'nuclei_mask',
@@ -62,7 +62,7 @@ class TestResolveLayerType:
 
     def test_auto_detect_when_no_overrides(self):
         """Test auto-detection when no overrides provided."""
-        from ndevio._layer_utils import resolve_layer_type
+        from ndevio.utils._layer_utils import resolve_layer_type
 
         assert (
             resolve_layer_type('nuclei_mask', None, None) == 'labels'
@@ -75,13 +75,13 @@ class TestDetermineInMemory:
 
     def test_none_path_returns_true(self):
         """Test that None path (array data) returns True."""
-        from ndevio._layer_utils import determine_in_memory
+        from ndevio.utils._layer_utils import determine_in_memory
 
         assert determine_in_memory(None) is True
 
     def test_small_file_returns_true(self, tmp_path):
         """Test that small files are loaded in memory."""
-        from ndevio._layer_utils import determine_in_memory
+        from ndevio.utils._layer_utils import determine_in_memory
 
         small_file = tmp_path / 'small.txt'
         small_file.write_text('x' * 100)
@@ -93,7 +93,7 @@ class TestDetermineInMemory:
 
     def test_large_file_returns_false(self, tmp_path):
         """Test that large files are loaded as dask."""
-        from ndevio._layer_utils import determine_in_memory
+        from ndevio.utils._layer_utils import determine_in_memory
 
         large_file = tmp_path / 'large.txt'
         large_file.write_text('x')
@@ -117,7 +117,7 @@ class TestBuildLayerTuple:
         """Test basic layer tuple structure."""
         import numpy as np
 
-        from ndevio._layer_utils import build_layer_tuple
+        from ndevio.utils._layer_utils import build_layer_tuple
 
         data = np.zeros((10, 10))
         result = build_layer_tuple(
@@ -142,7 +142,7 @@ class TestBuildLayerTuple:
         """Test that units are included in metadata."""
         import numpy as np
 
-        from ndevio._layer_utils import build_layer_tuple
+        from ndevio.utils._layer_utils import build_layer_tuple
 
         data = np.zeros((10, 10))
         result = build_layer_tuple(
@@ -161,7 +161,7 @@ class TestBuildLayerTuple:
         """Test that RGB flag is set correctly."""
         import numpy as np
 
-        from ndevio._layer_utils import build_layer_tuple
+        from ndevio.utils._layer_utils import build_layer_tuple
 
         data = np.zeros((10, 10, 3))
         result = build_layer_tuple(
@@ -184,7 +184,7 @@ class TestBuildLayerTuple:
         """Test that non-RGB images get colormap."""
         import numpy as np
 
-        from ndevio._layer_utils import build_layer_tuple
+        from ndevio.utils._layer_utils import build_layer_tuple
 
         data = np.zeros((10, 10))
         result = build_layer_tuple(
@@ -204,7 +204,7 @@ class TestBuildLayerTuple:
         """Test that labels don't get colormap."""
         import numpy as np
 
-        from ndevio._layer_utils import build_layer_tuple
+        from ndevio.utils._layer_utils import build_layer_tuple
 
         data = np.zeros((10, 10), dtype=np.int32)
         result = build_layer_tuple(
@@ -223,7 +223,7 @@ class TestBuildLayerTuple:
         """Test that extra_kwargs override defaults."""
         import numpy as np
 
-        from ndevio._layer_utils import build_layer_tuple
+        from ndevio.utils._layer_utils import build_layer_tuple
 
         data = np.zeros((10, 10))
         result = build_layer_tuple(
@@ -249,7 +249,7 @@ class TestGetSingleChannelName:
         import numpy as np
         import xarray as xr
 
-        from ndevio._layer_utils import get_single_channel_name
+        from ndevio.utils._layer_utils import get_single_channel_name
 
         data = xr.DataArray(
             np.zeros((10, 10)),
@@ -265,7 +265,7 @@ class TestGetSingleChannelName:
         import numpy as np
         import xarray as xr
 
-        from ndevio._layer_utils import get_single_channel_name
+        from ndevio.utils._layer_utils import get_single_channel_name
 
         data = xr.DataArray(
             np.zeros((10, 10)),
