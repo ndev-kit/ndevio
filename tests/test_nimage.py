@@ -202,37 +202,49 @@ def test_get_layer_data_tuples_ome_not_implemented_silent(
 
 
 def test_get_layer_data_mosaic_tile_in_memory(resources_dir: Path):
-    """Test mosaic tile image data in memory."""
-    import xarray as xr
-    from bioio_base.dimensions import DimensionNames
+    """Test mosaic tile image data in memory.
 
-    with mock.patch.object(nImage, 'reader', create=True) as mock_reader:
-        mock_reader.dims.order = [DimensionNames.MosaicTile]
-        mock_reader.mosaic_xarray_data.squeeze.return_value = xr.DataArray(
-            [1, 2, 3]
-        )
-        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+    BioImage.xarray_data now automatically handles mosaic tile reconstruction.
+    This test verifies that _load_layer_data properly uses xarray_data.
+    """
+    import numpy as np
+    import xarray as xr
+
+    # Mock xarray_data to return test data
+    test_data = xr.DataArray(np.array([1, 2, 3]))
+    img = nImage(test_data)
+    with mock.patch.object(
+        type(img), 'xarray_data', new_callable=mock.PropertyMock
+    ) as mock_xarray:
+        mock_xarray.return_value.squeeze.return_value = test_data
         img._load_layer_data(in_memory=True)
         assert img.layer_data is not None
         assert img.layer_data.shape == (3,)
+        mock_xarray.assert_called_once()
 
 
 def test_get_layer_data_mosaic_tile_not_in_memory(
     resources_dir: Path,
 ):
-    """Test mosaic tile image data as dask array."""
-    import xarray as xr
-    from bioio_base.dimensions import DimensionNames
+    """Test mosaic tile image data as dask array.
 
-    with mock.patch.object(nImage, 'reader', create=True) as mock_reader:
-        mock_reader.dims.order = [DimensionNames.MosaicTile]
-        mock_reader.mosaic_xarray_dask_data.squeeze.return_value = (
-            xr.DataArray([1, 2, 3])
-        )
-        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+    BioImage.xarray_dask_data now automatically handles mosaic tile reconstruction.
+    This test verifies that _load_layer_data properly uses xarray_dask_data.
+    """
+    import numpy as np
+    import xarray as xr
+
+    # Mock xarray_dask_data to return test data
+    test_data = xr.DataArray(np.array([1, 2, 3]))
+    img = nImage(test_data)
+    with mock.patch.object(
+        type(img), 'xarray_dask_data', new_callable=mock.PropertyMock
+    ) as mock_xarray:
+        mock_xarray.return_value.squeeze.return_value = test_data
         img._load_layer_data(in_memory=False)
         assert img.layer_data is not None
         assert img.layer_data.shape == (3,)
+        mock_xarray.assert_called_once()
 
 
 @pytest.mark.parametrize(

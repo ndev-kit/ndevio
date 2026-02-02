@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 
 import xarray as xr
 from bioio import BioImage
-from bioio_base.dimensions import DimensionNames
 from bioio_base.reader import Reader
 from bioio_base.types import ImageLike
 
@@ -188,29 +187,20 @@ class nImage(BioImage):
             Whether to load the image in memory or as dask array.
             If None, determined automatically based on file size.
 
+        Notes
+        -----
+        BioImage.xarray_data and BioImage.xarray_dask_data automatically
+        handle mosaic tile reconstruction when reconstruct_mosaic=True
+        (the default). No special mosaic handling needed here.
+
         """
         if in_memory is None:
             in_memory = determine_in_memory(self.path)
 
-        if DimensionNames.MosaicTile in self.reader.dims.order:
-            try:
-                if in_memory:
-                    self._layer_data = self.reader.mosaic_xarray_data.squeeze()
-                else:
-                    self._layer_data = (
-                        self.reader.mosaic_xarray_dask_data.squeeze()
-                    )
-
-            except NotImplementedError:
-                logger.warning(
-                    'Bioio: Mosaic tile switching not supported for this reader'
-                )
-                self._layer_data = None
+        if in_memory:
+            self._layer_data = self.xarray_data.squeeze()
         else:
-            if in_memory:
-                self._layer_data = self.reader.xarray_data.squeeze()
-            else:
-                self._layer_data = self.reader.xarray_dask_data.squeeze()
+            self._layer_data = self.xarray_dask_data.squeeze()
 
     # -------------------------------------------------------------------------
     # Layer Properties (derived from layer_data)
@@ -271,10 +261,9 @@ class nImage(BioImage):
         if layer_data is None:
             return ()
 
+        # Exclude Channel and Samples dimensions (RGB/multichannel handled separately)
         return tuple(
-            str(dim)
-            for dim in layer_data.dims
-            if dim not in (DimensionNames.Channel, DimensionNames.Samples)
+            str(dim) for dim in layer_data.dims if dim not in ('C', 'S')
         )
 
     @property
@@ -455,8 +444,8 @@ class nImage(BioImage):
         axis_labels = self.layer_axis_labels
         units = self.layer_units
 
-        # Handle RGB images (Samples dimension)
-        if DimensionNames.Samples in self.reader.dims.order:
+        # Handle RGB images (Samples dimension 'S')
+        if 'S' in self.reader.dims.order:
             return [
                 build_layer_tuple(
                     layer_data.data,
@@ -470,7 +459,7 @@ class nImage(BioImage):
                 )
             ]
 
-        channel_dim = DimensionNames.Channel
+        channel_dim = 'C'
 
         # Single channel (no C dimension to split)
         if channel_dim not in layer_data.dims:
