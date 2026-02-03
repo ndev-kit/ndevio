@@ -142,3 +142,35 @@ class ReaderPluginManager:
             installed_plugins=self.installed_plugins,
             installable_plugins=self.installable_plugins,
         )
+
+
+def raise_unsupported_with_suggestions(path: PathLike) -> None:
+    """Raise UnsupportedFileFormatError with installation suggestions.
+
+    Parameters
+    ----------
+    path : PathLike
+        Path to the unsupported file.
+
+    Raises
+    ------
+    UnsupportedFileFormatError
+        Always raised, with optional installation suggestions.
+
+    """
+    from bioio_base.exceptions import UnsupportedFileFormatError
+    from ndev_settings import get_settings
+
+    settings = get_settings()
+    manager = ReaderPluginManager(path)
+    msg_extra = (
+        manager.get_installation_message()
+        if settings.ndevio_reader.suggest_reader_plugins  # type: ignore
+        else None
+    )
+
+    raise UnsupportedFileFormatError(
+        reader_name='ndevio',
+        path=str(path),
+        msg_extra=msg_extra,
+    ) from None

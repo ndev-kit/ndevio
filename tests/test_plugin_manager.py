@@ -6,6 +6,44 @@ via TestSuggestPluginsForPath. We trust those unit tests and don't duplicate her
 
 from unittest.mock import patch
 
+import pytest
+from bioio_base.exceptions import UnsupportedFileFormatError
+
+
+class TestRaiseWithSuggestions:
+    """Tests for raise_unsupported_with_suggestions function."""
+
+    def test_raises_with_suggestions_enabled(self):
+        """Test error message includes suggestions when enabled."""
+        from ndevio._plugin_manager import raise_unsupported_with_suggestions
+
+        with patch('ndev_settings.get_settings') as mock_settings:
+            mock_settings.return_value.ndevio_reader.suggest_reader_plugins = (
+                True
+            )
+
+            with pytest.raises(UnsupportedFileFormatError) as exc_info:
+                raise_unsupported_with_suggestions('test.czi')
+
+            error_msg = str(exc_info.value)
+            assert 'bioio-czi' in error_msg
+
+    def test_raises_without_suggestions_when_disabled(self):
+        """Test error message has no suggestions when disabled."""
+        from ndevio._plugin_manager import raise_unsupported_with_suggestions
+
+        with patch('ndev_settings.get_settings') as mock_settings:
+            mock_settings.return_value.ndevio_reader.suggest_reader_plugins = (
+                False
+            )
+
+            with pytest.raises(UnsupportedFileFormatError) as exc_info:
+                raise_unsupported_with_suggestions('test.czi')
+
+            error_msg = str(exc_info.value)
+            # Should still mention the file but not include installation message
+            assert 'test.czi' in error_msg
+
 
 class TestGetInstalledPlugins:
     """Tests for get_installed_plugins module-level function."""

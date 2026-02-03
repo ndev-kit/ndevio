@@ -43,7 +43,6 @@ def scratch_assay() -> list[LayerDataTuple]:
         reader=OmeTiffReader,
     )
     return img.get_layer_data_tuples(
-        in_memory=True,
         channel_types={
             'H3342': 'image',
             'oblique': 'image',
@@ -68,7 +67,7 @@ def neocortex() -> list[LayerDataTuple]:
     return nImage(
         neocortex_raw_path,
         reader=OmeTiffReader,
-    ).get_layer_data_tuples(in_memory=True)
+    ).get_layer_data_tuples()
 
 
 def neuron_raw() -> list[LayerDataTuple]:
@@ -86,7 +85,6 @@ def neuron_raw() -> list[LayerDataTuple]:
         neuron_raw_path,
         reader=OmeTiffReader,
     ).get_layer_data_tuples(
-        in_memory=True,
         layer_type='image',
         channel_kwargs={
             'PHALL': {'colormap': 'gray'},
@@ -100,7 +98,6 @@ def neuron_labels() -> list[LayerDataTuple]:
         SAMPLE_DIR / 'neuron-4Ch_labels.tiff',
         reader=OmeTiffReader,
     ).get_layer_data_tuples(
-        in_memory=True,
         layer_type='labels',
     )
 
@@ -111,6 +108,5 @@ def neuron_labels_processed() -> list[LayerDataTuple]:
         SAMPLE_DIR / 'neuron-4Ch_labels_processed.tiff',
         reader=OmeTiffReader,
     ).get_layer_data_tuples(
-        in_memory=True,
         layer_type='labels',
     )

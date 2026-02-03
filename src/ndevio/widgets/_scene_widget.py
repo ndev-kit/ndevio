@@ -35,8 +35,6 @@ class nImageSceneWidget(Container):
         Path to the file.
     img : nImage
         The nImage instance.
-    in_memory : bool
-        Whether the image should be added in memory.
 
     Attributes
     ----------
@@ -46,8 +44,6 @@ class nImageSceneWidget(Container):
         Path to the file.
     img : nImage
         The nImage instance.
-    in_memory : bool
-        Whether the image should be added in memory.
     settings : Settings
         The settings instance.
     scenes : list
@@ -67,7 +63,6 @@ class nImageSceneWidget(Container):
         viewer: napari.viewer.Viewer,
         path: PathLike,
         img: nImage,
-        in_memory: bool,
     ):
         """
         Initialize the nImageSceneWidget.
@@ -80,8 +75,6 @@ class nImageSceneWidget(Container):
             Path to the file.
         img : nImage
             The nImage instance.
-        in_memory : bool
-            Whether the image should be added in memory.
 
         """
         super().__init__(labels=False)
@@ -89,7 +82,6 @@ class nImageSceneWidget(Container):
         self.viewer = viewer
         self.path = path
         self.img = img
-        self.in_memory = in_memory
         self.settings = get_settings()
         self.scenes = [
             f'{idx}{DELIMITER}{scene}'
@@ -128,8 +120,6 @@ class nImageSceneWidget(Container):
             # Get layer tuples and add to viewer using napari's Layer.create()
             from napari.layers import Layer
 
-            for ldt in self.img.get_layer_data_tuples(
-                in_memory=self.in_memory
-            ):
+            for ldt in self.img.get_layer_data_tuples():
                 layer = Layer.create(*ldt)
                 self.viewer.add_layer(layer)

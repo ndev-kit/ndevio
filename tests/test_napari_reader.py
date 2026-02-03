@@ -2,10 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import dask.array as da
-
 # import npe2
-import numpy as np
 import pytest
 
 from ndevio._napari_reader import napari_get_reader
@@ -40,13 +37,6 @@ def test_napari_viewer_open(resources_dir: Path, make_napari_viewer) -> None:
 
 
 @pytest.mark.parametrize(
-    ('in_memory', 'expected_dtype'),
-    [
-        (True, np.ndarray),
-        (False, da.core.Array),
-    ],
-)
-@pytest.mark.parametrize(
     (
         'filename',
         'expected_shape',
@@ -65,9 +55,7 @@ def test_napari_viewer_open(resources_dir: Path, make_napari_viewer) -> None:
 def test_reader_supported_formats(
     resources_dir: Path,
     filename: str,
-    in_memory: bool,
     expected_shape: tuple[int, ...],
-    expected_dtype,
     expected_has_scale: bool,
     expected_num_layers: int,
 ) -> None:
@@ -79,7 +67,7 @@ def test_reader_supported_formats(
 
     # Get reader
     partial_napari_reader_function = napari_get_reader(
-        path, in_memory=in_memory, open_first_scene_only=True
+        path, open_first_scene_only=True
     )
     # Check callable
     assert callable(partial_napari_reader_function)
@@ -93,8 +81,7 @@ def test_reader_supported_formats(
 
     data, meta, _ = layer_data[0]
 
-    # Check layer data
-    assert isinstance(data, expected_dtype)
+    # Check layer data shape
     assert data.shape == expected_shape
 
     # Check meta has expected keys
@@ -103,13 +90,6 @@ def test_reader_supported_formats(
         assert 'scale' in meta
 
 
-@pytest.mark.parametrize(
-    ('in_memory', 'expected_dtype'),
-    [
-        (True, np.ndarray),
-        (False, da.core.Array),
-    ],
-)
 @pytest.mark.parametrize(
     ('filename', 'expected_shape', 'should_work'),
     [
@@ -127,8 +107,6 @@ def test_for_multiscene_widget(
     make_napari_viewer,
     resources_dir: Path,
     filename: str,
-    in_memory: bool,
-    expected_dtype,
     expected_shape: tuple[int, ...],
     should_work: bool,
 ) -> None:
@@ -146,7 +124,7 @@ def test_for_multiscene_widget(
         path = str(resources_dir / filename)
 
     # Get reader
-    reader = napari_get_reader(path, in_memory)
+    reader = napari_get_reader(path)
 
     if reader is not None:
         # Call reader on path
@@ -169,11 +147,9 @@ def test_for_multiscene_widget(
 
             data = viewer.layers[0].data
 
-            assert isinstance(data, expected_dtype)
             assert data.shape == expected_shape
         else:
             data, _, _ = reader(path)[0]
-            assert isinstance(data, expected_dtype)
             assert data.shape == expected_shape
 
 
@@ -181,7 +157,6 @@ def test_napari_get_reader_multi_path(resources_dir: Path) -> None:
     # Get reader
     reader = napari_get_reader(
         [str(resources_dir / RGB_TIFF), str(resources_dir / MULTISCENE_CZI)],
-        in_memory=True,
     )
 
     # Check callable
