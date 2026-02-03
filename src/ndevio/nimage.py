@@ -7,14 +7,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from bioio import BioImage
+from bioio_base.reader import Reader
+from bioio_base.types import ImageLike
 
-from ._layer_utils import (
+from .bioio_plugins._manager import raise_unsupported_with_suggestions
+from .utils._layer_utils import (
     build_layer_tuple,
     determine_in_memory,
     get_single_channel_name,
     resolve_layer_type,
 )
-from ._plugin_manager import raise_unsupported_with_suggestions
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -61,7 +63,7 @@ def _resolve_reader(
     # Get preferred reader from settings
     from ndev_settings import get_settings
 
-    from ._bioio_plugin_utils import get_installed_plugins, get_reader_by_name
+    from .bioio_plugins._utils import get_installed_plugins, get_reader_by_name
 
     settings = get_settings()
     preferred = settings.ndevio_reader.preferred_reader  # type: ignore

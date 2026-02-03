@@ -1,6 +1,11 @@
 """
 Helper functions for file handling and image processing.
 
+Note
+----
+This is a legacy module that will be refactored in the future.
+It should not be considered stable API.
+
 Functions
 ---------
 get_directory_and_files : Get the directory and files in the specified directory.

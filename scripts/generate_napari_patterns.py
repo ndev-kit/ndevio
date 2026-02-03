@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 
-from ndevio._bioio_plugin_utils import BIOIO_PLUGINS
+from ndevio.bioio_plugins._utils import BIOIO_PLUGINS
 
 # Ensure src is on path so we can import the package in editable installs
 repo_root = Path(__file__).resolve().parents[1]

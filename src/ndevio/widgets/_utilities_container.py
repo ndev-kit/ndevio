@@ -27,7 +27,7 @@ from magicgui.widgets import (
 )
 from ndev_settings import get_settings
 
-from ndevio import helpers
+from ndevio.utils import helpers
 
 if TYPE_CHECKING:
     import napari

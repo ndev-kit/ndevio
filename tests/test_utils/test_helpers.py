@@ -5,7 +5,7 @@ import pytest
 from bioio.writers import OmeTiffWriter
 
 from ndevio import nImage
-from ndevio.helpers import (
+from ndevio.utils.helpers import (
     check_for_missing_files,
     create_id_string,
     elide_string,

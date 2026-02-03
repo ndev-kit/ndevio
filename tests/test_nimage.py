@@ -350,7 +350,7 @@ class TestGetLayerDataTuples:
         import xarray as xr
         from bioio_base.dimensions import DimensionNames
 
-        from ndevio._colormap_utils import MULTI_CHANNEL_CYCLE
+        from ndevio.utils._colormap_utils import MULTI_CHANNEL_CYCLE
 
         # Create nImage directly with 4 channel data
         mock_data = xr.DataArray(
@@ -563,7 +563,7 @@ class TestResolveReaderFunction:
         with (
             patch('ndev_settings.get_settings') as mock_get_settings,
             patch(
-                'ndevio._bioio_plugin_utils.get_installed_plugins',
+                'ndevio.bioio_plugins._utils.get_installed_plugins',
                 return_value={'bioio-ome-tiff', 'bioio-tifffile'},
             ),
         ):
@@ -581,11 +581,11 @@ class TestResolveReaderFunction:
         with (
             patch('ndev_settings.get_settings') as mock_get_settings,
             patch(
-                'ndevio._bioio_plugin_utils.get_installed_plugins',
+                'ndevio.bioio_plugins._utils.get_installed_plugins',
                 return_value={'bioio-ome-tiff'},
             ),
             patch(
-                'ndevio._bioio_plugin_utils.get_reader_by_name'
+                'ndevio.bioio_plugins._utils.get_reader_by_name'
             ) as mock_get_reader,
         ):
             from bioio_ome_tiff import Reader as OmeTiffReader

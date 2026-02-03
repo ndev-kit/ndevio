@@ -13,10 +13,10 @@ from typing import TYPE_CHECKING
 
 from magicgui.widgets import ComboBox, Container, Label, PushButton
 
-from .._bioio_plugin_utils import BIOIO_PLUGINS
+from ..bioio_plugins._utils import BIOIO_PLUGINS
 
 if TYPE_CHECKING:
-    from .._plugin_manager import ReaderPluginManager
+    from ..bioio_plugins._manager import ReaderPluginManager
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ class PluginInstallerWidget(Container):
         super().__init__(labels=False)
 
         # Import here to avoid circular imports
-        from .._plugin_manager import ReaderPluginManager
+        from ..bioio_plugins._manager import ReaderPluginManager
 
         # Create or use provided manager
         self.manager = plugin_manager or ReaderPluginManager()
@@ -137,7 +137,10 @@ class PluginInstallerWidget(Container):
         logger.info('User requested install of: %s', plugin_name)
 
         # Use napari-plugin-manager's InstallerQueue
-        from .._plugin_installer import get_installer_queue, install_plugin
+        from ..bioio_plugins._installer import (
+            get_installer_queue,
+            install_plugin,
+        )
 
         # Get the global installer queue
         queue = get_installer_queue()

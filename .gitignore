@@ -93,3 +93,6 @@ src/ndevio/sampledata/data/neuron-4Ch_raw.tiff
 
 # LLMs
 AGENTS.md
+
+# Scripts
+scripts/nimage_testing.py

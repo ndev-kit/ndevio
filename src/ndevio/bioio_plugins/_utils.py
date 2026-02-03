@@ -34,7 +34,7 @@ import importlib
 import logging
 from typing import TYPE_CHECKING
 
-from ._bioio_extensions import (
+from ._extensions import (
     BIOIO_BIOFORMATS_EXTENSIONS,
     BIOIO_IMAGEIO_EXTENSIONS,
 )

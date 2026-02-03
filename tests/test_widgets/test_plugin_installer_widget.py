@@ -26,13 +26,13 @@ class TestPluginInstallerWidget:
 
     def test_error_mode_with_path(self):
         """Test widget in error mode - has path, preselects suggested plugin."""
-        from ndevio._plugin_manager import ReaderPluginManager
+        from ndevio.bioio_plugins._manager import ReaderPluginManager
         from ndevio.widgets import PluginInstallerWidget
 
         # Mock installed plugins to NOT include bioio-czi
         # This simulates the error case where file can't be read
         with patch(
-            'ndevio._plugin_manager.get_installed_plugins',
+            'ndevio.bioio_plugins._manager.get_installed_plugins',
             return_value={'bioio-ome-tiff'},
         ):
             manager = ReaderPluginManager('test.czi')
@@ -53,7 +53,9 @@ class TestPluginInstallerWidget:
         widget = PluginInstallerWidget()
         widget._plugin_select.value = 'bioio-imageio'
 
-        with patch('ndevio._plugin_installer.install_plugin') as mock_install:
+        with patch(
+            'ndevio.bioio_plugins._installer.install_plugin'
+        ) as mock_install:
             mock_install.return_value = 123
             widget._on_install_clicked()
 
