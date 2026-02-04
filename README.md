@@ -24,17 +24,17 @@ Originally developed as part of [napari-ndev], `ndevio` has since been separated
 - **Smart plugin installation** — automatic suggestions to install missing bioio reader plugins
 - **Programmatic API** — `nImage` class for napari-ready metadata extraction
 - **Batch utilities** — legacy widget for batch concatenation (with [nbatch]) and metadata management, with features being superseded by [napari-metadata]
-- **Sample data** — demonstrates ndevio capabilities
+- **Sample data** — demonstrates ndevio metadata handling and capabilities
+
+![napari viewer showing scene selection widget and napari-metadata widget displaying the metadata provided by ndevio a .czi file](https://github.com/ndev-kit/ndevio/blob/main/resources/ndevio-scene-and-metadata.png?raw=true)
 
 ## Installation
 
-You can install `ndevio` via [pip]:
+You can install `ndevio` from [PyPI] or via the napari plugin manager:
 
 ```bash
 pip install ndevio
 ```
-
-or search for it in the napari plugin manager. Conda-forge installation is coming soon!
 
 If you would like to try out ndevio, you can run napari in a temporary environment with [uv]:
 
@@ -42,7 +42,7 @@ If you would like to try out ndevio, you can run napari in a temporary environme
 uvx --with ndevio -p 3.13 "napari[all]"
 ```
 
-To contibute to ndevio or experiment with the latest features, see [Contributing.md](Contributing.md) for development setup instructions.
+To contibute to ndevio or experiment with the latest features, see [Contributing.md](CONTRIBUTING.md) for development setup instructions. Conda-forge availability is coming soon!
 
 ### Additional Image Format Support
 
