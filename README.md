@@ -111,14 +111,14 @@ from napari import Viewer
 img = nImage("path/to/image.czi")
 
 # Because nImage subclasses BioImage, all BioImage methods are available
-img.dims)             # e.g., <Dimensions [T: 15, C: 4, Z: 1, Y: 256, X: 256]>
+img.dims               # e.g., <Dimensions [T: 15, C: 4, Z: 1, Y: 256, X: 256]>
 
 # Access napari-ready properties, note that channel and singleton dimensions are dropped
-img.layer_data.shape)   # e.g. (15, 4, 256, 256) - still includes channel dimbecause it has not yet been converted to a list of LayerDataTuples
-img.layer_scale)        # e.g., (1.0, 0.2, 0.2) - time interval + physical scale per dimension, napari ready
-img.layer_axis_labels)  # e.g., ('T', 'Y', 'X')
-img.layer_units)        # e.g., ('s', 'µm', 'µm')
-img.layer_metadata)     # e.g., a dictionary containing the 1) full BioImage object, 2) raw_image metadata and 3) OME metadata (if parsed) - accessible via `viewer.layers[n].metadata`
+img.layer_data.shape   # e.g. (15, 4, 256, 256) - still includes channel dimbecause it has not yet been converted to a list of LayerDataTuples
+img.layer_scale        # e.g., (1.0, 0.2, 0.2) - time interval + physical scale per dimension, napari ready
+img.layer_axis_labels  # e.g., ('T', 'Y', 'X')
+img.layer_units        # e.g., ('s', 'µm', 'µm')
+img.layer_metadata     # e.g., a dictionary containing the 1) full BioImage object, 2) raw_image metadata and 3) OME metadata (if parsed) - accessible via `viewer.layers[n].metadata`
 
 # A convenience method to get napari LayerDataTuples with nImage metadata for napari
 viewer = Viewer()
