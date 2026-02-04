@@ -62,7 +62,7 @@ See the [bioio documentation](https://bioio-devs.github.io/bioio/) for the full 
 
 ### In napari
 
-Simply drag and drop image files into napari. `ndevio` handles the rest!
+Simply drag and drop image files into napari. `ndevio` handles the rest! To learn more about the decisions that ndevio (and its settings) makes when loading images, see [How ndevio Handles Images](#how-ndevio-handles-images) below.
 
 #### Multi-scene Images
 
@@ -97,7 +97,7 @@ Access via `Plugins > ndevio > Utilities` for:
 - **Export** as OME-TIFF or figure (PNG)
 
 **Note**: Elements of this widget are being superseded by [napari-metadata] for more comprehensive metadata handling.
-**Note 2:** This widget was built during [napari-ndev] mono-repo development and does not fully reflect the design goals of ndevio. It will remain functional, but expect future versions to look different.
+**Note 2:** This widget was built during napari-ndev mono-repo development and does not fully reflect the design goals of ndevio. It will remain functional, but expect future versions to look different.
 
 ### Programmatic Usage with `nImage`
 
