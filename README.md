@@ -9,19 +9,22 @@
 [![npe2](https://img.shields.io/badge/plugin-npe2-blue?link=https://napari.org/stable/plugins/index.html)](https://napari.org/stable/plugins/index.html)
 [![Copier](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/copier-org/copier/master/img/badge/badge-grayscale-inverted-border-purple.json)](https://github.com/copier-org/copier)
 
-Read, write, and manage images in napari
+**A generalized image format reader for napari built on top of [bioio]**
+
+`ndevio` provides flexible, metadata-aware image I/O for images in napari.
+Originally developed as part of [napari-ndev], `ndevio` has since been separated into its own plugin and is intended to be a feature-rich and easier to maintain spiritual successor to [napari-aicsimageio].
 
 ----------------------------------
 
-This [napari] plugin was generated with [copier] using the [napari-plugin-template].
+## Features
 
-<!--
-Don't miss the full getting started guide to set up your new package:
-https://github.com/napari/napari-plugin-template#getting-started
-
-and review the napari docs for plugin developers:
-https://napari.org/stable/plugins/index.html
--->
+- **Extensive format support** via [bioio] and its plugin system — read OME-TIFF, OME-Zarr, common image and movie formats, proprietary formats (CZI, LIF, ND2), and many more (with bioformats)!
+- **Multi-scene handling** — interactive widget for selecting between scenes/positions in multi-scene files
+- **Configurable behavior** via [ndev-settings] — customize reader priority, multi-scene handling, and more
+- **Smart plugin installation** — automatic suggestions to install missing bioio reader plugins
+- **Programmatic API** — `nImage` class for napari-ready metadata extraction
+- **Batch utilities** — legacy widget for batch concatenation (with [nbatch]) and metadata management, with features being superseded by [napari-metadata]
+- **Sample data** — demonstrates ndevio capabilities
 
 ## Installation
 
@@ -31,17 +34,15 @@ You can install `ndevio` via [pip]:
 pip install ndevio
 ```
 
-If napari is not already installed, you can install `ndevio` with napari and Qt via:
+or search for it in the napari plugin manager. Conda-forge installation is coming soon!
+
+If you would like to try out ndevio, you can run napari in a temporary environment with [uv]:
 
 ```bash
-pip install "ndevio[all]"
+uvx --with ndevio -p 3.13 "napari[all]"
 ```
 
-To install the latest development version:
-
-```bash
-pip install git+https://github.com/ndev-kit/ndevio.git
-```
+To contibute to ndevio or experiment with the latest features, see [Contributing.md](Contributing.md) for development setup instructions.
 
 ### Additional Image Format Support
 
