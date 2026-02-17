@@ -35,7 +35,7 @@ contributions:
       title: Load processed neuron labels data
   readers:
     - command: ndevio.get_reader
-      accepts_directories: false
+      accepts_directories: true
       filename_patterns: [
         '*.1sc', '*.264', '*.265', '*.2fl', '*.3fr', '*.3g2', '*.a64', '*.acff', '*.adp', '*.afi',
         '*.afm', '*.aim', '*.al3d', '*.am', '*.amiramesh', '*.amr', '*.amv', '*.apl', '*.apng', '*.arf',

@@ -18,6 +18,7 @@ CELLS3D2CH_OME_TIFF = 'cells3d2ch_legacy.tiff'  # 2 channel, 3D OME-TIFF, from o
 LOGO_PNG = 'nDev-logo-small.png'  # small PNG file (fix typo)
 CZI_FILE = '0T-4C-0Z-7pos.czi'  # multi-scene CZI file
 ND2_FILE = 'ND2_dims_rgb.nd2'  # ND2 file requiring bioio-nd2
+ZARR = 'dimension_handling_zyx_V3.zarr'
 
 
 def test_nImage_init(resources_dir: Path):
@@ -31,6 +32,14 @@ def test_nImage_init(resources_dir: Path):
     assert img._layer_data is None
     # Accessing the property triggers lazy loading
     assert img.layer_data is not None
+
+
+def test_nImage_zarr(resources_dir: Path):
+    """Test that nImage can read a Zarr file."""
+    img = nImage(resources_dir / ZARR)
+    assert img.data is not None
+    assert img.path == resources_dir / ZARR
+    assert img.data.shape == (1, 1, 2, 4, 4)
 
 
 def test_nImage_ome_reader(resources_dir: Path):
