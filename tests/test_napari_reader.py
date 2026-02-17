@@ -36,6 +36,18 @@ def test_napari_viewer_open(resources_dir: Path, make_napari_viewer) -> None:
     assert viewer.layers[0].data.shape == (60, 66, 85)
 
 
+def test_napari_viewer_open_directory(
+    resources_dir: Path, make_napari_viewer
+) -> None:
+    viewer = make_napari_viewer()
+    viewer.open(
+        str(resources_dir / 'dimension_handling_zyx_V3.zarr/'), plugin='ndevio'
+    )
+
+    assert len(viewer.layers) == 1
+    assert viewer.layers[0].data.shape == (2, 4, 4)
+
+
 @pytest.mark.parametrize(
     (
         'filename',
