@@ -19,12 +19,7 @@ def napari_get_reader(
     open_first_scene_only: bool | None = None,
     open_all_scenes: bool | None = None,
 ) -> ReaderFunction | None:
-    """
-    Get the appropriate reader function for a single given path.
-
-    Uses a quick extension check to determine if any bioio plugin might
-    support this file. If so, returns a reader function that will use
-    bioio's priority system to try each installed reader.
+    """Get the appropriate reader function for a single given path.
 
     Parameters
     ----------
@@ -41,24 +36,9 @@ def napari_get_reader(
 
     Returns
     -------
-    ReaderFunction or None
-        The reader function for the given path, or None if extension
-        is not recognized by any bioio plugin.
-
+    ReaderFunction
+        The reader function for the given path
     """
-    from .bioio_plugins._utils import suggest_plugins_for_path
-
-    if isinstance(path, list):
-        logger.info('Bioio: Expected a single path, got a list of paths.')
-        return None
-
-    # Quick extension check - if no plugins recognize this extension, return None
-    # This allows other napari readers to try the file
-    # TODO: This is probably legacy cruft before starting to autopopulate the filename_patterns in napari.yaml
-    suggested = suggest_plugins_for_path(path)
-    if not suggested:
-        logger.debug('ndevio: No bioio plugins for extension: %s', path)
-        return None
 
     settings = get_settings()
 
@@ -74,8 +54,8 @@ def napari_get_reader(
         else settings.ndevio_reader.scene_handling == 'View All Scenes'  # type: ignore
     ) or False
 
-    # Extension is recognized - return a reader function
-    # The actual reading happens in napari_reader_function
+    # Return reader function; actual format validation happens in
+    # napari_reader_function via nImage initialization.
     return partial(
         napari_reader_function,
         open_first_scene_only=open_first_scene_only,
