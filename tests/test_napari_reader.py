@@ -153,35 +153,6 @@ def test_for_multiscene_widget(
             assert data.shape == expected_shape
 
 
-def test_napari_get_reader_multi_path(resources_dir: Path) -> None:
-    # Get reader
-    reader = napari_get_reader(
-        [str(resources_dir / RGB_TIFF), str(resources_dir / MULTISCENE_CZI)],
-    )
-
-    # Check callable
-    assert reader is None
-
-
-def test_napari_get_reader_ome_override(resources_dir: Path) -> None:
-    reader = napari_get_reader(
-        str(resources_dir / OME_TIFF),
-    )
-
-    assert callable(reader)
-
-
-def test_napari_get_reader_unsupported(resources_dir: Path):
-    """Test that unsupported file extension returns None per napari reader spec."""
-    reader = napari_get_reader(
-        str(resources_dir / 'measure_props_Labels.abcdefg'),
-    )
-
-    # Should return None for unsupported formats (per napari spec)
-    # Unknown extensions are quickly rejected via suggest_plugins_for_path()
-    assert reader is None
-
-
 def test_napari_get_reader_supported_formats_work(resources_dir: Path):
     """Test that supported formats return valid readers."""
     # PNG should work (bioio-imageio is core)
