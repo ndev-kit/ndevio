@@ -99,10 +99,12 @@ class nImage(BioImage):
 
     Attributes
     ----------
-    path : Path | str | None
+    path : str | None
         Path or URI to the source file, or None if created from array data.
-        Preserved as-is from the input: a ``Path`` if a ``Path`` was passed,
-        a ``str`` if a string URI was passed (e.g. ``"s3://bucket/image.zarr"``).
+        Always a plain string — local paths are stored as-is, ``file://`` URIs
+        are normalised to their path component, and remote URIs (``s3://``,
+        ``https://``, …) are kept verbatim.  Use ``is_remote`` to distinguish
+        local from remote.
 
     Examples
     --------
@@ -122,7 +124,7 @@ class nImage(BioImage):
     """
 
     # Class-level type hints for instance attributes
-    path: Path | str | None
+    path: str | None
     _layer_data: xr.DataArray | None
 
     def __init__(
@@ -158,7 +160,21 @@ class nImage(BioImage):
 
         # Instance state
         self._layer_data = None
-        self.path = image if isinstance(image, str | Path) else None
+        if isinstance(image, str | Path):
+            from urllib.parse import unquote, urlparse
+            from urllib.request import url2pathname
+
+            s = str(image)
+            scheme = urlparse(s).scheme
+            # file:// URIs are local — normalise to a plain path string.
+            # Single-char schemes are Windows drive letters (e.g. 'C:/path'),
+            # not real URI schemes, so treat those as plain paths too.
+            if scheme == 'file':
+                self.path = url2pathname(unquote(urlparse(s).path))
+            else:
+                self.path = s
+        else:
+            self.path = None
 
     @property
     def layer_data(self) -> xr.DataArray:
@@ -191,28 +207,22 @@ class nImage(BioImage):
     def is_remote(self) -> bool:
         """True if the image source is on a remote filesystem (S3, HTTP, etc.).
 
-        Inspects the already-initialised ``reader._fs`` rather than
-        re-parsing the path, so no network requests are made.
-
         Returns
         -------
         bool
-            False for local files and array data; True for any non-local
-            fsspec filesystem.
-
-        Notes
-        -----
-        ``reader._fs`` is an annotation-only attribute in bioio-base with no
-        default: array-backed readers never set it, so ``AttributeError`` is
-        the expected signal for "no filesystem" rather than a bug.
+            False for local files (including ``file://`` URIs, which are
+            normalised to plain paths at construction) and array data.
+            True for any multi-char URI scheme other than ``file``
+            (e.g. ``s3://``, ``https://``, ``gc://``).
 
         """
-        from fsspec.implementations.local import LocalFileSystem
-
-        try:
-            return not isinstance(self.reader._fs, LocalFileSystem)
-        except AttributeError:
+        if self.path is None:
             return False
+        from urllib.parse import urlparse
+
+        scheme = urlparse(self.path).scheme
+        # Single-char schemes are Windows drive letters, not real URI schemes.
+        return bool(scheme) and len(scheme) > 1
 
     @property
     def path_stem(self) -> str:
@@ -234,12 +244,12 @@ class nImage(BioImage):
         """
         if self.path is None:
             return 'unknown'
-        if isinstance(self.path, Path):
-            return self.path.stem
-        # Remote URI string — strip scheme then use PurePosixPath for the stem
-        from pathlib import PurePosixPath
+        if self.is_remote:
+            from pathlib import PurePosixPath
+            from urllib.parse import urlparse
 
-        return PurePosixPath(str(self.path).split('://', 1)[-1]).stem
+            return PurePosixPath(urlparse(self.path).path).stem
+        return Path(self.path).stem
 
     @property
     def layer_scale(self) -> tuple[float, ...]:

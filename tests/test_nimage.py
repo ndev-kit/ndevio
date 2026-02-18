@@ -24,7 +24,7 @@ ZARR = 'dimension_handling_zyx_V3.zarr'
 def test_nImage_init(resources_dir: Path):
     """Test nImage initialization with a file that should work."""
     img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
-    assert img.path == resources_dir / CELLS3D2CH_OME_TIFF
+    assert img.path == str(resources_dir / CELLS3D2CH_OME_TIFF)
     assert img.reader is not None
     # Shape is (T, C, Z, Y, X) = (1, 2, 60, 66, 85)
     assert img.data.shape == (1, 2, 60, 66, 85)
@@ -38,7 +38,7 @@ def test_nImage_zarr(resources_dir: Path):
     """Test that nImage can read a Zarr file."""
     img = nImage(resources_dir / ZARR)
     assert img.data is not None
-    assert img.path == resources_dir / ZARR
+    assert img.path == str(resources_dir / ZARR)
     assert img.data.shape == (1, 1, 2, 4, 4)
 
 
@@ -48,6 +48,7 @@ def test_nImage_remote_zarr():
     remote_zarr = 'https://uk1s3.embassy.ebi.ac.uk/ebi-ngff-challenge-2024/4ffaeed2-fa70-4907-820f-8a96ef683095.zarr'  # from https://github.com/bioio-devs/bioio-ome-zarr/blob/main/bioio_ome_zarr/tests/test_remote_read_zarrV3.py
     img = nImage(remote_zarr)
     assert img.path == remote_zarr
+    assert img.is_remote
     # original shape is (1, 2, 1, 512, 512) but layer_data is squeezed
     assert img.layer_data.shape == (2, 512, 512)
 
@@ -234,7 +235,7 @@ def test_nimage_init_with_various_formats(
         # Must successfully initialize
         img = nImage(resources_dir / filename)
         assert img.data is not None
-        assert img.path == resources_dir / filename
+        assert img.path == str(resources_dir / filename)
     elif should_work is False:
         # Must fail with helpful error
         with pytest.raises(UnsupportedFileFormatError) as exc_info:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -109,7 +108,7 @@ def resolve_layer_type(
 
 
 def determine_in_memory(
-    path: Path | str | None,
+    path: str | None,
     max_in_mem_bytes: float = 4e9,
     max_in_mem_percent: float = 0.3,
 ) -> bool:
@@ -117,8 +116,9 @@ def determine_in_memory(
 
     Parameters
     ----------
-    path : Path | str | None
-        Path or URI to the image file. If None (array data), returns True.
+    path : str | None
+        Path to the image file as a string. If None (array data or remote
+        URI), returns True.
     max_in_mem_bytes : float
         Maximum file size in bytes for in-memory loading.
         Default is 4 GB (4e9 bytes).
