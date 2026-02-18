@@ -99,8 +99,10 @@ class nImage(BioImage):
 
     Attributes
     ----------
-    path : Path | None
-        Path to the source file, or None if created from array data.
+    path : Path | str | None
+        Path or URI to the source file, or None if created from array data.
+        Preserved as-is from the input: a ``Path`` if a ``Path`` was passed,
+        a ``str`` if a string URI was passed (e.g. ``"s3://bucket/image.zarr"``).
 
     Examples
     --------
@@ -120,7 +122,7 @@ class nImage(BioImage):
     """
 
     # Class-level type hints for instance attributes
-    path: Path | None
+    path: Path | str | None
     _layer_data: xr.DataArray | None
 
     def __init__(
@@ -156,7 +158,7 @@ class nImage(BioImage):
 
         # Instance state
         self._layer_data = None
-        self.path = Path(image) if isinstance(image, str | Path) else None
+        self.path = image if isinstance(image, str | Path) else None
 
     @property
     def layer_data(self) -> xr.DataArray:
@@ -179,12 +181,65 @@ class nImage(BioImage):
 
         """
         if self._layer_data is None:
-            in_memory = determine_in_memory(self.path)
-            if in_memory:
-                self._layer_data = self.xarray_data.squeeze()
-            else:
+            if self.is_remote or not determine_in_memory(self.path):
                 self._layer_data = self.xarray_dask_data.squeeze()
+            else:
+                self._layer_data = self.xarray_data.squeeze()
         return self._layer_data
+
+    @property
+    def is_remote(self) -> bool:
+        """True if the image source is on a remote filesystem (S3, HTTP, etc.).
+
+        Inspects the already-initialised ``reader._fs`` rather than
+        re-parsing the path, so no network requests are made.
+
+        Returns
+        -------
+        bool
+            False for local files and array data; True for any non-local
+            fsspec filesystem.
+
+        Notes
+        -----
+        ``reader._fs`` is an annotation-only attribute in bioio-base with no
+        default: array-backed readers never set it, so ``AttributeError`` is
+        the expected signal for "no filesystem" rather than a bug.
+
+        """
+        from fsspec.implementations.local import LocalFileSystem
+
+        try:
+            return not isinstance(self.reader._fs, LocalFileSystem)
+        except AttributeError:
+            return False
+
+    @property
+    def path_stem(self) -> str:
+        """Filename stem derived from path or URI, used in layer names.
+
+        Returns
+        -------
+        str
+            The stem of the filename (no extension, no parent path), or
+            ``'unknown'`` when the image was created from array data.
+
+        Examples
+        --------
+        >>> nImage("/data/cells.ome.tiff").path_stem
+        'cells.ome'
+        >>> nImage("s3://bucket/experiment/image.zarr").path_stem
+        'image'
+
+        """
+        if self.path is None:
+            return 'unknown'
+        if isinstance(self.path, Path):
+            return self.path.stem
+        # Remote URI string — strip scheme then use PurePosixPath for the stem
+        from pathlib import PurePosixPath
+
+        return PurePosixPath(str(self.path).split('://', 1)[-1]).stem
 
     @property
     def layer_scale(self) -> tuple[float, ...]:
@@ -334,8 +389,7 @@ class nImage(BioImage):
         if len(self.scenes) > 1 or self.current_scene != 'Image:0':
             parts.extend([str(self.current_scene_index), self.current_scene])
 
-        path_stem = self.path.stem if self.path is not None else 'unknown path'
-        parts.append(path_stem)
+        parts.append(self.path_stem)
 
         return delim.join(parts)
 
