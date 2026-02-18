@@ -49,6 +49,7 @@ def test_napari_viewer_open_directory(
     assert viewer.layers[0].data.shape == (2, 4, 4)
 
 
+@pytest.mark.network
 def test_napari_viewer_open_remote(make_napari_viewer) -> None:
     viewer = make_napari_viewer()
     viewer.open(REMOTE_ZARR, plugin='ndevio')
