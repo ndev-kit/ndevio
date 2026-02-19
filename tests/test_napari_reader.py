@@ -14,6 +14,7 @@ MULTISCENE_CZI = r'0T-4C-0Z-7pos.czi'
 PNG_FILE = 'nDev-logo-small.png'
 ND2_FILE = 'ND2_dims_rgb.nd2'
 OME_TIFF = 'cells3d2ch_legacy.tiff'
+REMOTE_ZARR = 'https://uk1s3.embassy.ebi.ac.uk/ebi-ngff-challenge-2024/4ffaeed2-fa70-4907-820f-8a96ef683095.zarr'  # from https://github.com/bioio-devs/bioio-ome-zarr/blob/main/bioio_ome_zarr/tests/test_remote_read_zarrV3.py
 
 ###############################################################################
 
@@ -46,6 +47,15 @@ def test_napari_viewer_open_directory(
 
     assert len(viewer.layers) == 1
     assert viewer.layers[0].data.shape == (2, 4, 4)
+
+
+@pytest.mark.network
+def test_napari_viewer_open_remote(make_napari_viewer) -> None:
+    viewer = make_napari_viewer()
+    viewer.open(REMOTE_ZARR, plugin='ndevio')
+
+    assert len(viewer.layers) == 2
+    assert viewer.layers[0].data.shape == (512, 512)
 
 
 @pytest.mark.parametrize(

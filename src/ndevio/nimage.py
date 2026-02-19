@@ -99,8 +99,12 @@ class nImage(BioImage):
 
     Attributes
     ----------
-    path : Path | None
-        Path to the source file, or None if created from array data.
+    path : str | None
+        Path or URI to the source file, or None if created from array data.
+        Always a plain string — local paths are stored as-is, ``file://`` URIs
+        are normalised to their path component, and remote URIs (``s3://``,
+        ``https://``, …) are kept verbatim.  Use ``_is_remote`` to distinguish
+        local from remote.
 
     Examples
     --------
@@ -120,7 +124,8 @@ class nImage(BioImage):
     """
 
     # Class-level type hints for instance attributes
-    path: Path | None
+    path: str | None
+    _is_remote: bool
     _layer_data: xr.DataArray | None
 
     def __init__(
@@ -156,7 +161,24 @@ class nImage(BioImage):
 
         # Instance state
         self._layer_data = None
-        self.path = Path(image) if isinstance(image, str | Path) else None
+        if isinstance(image, str | Path):
+            import fsspec
+            from fsspec.implementations.local import LocalFileSystem
+
+            s = str(image)
+            fs, resolved = fsspec.url_to_fs(s)
+            if isinstance(fs, LocalFileSystem):
+                # Normalise file:// URIs and any platform variations to an
+                # OS-native path string so Path(self.path) always round-trips.
+                self.path = str(Path(resolved))
+                self._is_remote = False
+            else:
+                # Remote URI (s3://, https://, gc://, …) — keep verbatim.
+                self.path = s
+                self._is_remote = True
+        else:
+            self.path = None
+            self._is_remote = False
 
     @property
     def layer_data(self) -> xr.DataArray:
@@ -179,12 +201,38 @@ class nImage(BioImage):
 
         """
         if self._layer_data is None:
-            in_memory = determine_in_memory(self.path)
-            if in_memory:
-                self._layer_data = self.xarray_data.squeeze()
-            else:
+            if self._is_remote or not determine_in_memory(self.path):
                 self._layer_data = self.xarray_dask_data.squeeze()
+            else:
+                self._layer_data = self.xarray_data.squeeze()
         return self._layer_data
+
+    @property
+    def path_stem(self) -> str:
+        """Filename stem derived from path or URI, used in layer names.
+
+        Returns
+        -------
+        str
+            The stem of the filename (no extension, no parent path), or
+            ``'unknown'`` when the image was created from array data.
+
+        Examples
+        --------
+        >>> nImage("/data/cells.ome.tiff").path_stem
+        'cells.ome'
+        >>> nImage("s3://bucket/experiment/image.zarr").path_stem
+        'image'
+
+        """
+        if self.path is None:
+            return 'unknown'
+        if self._is_remote:
+            from pathlib import PurePosixPath
+            from urllib.parse import urlparse
+
+            return PurePosixPath(urlparse(self.path).path).stem
+        return Path(self.path).stem
 
     @property
     def layer_scale(self) -> tuple[float, ...]:
@@ -334,8 +382,7 @@ class nImage(BioImage):
         if len(self.scenes) > 1 or self.current_scene != 'Image:0':
             parts.extend([str(self.current_scene_index), self.current_scene])
 
-        path_stem = self.path.stem if self.path is not None else 'unknown path'
-        parts.append(path_stem)
+        parts.append(self.path_stem)
 
         return delim.join(parts)
 

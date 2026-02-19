@@ -49,7 +49,7 @@ jobs:
           wm: herbstluftwm
 
       - name: Run tests
-        run: uv run --dev pytest -v --color=yes -m "not network" --cov=ndevio --cov-report=xml
+        run: uv run --dev pytest -v --color=yes --cov=ndevio --cov-report=xml
 
       - name: Coverage
         uses: codecov/codecov-action@v5
