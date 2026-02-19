@@ -103,8 +103,9 @@ def test_reader_supported_formats(
 
     data, meta, _ = layer_data[0]
 
-    # Check layer data shape
-    assert data.shape == expected_shape
+    # Check layer data shape (data is a list of arrays, one per resolution level)
+    assert isinstance(data, list)
+    assert data[0].shape == expected_shape
 
     # Check meta has expected keys
     assert 'name' in meta
@@ -169,10 +170,13 @@ def test_for_multiscene_widget(
 
             data = viewer.layers[0].data
 
-            assert data.shape == expected_shape
+            if isinstance(data, list):
+                assert data[0].shape == expected_shape
+            else:
+                assert data.shape == expected_shape
         else:
             data, _, _ = reader(path)[0]
-            assert data.shape == expected_shape
+            assert data[0].shape == expected_shape
 
 
 def test_napari_get_reader_supported_formats_work(resources_dir: Path):

@@ -36,9 +36,11 @@ def _validate_layer_data_tuples(
 
         data, kwargs, layer_type = layer_tuple
 
-        # Data should be array-like with shape
-        assert hasattr(data, 'shape')
-        assert len(data.shape) >= 2  # At minimum 2D
+        # Data should be a list of array-like objects (multiscale-ready)
+        assert isinstance(data, list)
+        assert len(data) >= 1
+        assert hasattr(data[0], 'shape')
+        assert len(data[0].shape) >= 2  # At minimum 2D
 
         # kwargs should be a dict
         assert isinstance(kwargs, dict)

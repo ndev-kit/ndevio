@@ -113,7 +113,7 @@ def determine_in_memory(
 
 
 def build_layer_tuple(
-    data: ArrayLike,
+    data: ArrayLike | list[ArrayLike],
     *,
     layer_type: str,
     name: str,
@@ -130,8 +130,9 @@ def build_layer_tuple(
 
     Parameters
     ----------
-    data : ArrayLike
-        Image data for this layer.
+    data : ArrayLike | list[ArrayLike]
+        Image data for this layer. A list of arrays is interpreted by
+        napari as multiscale data (highest to lowest resolution).
     layer_type : str
         Layer type ('image', 'labels', etc.).
     name : str
