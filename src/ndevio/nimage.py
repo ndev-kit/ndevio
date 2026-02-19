@@ -274,7 +274,7 @@ class nImage(BioImage):
 
         # Single channel (C=1 is squeezed out of layer_data)
         if self.dims.C == 1:
-            ch_name = channel_names[0] if channel_names else None
+            ch_name = channel_names[0]
             return [f'{ch_name} :: {base_name}' if ch_name else base_name]
 
         # Multichannel
@@ -486,9 +486,7 @@ class nImage(BioImage):
 
         # Single channel (no C dimension to split)
         if channel_dim not in layer_data.dims:
-            channel_name = (
-                self.channel_names[0] if self.channel_names else None
-            )
+            channel_name = self.channel_names[0]
             effective_type = resolve_layer_type(
                 channel_name or '', layer_type, channel_types
             )
@@ -517,9 +515,7 @@ class nImage(BioImage):
 
         tuples: list[LayerDataTuple] = []
         for i in range(total_channels):
-            channel_name = (
-                channel_names[i] if i < len(channel_names) else f'channel_{i}'
-            )
+            channel_name = channel_names[i]
             effective_type = resolve_layer_type(
                 channel_name, layer_type, channel_types
             )
