@@ -240,22 +240,25 @@ class nImage(BioImage):
 
         Returns one name per output layer — the same count as
         :meth:`get_layer_data_tuples` returns tuples. The base name is the
-        scene-qualified :attr:`path_stem`; channel names are prepended with
-        ``' :: '`` when present.
+        scene-qualified :attr:`path_stem`; channel names are prepended using
+        ``' :: '`` as a delimiter when present.
 
         Returns
         -------
         list[str]
             e.g. ``['membrane :: cells.ome', 'nuclei :: cells.ome']``
-            for a 2-channel file, or ``['cells.ome']`` for single-channel.
+            for a 2-channel file, or ``['0 :: cells.ome']`` for a
+            single-channel OME image with a default ``C`` coordinate.
+            Only when no ``C`` dimension is present at all will the name
+            be just ``['cells.ome']``.
 
         Examples
         --------
         >>> nImage("cells.ome.tiff").layer_names
-        ['cells.ome']
+        ['0 :: cells.ome']
 
         """
-        # Build scene-qualified base name
+        # Build scene-qualified base name (pure metadata, no data load)
         delim = ' :: '
         parts: list[str] = []
         if len(self.scenes) > 1 or self.current_scene != 'Image:0':
@@ -263,24 +266,23 @@ class nImage(BioImage):
         parts.append(self.path_stem)
         base_name = delim.join(parts)
 
-        layer_data = self.layer_data
-
-        # RGB: single layer, no channel prefix
-        if 'S' in self.reader.dims.order:
+        # RGB (Samples dim): single layer, no channel prefix
+        if 'S' in self.dims.order:
             return [base_name]
 
-        channel_dim = 'C'
+        # No channel dimension at all (pure spatial image)
+        if 'C' not in self.dims.order:
+            return [base_name]
 
-        # Single channel (no C dimension present)
-        if channel_dim not in layer_data.dims:
-            ch_name = get_single_channel_name(layer_data, channel_dim)
-            name = f'{ch_name} :: {base_name}' if ch_name else base_name
-            return [name]
+        # Use BioImage channel_names — metadata only, no data load
+        channel_names = self.channel_names
+
+        # Single channel (C=1 is squeezed out of layer_data)
+        if self.dims.C == 1:
+            ch_name = channel_names[0] if channel_names else None
+            return [f'{ch_name} :: {base_name}' if ch_name else base_name]
 
         # Multichannel
-        channel_names = [
-            str(c) for c in layer_data.coords[channel_dim].data.tolist()
-        ]
         return [f'{ch} :: {base_name}' for ch in channel_names]
 
     @property
@@ -471,7 +473,7 @@ class nImage(BioImage):
         units = self.layer_units
 
         # Handle RGB images (Samples dimension 'S')
-        if 'S' in self.reader.dims.order:
+        if 'S' in self.dims.order:
             return [
                 build_layer_tuple(
                     layer_data.data,
