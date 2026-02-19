@@ -235,37 +235,53 @@ class nImage(BioImage):
         return Path(self.path).stem
 
     @property
-    def layer_name(self) -> str:
-        """Base layer name from scene info and file path.
+    def layer_names(self) -> list[str]:
+        """Per-channel layer names for napari.
 
-        Returns the scene-qualified filename stem. For multichannel images,
-        prepend the channel name with `` :: `` to form the full layer name
-        (this is done automatically in :meth:`get_layer_data_tuples`).
+        Returns one name per output layer — the same count as
+        :meth:`get_layer_data_tuples` returns tuples. The base name is the
+        scene-qualified :attr:`path_stem`; channel names are prepended with
+        ``' :: '`` when present.
 
         Returns
         -------
-        str
-            Formatted name like ``"3 :: WellA2 :: filename"`` for multi-scene
-            or ``"filename"`` for single-scene files.
+        list[str]
+            e.g. ``['membrane :: cells.ome', 'nuclei :: cells.ome']``
+            for a 2-channel file, or ``['cells.ome']`` for single-channel.
 
         Examples
         --------
-        >>> nImage("cells.ome.tiff").layer_name
-        'cells.ome'
-        >>> # Full per-channel name used in get_layer_data_tuples:
-        >>> # f"{channel_name} :: {img.layer_name}"  →  'DAPI :: cells.ome'
+        >>> nImage("cells.ome.tiff").layer_names
+        ['cells.ome']
 
         """
+        # Build scene-qualified base name
         delim = ' :: '
         parts: list[str] = []
-
-        # Include scene info if multi-scene or non-default scene name
         if len(self.scenes) > 1 or self.current_scene != 'Image:0':
             parts.extend([str(self.current_scene_index), self.current_scene])
-
         parts.append(self.path_stem)
+        base_name = delim.join(parts)
 
-        return delim.join(parts)
+        layer_data = self.layer_data
+
+        # RGB: single layer, no channel prefix
+        if 'S' in self.reader.dims.order:
+            return [base_name]
+
+        channel_dim = 'C'
+
+        # Single channel (no C dimension present)
+        if channel_dim not in layer_data.dims:
+            ch_name = get_single_channel_name(layer_data, channel_dim)
+            name = f'{ch_name} :: {base_name}' if ch_name else base_name
+            return [name]
+
+        # Multichannel
+        channel_names = [
+            str(c) for c in layer_data.coords[channel_dim].data.tolist()
+        ]
+        return [f'{ch} :: {base_name}' for ch in channel_names]
 
     @property
     def layer_scale(self) -> tuple[float, ...]:
@@ -445,12 +461,10 @@ class nImage(BioImage):
         https://napari.org/dev/plugins/building_a_plugin/guides.html
 
         """
-        # Access layer_data property to ensure it's loaded
         layer_data = self.layer_data
-
         if layer_type is not None:
             channel_types = None  # Global override ignores per-channel
-
+        names = self.layer_names
         base_metadata = self.layer_metadata
         scale = self.layer_scale
         axis_labels = self.layer_axis_labels
@@ -462,7 +476,7 @@ class nImage(BioImage):
                 build_layer_tuple(
                     layer_data.data,
                     layer_type='image',
-                    name=self.layer_name,
+                    name=names[0],
                     metadata=base_metadata,
                     scale=scale,
                     axis_labels=axis_labels,
@@ -488,11 +502,7 @@ class nImage(BioImage):
                 build_layer_tuple(
                     layer_data.data,
                     layer_type=effective_type,
-                    name=(
-                        f'{channel_name} :: {self.layer_name}'
-                        if channel_name
-                        else self.layer_name
-                    ),
+                    name=names[0],
                     metadata=base_metadata,
                     scale=scale,
                     axis_labels=axis_labels,
@@ -530,7 +540,7 @@ class nImage(BioImage):
                 build_layer_tuple(
                     channel_data,
                     layer_type=effective_type,
-                    name=f'{channel_name} :: {self.layer_name}',
+                    name=names[i],
                     metadata=base_metadata,
                     scale=scale,
                     axis_labels=axis_labels,

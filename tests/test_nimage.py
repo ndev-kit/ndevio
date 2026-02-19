@@ -303,6 +303,23 @@ class TestGetLayerDataTuples:
         assert 'membrane' in names[0]
         assert 'nuclei' in names[1]
 
+    def test_layer_names_matches_tuple_names(self, resources_dir: Path):
+        """Test that layer_names property matches names in get_layer_data_tuples."""
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+        layer_tuples = img.get_layer_data_tuples()
+
+        # layer_names should match names baked into the tuples
+        assert img.layer_names == [meta['name'] for _, meta, _ in layer_tuples]
+        assert len(img.layer_names) == 2
+        assert 'membrane' in img.layer_names[0]
+        assert 'nuclei' in img.layer_names[1]
+
+    def test_layer_names_single_channel(self, resources_dir: Path):
+        """Test layer_names for a single-channel image."""
+        img = nImage(resources_dir / LOGO_PNG)
+        assert len(img.layer_names) == 1
+        assert img.layer_names[0].endswith(img.path_stem)
+
     def test_single_channel_image_returns_single_tuple(
         self, resources_dir: Path
     ):
