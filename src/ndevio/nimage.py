@@ -103,7 +103,7 @@ class nImage(BioImage):
         Path or URI to the source file, or None if created from array data.
         Always a plain string — local paths are stored as-is, ``file://`` URIs
         are normalised to their path component, and remote URIs (``s3://``,
-        ``https://``, …) are kept verbatim.  Use ``is_remote`` to distinguish
+        ``https://``, …) are kept verbatim.  Use ``_is_remote`` to distinguish
         local from remote.
 
     Examples

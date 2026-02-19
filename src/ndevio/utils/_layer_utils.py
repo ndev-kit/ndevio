@@ -117,8 +117,7 @@ def determine_in_memory(
     Parameters
     ----------
     path : str | None
-        Path to the image file as a string. If None (array data or remote
-        URI), returns True.
+        Path to the image file as a string. If None (array data), returns True.
     max_in_mem_bytes : float
         Maximum file size in bytes for in-memory loading.
         Default is 4 GB (4e9 bytes).
