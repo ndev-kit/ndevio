@@ -14,7 +14,6 @@ from .bioio_plugins._manager import raise_unsupported_with_suggestions
 from .utils._layer_utils import (
     build_layer_tuple,
     determine_in_memory,
-    get_single_channel_name,
     resolve_layer_type,
 )
 
@@ -235,6 +234,53 @@ class nImage(BioImage):
         return Path(self.path).stem
 
     @property
+    def layer_names(self) -> list[str]:
+        """Per-channel layer names for napari.
+
+        Returns one name per output layer — the same count as
+        :meth:`get_layer_data_tuples` returns tuples. The base name is the
+        scene-qualified :attr:`path_stem`; channel names are prepended using
+        ``' :: '`` as a delimiter when present.
+
+        Returns
+        -------
+        list[str]
+            e.g. ``['membrane :: cells.ome', 'nuclei :: cells.ome']``
+            for a 2-channel file, or ``['0 :: cells.ome']`` for a
+            single-channel OME image with a default ``C`` coordinate.
+            Only when no ``C`` dimension is present at all will the name
+            be just ``['cells.ome']``.
+
+        Examples
+        --------
+        >>> nImage("cells.ome.tiff").layer_names
+        ['0 :: cells.ome']
+
+        """
+        # Build scene-qualified base name
+        delim = ' :: '
+        parts: list[str] = []
+        if len(self.scenes) > 1 or self.current_scene != 'Image:0':
+            parts.extend([str(self.current_scene_index), self.current_scene])
+        parts.append(self.path_stem)
+        base_name = delim.join(parts)
+
+        # RGB (Samples dim): single layer, no channel prefix
+        if 'S' in self.dims.order:
+            return [base_name]
+
+        # Use BioImage channel_names — metadata only, no data load
+        channel_names = self.channel_names
+
+        # Single channel (C=1 is squeezed out of layer_data)
+        if self.dims.C == 1:
+            ch_name = channel_names[0]
+            return [f'{ch_name} :: {base_name}' if ch_name else base_name]
+
+        # Multichannel
+        return [f'{ch} :: {base_name}' for ch in channel_names]
+
+    @property
     def layer_scale(self) -> tuple[float, ...]:
         """Physical scale for dimensions in layer data.
 
@@ -358,34 +404,6 @@ class nImage(BioImage):
 
         return meta
 
-    def _build_layer_name(self, channel_name: str | None = None) -> str:
-        """Build layer name from channel, scene, and file path.
-
-        Parameters
-        ----------
-        channel_name : str, optional
-            Name of the channel to include in the layer name.
-
-        Returns
-        -------
-        str
-            Formatted layer name like "channel :: 0 :: Image:0 :: filename".
-
-        """
-        delim = ' :: '
-        parts: list[str] = []
-
-        if channel_name:
-            parts.append(channel_name)
-
-        # Include scene info if multi-scene or non-default scene name
-        if len(self.scenes) > 1 or self.current_scene != 'Image:0':
-            parts.extend([str(self.current_scene_index), self.current_scene])
-
-        parts.append(self.path_stem)
-
-        return delim.join(parts)
-
     def get_layer_data_tuples(
         self,
         layer_type: str | None = None,
@@ -440,24 +458,22 @@ class nImage(BioImage):
         https://napari.org/dev/plugins/building_a_plugin/guides.html
 
         """
-        # Access layer_data property to ensure it's loaded
         layer_data = self.layer_data
-
         if layer_type is not None:
             channel_types = None  # Global override ignores per-channel
-
+        names = self.layer_names
         base_metadata = self.layer_metadata
         scale = self.layer_scale
         axis_labels = self.layer_axis_labels
         units = self.layer_units
 
         # Handle RGB images (Samples dimension 'S')
-        if 'S' in self.reader.dims.order:
+        if 'S' in self.dims.order:
             return [
                 build_layer_tuple(
                     layer_data.data,
                     layer_type='image',
-                    name=self._build_layer_name(),
+                    name=names[0],
                     metadata=base_metadata,
                     scale=scale,
                     axis_labels=axis_labels,
@@ -470,7 +486,7 @@ class nImage(BioImage):
 
         # Single channel (no C dimension to split)
         if channel_dim not in layer_data.dims:
-            channel_name = get_single_channel_name(layer_data, channel_dim)
+            channel_name = self.channel_names[0]
             effective_type = resolve_layer_type(
                 channel_name or '', layer_type, channel_types
             )
@@ -483,7 +499,7 @@ class nImage(BioImage):
                 build_layer_tuple(
                     layer_data.data,
                     layer_type=effective_type,
-                    name=self._build_layer_name(channel_name),
+                    name=names[0],
                     metadata=base_metadata,
                     scale=scale,
                     axis_labels=axis_labels,
@@ -493,17 +509,13 @@ class nImage(BioImage):
             ]
 
         # Multichannel - split into separate layers
-        channel_names = [
-            str(c) for c in layer_data.coords[channel_dim].data.tolist()
-        ]
+        channel_names = self.channel_names
         channel_axis = layer_data.dims.index(channel_dim)
         total_channels = layer_data.shape[channel_axis]
 
         tuples: list[LayerDataTuple] = []
         for i in range(total_channels):
-            channel_name = (
-                channel_names[i] if i < len(channel_names) else f'channel_{i}'
-            )
+            channel_name = channel_names[i]
             effective_type = resolve_layer_type(
                 channel_name, layer_type, channel_types
             )
@@ -521,7 +533,7 @@ class nImage(BioImage):
                 build_layer_tuple(
                     channel_data,
                     layer_type=effective_type,
-                    name=self._build_layer_name(channel_name),
+                    name=names[i],
                     metadata=base_metadata,
                     scale=scale,
                     axis_labels=axis_labels,
