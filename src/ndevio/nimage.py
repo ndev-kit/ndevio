@@ -125,6 +125,7 @@ class nImage(BioImage):
 
     # Class-level type hints for instance attributes
     path: str | None
+    _is_remote: bool
     _layer_data: xr.DataArray | None
 
     def __init__(
@@ -161,20 +162,23 @@ class nImage(BioImage):
         # Instance state
         self._layer_data = None
         if isinstance(image, str | Path):
-            from urllib.parse import unquote, urlparse
-            from urllib.request import url2pathname
+            import fsspec
+            from fsspec.implementations.local import LocalFileSystem
 
             s = str(image)
-            scheme = urlparse(s).scheme
-            # file:// URIs are local — normalise to a plain path string.
-            # Single-char schemes are Windows drive letters (e.g. 'C:/path'),
-            # not real URI schemes, so treat those as plain paths too.
-            if scheme == 'file':
-                self.path = url2pathname(unquote(urlparse(s).path))
+            fs, resolved = fsspec.url_to_fs(s)
+            if isinstance(fs, LocalFileSystem):
+                # Normalise file:// URIs and any platform variations to an
+                # OS-native path string so Path(self.path) always round-trips.
+                self.path = str(Path(resolved))
+                self._is_remote = False
             else:
+                # Remote URI (s3://, https://, gc://, …) — keep verbatim.
                 self.path = s
+                self._is_remote = True
         else:
             self.path = None
+            self._is_remote = False
 
     @property
     def layer_data(self) -> xr.DataArray:
@@ -197,32 +201,11 @@ class nImage(BioImage):
 
         """
         if self._layer_data is None:
-            if self.is_remote or not determine_in_memory(self.path):
+            if self._is_remote or not determine_in_memory(self.path):
                 self._layer_data = self.xarray_dask_data.squeeze()
             else:
                 self._layer_data = self.xarray_data.squeeze()
         return self._layer_data
-
-    @property
-    def is_remote(self) -> bool:
-        """True if the image source is on a remote filesystem (S3, HTTP, etc.).
-
-        Returns
-        -------
-        bool
-            False for local files (including ``file://`` URIs, which are
-            normalised to plain paths at construction) and array data.
-            True for any multi-char URI scheme other than ``file``
-            (e.g. ``s3://``, ``https://``, ``gc://``).
-
-        """
-        if self.path is None:
-            return False
-        from urllib.parse import urlparse
-
-        scheme = urlparse(self.path).scheme
-        # Single-char schemes are Windows drive letters, not real URI schemes.
-        return bool(scheme) and len(scheme) > 1
 
     @property
     def path_stem(self) -> str:
@@ -244,7 +227,7 @@ class nImage(BioImage):
         """
         if self.path is None:
             return 'unknown'
-        if self.is_remote:
+        if self._is_remote:
             from pathlib import PurePosixPath
             from urllib.parse import urlparse
 

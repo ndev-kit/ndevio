@@ -48,7 +48,7 @@ def test_nImage_remote_zarr():
     remote_zarr = 'https://uk1s3.embassy.ebi.ac.uk/ebi-ngff-challenge-2024/4ffaeed2-fa70-4907-820f-8a96ef683095.zarr'  # from https://github.com/bioio-devs/bioio-ome-zarr/blob/main/bioio_ome_zarr/tests/test_remote_read_zarrV3.py
     img = nImage(remote_zarr)
     assert img.path == remote_zarr
-    assert img.is_remote
+    assert img._is_remote
     # original shape is (1, 2, 1, 512, 512) but layer_data is squeezed
     assert img.layer_data.shape == (2, 512, 512)
 
