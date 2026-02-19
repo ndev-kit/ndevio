@@ -125,7 +125,8 @@ class nImage(BioImage):
     # Class-level type hints for instance attributes
     path: str | None
     _is_remote: bool
-    _layer_data: xr.DataArray | None
+    _reference_xarray: xr.DataArray | None
+    _layer_data: list | None
 
     def __init__(
         self,
@@ -159,6 +160,7 @@ class nImage(BioImage):
                 raise
 
         # Instance state
+        self._reference_xarray = None
         self._layer_data = None
         if isinstance(image, str | Path):
             import fsspec
@@ -180,17 +182,16 @@ class nImage(BioImage):
             self._is_remote = False
 
     @property
-    def layer_data(self) -> xr.DataArray:
-        """
-        Image data as xarray DataArray for napari layer creation.
+    def reference_xarray(self) -> xr.DataArray:
+        """Image data as xarray DataArray for metadata determination.
 
-        Lazily loads data on first access. Uses in-memory or dask array
+        Lazily loads xarray on first access. Uses in-memory or dask array
         based on file size (determined automatically).
 
         Returns
         -------
         xr.DataArray
-            Squeezed image data.
+            Squeezed xarray for napari dimensions.
 
         Notes
         -----
@@ -199,12 +200,69 @@ class nImage(BioImage):
         (the default). No special mosaic handling needed here.
 
         """
-        if self._layer_data is None:
+        if self._reference_xarray is None:
+            # Ensure we're at the highest-res level for metadata consistency
+            current_res = self.current_resolution_level
+            self.set_resolution_level(0)
             if self._is_remote or not determine_in_memory(self.path):
-                self._layer_data = self.xarray_dask_data.squeeze()
+                self._reference_xarray = self.xarray_dask_data.squeeze()
             else:
-                self._layer_data = self.xarray_data.squeeze()
+                self._reference_xarray = self.xarray_data.squeeze()
+            self.set_resolution_level(current_res)
+        return self._reference_xarray
+
+    @property
+    def layer_data(self) -> list:
+        """Image data arrays shaped for napari, one per resolution level.
+
+        Returns a list of arrays ordered from highest to lowest resolution.
+        For single-resolution images the list has one element.
+        napari automatically treats multi-element lists as multiscale data.
+
+        Multiscale images are always dask-backed for memory efficiency.
+        Single-resolution images use numpy or dask based on file size.
+
+        Returns
+        -------
+        list[ArrayLike]
+            Squeezed image arrays (C dim retained for multichannel split
+            in :meth:`get_layer_data_tuples`).
+
+        """
+        if self._layer_data is None:
+            self._layer_data = self._build_layer_data()
         return self._layer_data
+
+    def _build_layer_data(self) -> list:
+        """Build the list of arrays for all resolution levels."""
+        current_res = self.current_resolution_level
+        levels = self.resolution_levels
+        multiscale = len(levels) > 1
+
+        # Determine which dims to keep from level 0's squeezed metadata.
+        # Using isel instead of squeeze ensures all levels have
+        # consistent ndim (lower levels may have extra singleton spatial dims
+        # that squeeze would incorrectly remove).
+        ref = self.reference_xarray
+        keep_dims = set(ref.dims)
+
+        arrays: list = []
+        for level in levels:
+            self.set_resolution_level(level)
+            if (
+                multiscale
+                or self._is_remote
+                or not determine_in_memory(self.path)
+            ):
+                xr_data = self.xarray_dask_data
+            else:
+                xr_data = self.xarray_data
+
+            indexer = {d: 0 for d in xr_data.dims if d not in keep_dims}
+            arrays.append(xr_data.isel(indexer).data)
+
+        self.set_resolution_level(current_res)
+        return arrays
 
     @property
     def path_stem(self) -> str:
@@ -331,7 +389,7 @@ class nImage(BioImage):
         ('Z', 'Y', 'X')
 
         """
-        layer_data = self.layer_data
+        layer_data = self.reference_xarray
 
         # Exclude Channel and Samples dimensions (RGB/multichannel handled separately)
         return tuple(
@@ -458,7 +516,8 @@ class nImage(BioImage):
         https://napari.org/dev/plugins/building_a_plugin/guides.html
 
         """
-        layer_data = self.layer_data
+        ref = self.reference_xarray
+        data = self.layer_data
         if layer_type is not None:
             channel_types = None  # Global override ignores per-channel
         names = self.layer_names
@@ -471,7 +530,7 @@ class nImage(BioImage):
         if 'S' in self.dims.order:
             return [
                 build_layer_tuple(
-                    layer_data.data,
+                    data,
                     layer_type='image',
                     name=names[0],
                     metadata=base_metadata,
@@ -485,7 +544,7 @@ class nImage(BioImage):
         channel_dim = 'C'
 
         # Single channel (no C dimension to split)
-        if channel_dim not in layer_data.dims:
+        if channel_dim not in ref.dims:
             channel_name = self.channel_names[0]
             effective_type = resolve_layer_type(
                 channel_name or '', layer_type, channel_types
@@ -497,7 +556,7 @@ class nImage(BioImage):
             )
             return [
                 build_layer_tuple(
-                    layer_data.data,
+                    data,
                     layer_type=effective_type,
                     name=names[0],
                     metadata=base_metadata,
@@ -510,8 +569,8 @@ class nImage(BioImage):
 
         # Multichannel - split into separate layers
         channel_names = self.channel_names
-        channel_axis = layer_data.dims.index(channel_dim)
-        total_channels = layer_data.shape[channel_axis]
+        channel_axis = ref.dims.index(channel_dim)
+        total_channels = ref.shape[channel_axis]
 
         tuples: list[LayerDataTuple] = []
         for i in range(total_channels):
@@ -520,10 +579,10 @@ class nImage(BioImage):
                 channel_name, layer_type, channel_types
             )
 
-            # Slice along channel axis
-            slices: list[slice | int] = [slice(None)] * layer_data.ndim
+            # Slice along channel axis for each resolution level
+            slices: list[slice | int] = [slice(None)] * ref.ndim
             slices[channel_axis] = i
-            channel_data = layer_data.data[tuple(slices)]
+            channel_data = [arr[tuple(slices)] for arr in data]
 
             extra_kwargs = (
                 channel_kwargs.get(channel_name) if channel_kwargs else None

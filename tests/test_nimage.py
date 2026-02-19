@@ -29,9 +29,9 @@ def test_nImage_init(resources_dir: Path):
     # Shape is (T, C, Z, Y, X) = (1, 2, 60, 66, 85)
     assert img.data.shape == (1, 2, 60, 66, 85)
     # layer_data should not be loaded until accessed
-    assert img._layer_data is None
+    assert img._reference_xarray is None
     # Accessing the property triggers lazy loading
-    assert img.layer_data is not None
+    assert img.reference_xarray is not None
 
 
 def test_nImage_zarr(resources_dir: Path):
@@ -50,7 +50,7 @@ def test_nImage_remote_zarr():
     assert img.path == remote_zarr
     assert img._is_remote
     # original shape is (1, 2, 1, 512, 512) but layer_data is squeezed
-    assert img.layer_data.shape == (2, 512, 512)
+    assert img.reference_xarray.shape == (2, 512, 512)
 
 
 def test_nImage_ome_reader(resources_dir: Path):
@@ -115,7 +115,7 @@ def test_get_layer_data(resources_dir: Path):
     """Test loading napari layer data in memory."""
     img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
     # Access layer_data property to trigger loading
-    data = img.layer_data
+    data = img.reference_xarray
     # layer_data will be squeezed
     # Original shape (1, 2, 60, 66, 85) -> (2, 60, 66, 85)
     assert data.shape == (2, 60, 66, 85)
@@ -285,8 +285,11 @@ class TestGetLayerDataTuples:
             # name should be a string (not a list)
             assert isinstance(meta['name'], str)
 
-            # Data shape should NOT include channel dimension
-            assert data.shape == (60, 66, 85)  # ZYX only
+            # Data should be a list of arrays (multiscale-ready)
+            assert isinstance(data, list)
+            assert len(data) == 1  # single resolution level
+            # Shape should NOT include channel dimension
+            assert data[0].shape == (60, 66, 85)  # ZYX only
 
             # Default layer type is "image" (channel names don't match label keywords)
             assert layer_type == 'image'
