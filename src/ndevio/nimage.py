@@ -235,6 +235,39 @@ class nImage(BioImage):
         return Path(self.path).stem
 
     @property
+    def layer_name(self) -> str:
+        """Base layer name from scene info and file path.
+
+        Returns the scene-qualified filename stem. For multichannel images,
+        prepend the channel name with `` :: `` to form the full layer name
+        (this is done automatically in :meth:`get_layer_data_tuples`).
+
+        Returns
+        -------
+        str
+            Formatted name like ``"3 :: WellA2 :: filename"`` for multi-scene
+            or ``"filename"`` for single-scene files.
+
+        Examples
+        --------
+        >>> nImage("cells.ome.tiff").layer_name
+        'cells.ome'
+        >>> # Full per-channel name used in get_layer_data_tuples:
+        >>> # f"{channel_name} :: {img.layer_name}"  →  'DAPI :: cells.ome'
+
+        """
+        delim = ' :: '
+        parts: list[str] = []
+
+        # Include scene info if multi-scene or non-default scene name
+        if len(self.scenes) > 1 or self.current_scene != 'Image:0':
+            parts.extend([str(self.current_scene_index), self.current_scene])
+
+        parts.append(self.path_stem)
+
+        return delim.join(parts)
+
+    @property
     def layer_scale(self) -> tuple[float, ...]:
         """Physical scale for dimensions in layer data.
 
@@ -358,34 +391,6 @@ class nImage(BioImage):
 
         return meta
 
-    def _build_layer_name(self, channel_name: str | None = None) -> str:
-        """Build layer name from channel, scene, and file path.
-
-        Parameters
-        ----------
-        channel_name : str, optional
-            Name of the channel to include in the layer name.
-
-        Returns
-        -------
-        str
-            Formatted layer name like "channel :: 0 :: Image:0 :: filename".
-
-        """
-        delim = ' :: '
-        parts: list[str] = []
-
-        if channel_name:
-            parts.append(channel_name)
-
-        # Include scene info if multi-scene or non-default scene name
-        if len(self.scenes) > 1 or self.current_scene != 'Image:0':
-            parts.extend([str(self.current_scene_index), self.current_scene])
-
-        parts.append(self.path_stem)
-
-        return delim.join(parts)
-
     def get_layer_data_tuples(
         self,
         layer_type: str | None = None,
@@ -457,7 +462,7 @@ class nImage(BioImage):
                 build_layer_tuple(
                     layer_data.data,
                     layer_type='image',
-                    name=self._build_layer_name(),
+                    name=self.layer_name,
                     metadata=base_metadata,
                     scale=scale,
                     axis_labels=axis_labels,
@@ -483,7 +488,11 @@ class nImage(BioImage):
                 build_layer_tuple(
                     layer_data.data,
                     layer_type=effective_type,
-                    name=self._build_layer_name(channel_name),
+                    name=(
+                        f'{channel_name} :: {self.layer_name}'
+                        if channel_name
+                        else self.layer_name
+                    ),
                     metadata=base_metadata,
                     scale=scale,
                     axis_labels=axis_labels,
@@ -521,7 +530,7 @@ class nImage(BioImage):
                 build_layer_tuple(
                     channel_data,
                     layer_type=effective_type,
-                    name=self._build_layer_name(channel_name),
+                    name=f'{channel_name} :: {self.layer_name}',
                     metadata=base_metadata,
                     scale=scale,
                     axis_labels=axis_labels,
