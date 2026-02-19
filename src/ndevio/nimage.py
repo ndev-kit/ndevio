@@ -14,7 +14,6 @@ from .bioio_plugins._manager import raise_unsupported_with_suggestions
 from .utils._layer_utils import (
     build_layer_tuple,
     determine_in_memory,
-    get_single_channel_name,
     resolve_layer_type,
 )
 
@@ -258,7 +257,7 @@ class nImage(BioImage):
         ['0 :: cells.ome']
 
         """
-        # Build scene-qualified base name (pure metadata, no data load)
+        # Build scene-qualified base name
         delim = ' :: '
         parts: list[str] = []
         if len(self.scenes) > 1 or self.current_scene != 'Image:0':
@@ -268,10 +267,6 @@ class nImage(BioImage):
 
         # RGB (Samples dim): single layer, no channel prefix
         if 'S' in self.dims.order:
-            return [base_name]
-
-        # No channel dimension at all (pure spatial image)
-        if 'C' not in self.dims.order:
             return [base_name]
 
         # Use BioImage channel_names — metadata only, no data load
@@ -491,7 +486,9 @@ class nImage(BioImage):
 
         # Single channel (no C dimension to split)
         if channel_dim not in layer_data.dims:
-            channel_name = get_single_channel_name(layer_data, channel_dim)
+            channel_name = (
+                self.channel_names[0] if self.channel_names else None
+            )
             effective_type = resolve_layer_type(
                 channel_name or '', layer_type, channel_types
             )
@@ -514,9 +511,7 @@ class nImage(BioImage):
             ]
 
         # Multichannel - split into separate layers
-        channel_names = [
-            str(c) for c in layer_data.coords[channel_dim].data.tolist()
-        ]
+        channel_names = self.channel_names
         channel_axis = layer_data.dims.index(channel_dim)
         total_channels = layer_data.shape[channel_axis]
 

@@ -239,38 +239,3 @@ class TestBuildLayerTuple:
 
         assert result[1]['colormap'] == 'custom'
         assert result[1]['visible'] is False
-
-
-class TestGetSingleChannelName:
-    """Tests for get_single_channel_name function."""
-
-    def test_returns_channel_name_from_coords(self):
-        """Test extracting channel name from coords."""
-        import numpy as np
-        import xarray as xr
-
-        from ndevio.utils._layer_utils import get_single_channel_name
-
-        data = xr.DataArray(
-            np.zeros((10, 10)),
-            dims=['Y', 'X'],
-            coords={'C': 'DAPI'},  # Single channel coord
-        )
-
-        result = get_single_channel_name(data, 'C')
-        assert result == 'DAPI'
-
-    def test_returns_none_when_no_coord(self):
-        """Test returns None when no channel coord."""
-        import numpy as np
-        import xarray as xr
-
-        from ndevio.utils._layer_utils import get_single_channel_name
-
-        data = xr.DataArray(
-            np.zeros((10, 10)),
-            dims=['Y', 'X'],
-        )
-
-        result = get_single_channel_name(data, 'C')
-        assert result is None
