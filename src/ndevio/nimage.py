@@ -181,6 +181,13 @@ class nImage(BioImage):
             self.path = None
             self._is_remote = False
 
+        # Any compatibility warnings for old formats should be emitted at this point
+        # Cheaply check without imports by looking at the reader's module name
+        if self.reader.__module__.startswith('bioio_ome_zarr'):
+            from .bioio_plugins._compatibility import warn_if_old_zarr_format
+
+            warn_if_old_zarr_format(self.reader)
+
     @property
     def reference_xarray(self) -> xr.DataArray:
         """Image data as xarray DataArray for metadata determination.
@@ -363,12 +370,13 @@ class nImage(BioImage):
         axis_labels = self.layer_axis_labels
 
         # Try to get scale from BioImage - may fail for array-like inputs
-        # where physical_pixel_sizes is None
+        # where physical_pixel_sizes is None (AttributeError), or for old OME-Zarr formats
+        # (v0.1/v0.2) that lack 'coordinateTransformations' in their dataset
+        # metadata (introduced in v0.3) (KeyError).
         try:
             bio_scale = self.scale
-        except AttributeError:
+        except (AttributeError, KeyError):
             return tuple(1.0 for _ in axis_labels)
-
         return tuple(
             getattr(bio_scale, dim, None) or 1.0 for dim in axis_labels
         )
@@ -419,7 +427,9 @@ class nImage(BioImage):
 
         try:
             dim_props = self.dimension_properties
-        except AttributeError:
+        # Old OME-Zarr v0.1/v0.2: dimension_properties → reader.scale →
+        # _get_scale_array raises KeyError for missing 'coordinateTransformations'.
+        except (AttributeError, KeyError):
             return tuple(None for _ in axis_labels)
 
         def _get_unit(dim: str) -> str | None:
