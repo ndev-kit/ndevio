@@ -54,7 +54,7 @@ def test_nImage_remote_zarr():
 
 
 @pytest.mark.network
-def test_nImage_remote_zarr_old_format(caplog):
+def test_nImage_remote_zarr_v01v02_format(caplog):
     """Test that nImage emits a warning for old OME-Zarr formats when reading remotely."""
     remote_zarr = 'https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/9836841.zarr'  # from https://github.com/ndev-kit/ndevio/issues/50
     with caplog.at_level(
@@ -66,6 +66,18 @@ def test_nImage_remote_zarr_old_format(caplog):
     # but still quietly create a scale with no units
     assert img.layer_scale == (1.0, 1.0)
     assert img.layer_units == (None, None)
+
+
+@pytest.mark.network
+def test_nimage_remote_v03_zarr():
+    """Test that nImage can read a real remote OME-Zarr v0.3 store."""
+    remote_zarr = 'https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.3/9836842.zarr'
+    img = nImage(remote_zarr)
+    assert img.path == remote_zarr
+    assert img._is_remote
+    assert img.reference_xarray is not None
+    tuples = img.get_layer_data_tuples()
+    assert len(tuples) > 0
 
 
 def test_nImage_ome_reader(resources_dir: Path):

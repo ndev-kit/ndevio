@@ -184,9 +184,11 @@ class nImage(BioImage):
         # Any compatibility warnings for old formats should be emitted at this point
         # Cheaply check without imports by looking at the reader's module name
         if self.reader.__module__.startswith('bioio_ome_zarr'):
-            from .bioio_plugins._compatibility import warn_if_old_zarr_format
+            from .bioio_plugins._compatibility import (
+                apply_ome_zarr_compat_patches,
+            )
 
-            warn_if_old_zarr_format(self.reader)
+            apply_ome_zarr_compat_patches(self.reader)
 
     @property
     def reference_xarray(self) -> xr.DataArray:
@@ -370,12 +372,12 @@ class nImage(BioImage):
         axis_labels = self.layer_axis_labels
 
         # Try to get scale from BioImage - may fail for array-like inputs
-        # where physical_pixel_sizes is None (AttributeError), or for old OME-Zarr formats
-        # (v0.1/v0.2) that lack 'coordinateTransformations' in their dataset
-        # metadata (introduced in v0.3) (KeyError).
+        # where physical_pixel_sizes is None (AttributeError), old OME-Zarr
+        # v0.1/v0.2 missing 'coordinateTransformations' (KeyError), or
+        # v0.3 string-axes that weren't normalised (TypeError).
         try:
             bio_scale = self.scale
-        except (AttributeError, KeyError):
+        except (AttributeError, KeyError, TypeError):
             return tuple(1.0 for _ in axis_labels)
         return tuple(
             getattr(bio_scale, dim, None) or 1.0 for dim in axis_labels
@@ -427,9 +429,9 @@ class nImage(BioImage):
 
         try:
             dim_props = self.dimension_properties
-        # Old OME-Zarr v0.1/v0.2: dimension_properties → reader.scale →
-        # _get_scale_array raises KeyError for missing 'coordinateTransformations'.
-        except (AttributeError, KeyError):
+        # Old OME-Zarr v0.1/v0.2 (KeyError), v0.3 string-axes (TypeError),
+        # or array-like inputs without dimension metadata (AttributeError).
+        except (AttributeError, KeyError, TypeError):
             return tuple(None for _ in axis_labels)
 
         def _get_unit(dim: str) -> str | None:
