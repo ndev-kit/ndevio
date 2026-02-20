@@ -12,7 +12,7 @@
 **A generalized image format reader for napari built on top of [bioio]**
 
 `ndevio` provides flexible, metadata-aware image I/O for images in napari.
-Originally developed as part of napari-ndev, `ndevio` has since been separated into its own plugin as part of the [ndev-kit] and is intended to be a feature-rich and easier to maintain spiritual successor to [napari-aicsimageio].
+Originally developed as part of napari-ndev (as a spiritual successor to [napari-aicsimageio]), `ndevio` has since been separated into its own plugin as part of the [ndev-kit] and is intended to be a feature-rich, metadata-aware image reader for a variety of formats in napari, with a focus on microscopy images.
 
 ----------------------------------
 
@@ -20,6 +20,9 @@ Originally developed as part of napari-ndev, `ndevio` has since been separated i
 
 - **Extensive format support** via [bioio] and its plugin system — read OME-TIFF, OME-Zarr, common image and movie formats, proprietary formats (CZI, LIF, ND2), and many more (with bioformats)!
 - **Multi-scene handling** — interactive widget for selecting between scenes/positions in multi-scene files
+- **Thorough metadata extraction** — extract and apply scale, units, axis labels, metadata (inc. OME) to napari layers
+- **Remote file support** — compatible Bioio readers,such as [bioio-ome-zarr], can read from remote filesystems (HTTP, S3, etc.) with dask-backed loading
+- **Native multiscale support** — automatically read and display multiscale images when supported by the reader. For best experience, turn on the asynchronous rendering experimental setting in napari.
 - **Configurable behavior** via [ndev-settings] — customize reader priority, multi-scene handling, and more
 - **Smart plugin installation** — automatic suggestions to install missing bioio reader plugins
 - **Programmatic API** — `nImage` class for napari-ready metadata extraction
@@ -56,7 +59,9 @@ To contibute to ndevio or experiment with the latest features, see [Contributing
 If your image format is not supported by the default readers, then you will get a warning and (by default in napari) a widget to install the suggested reader.
 If you know of your additional proprietary formats, install the appropriate bioio reader.
 See the [bioio documentation](https://bioio-devs.github.io/bioio/) for the full list of available readers.
-**Note**: The use of `bioio-bioformats` has not been fully tested and may have issues. Please [file an issue] if you encounter problems.
+**Note**: The use of `bioio-bioformats` requires an automatic, initial download of required Java files, this takes some time. Most native format readers do a better job reading metadata compared to `bioio-bioformats`.
+
+Please [file an issue] if you encounter problems with image reading!
 
 ## Usage
 
@@ -111,14 +116,15 @@ from napari import Viewer
 img = nImage("path/to/image.czi")
 
 # Because nImage subclasses BioImage, all BioImage methods are available
-img.dims               # e.g., <Dimensions [T: 15, C: 4, Z: 1, Y: 256, X: 256]>
+print(img.dims)               # e.g., <Dimensions [T: 15, C: 4, Z: 1, Y: 256, X: 256]>
 
 # Access napari-ready properties, note that channel and singleton dimensions are dropped
-img.layer_data.shape   # e.g. (15, 4, 256, 256) - still includes channel dimbecause it has not yet been converted to a list of LayerDataTuples
-img.layer_scale        # e.g., (1.0, 0.2, 0.2) - time interval + physical scale per dimension, napari ready
-img.layer_axis_labels  # e.g., ('T', 'Y', 'X')
-img.layer_units        # e.g., ('s', 'µm', 'µm')
-img.layer_metadata     # e.g., a dictionary containing the 1) full BioImage object, 2) raw_image metadata and 3) OME metadata (if parsed) - accessible via `viewer.layers[n].metadata`
+print(img.reference_xarray)   # e.g., xarray.DataArray with dims (T, Y, X) and shape (15, 256, 256)
+print(img.layer_data[0])      # e.g. the highest resolution array; a list is returned for multiscale image support
+print(img.layer_scale)        # e.g., (1.0, 0.2, 0.2) - time interval + physical scale per dimension, napari ready
+print(img.layer_axis_labels)  # e.g., ('T', 'Y', 'X')
+print(img.layer_units)        # e.g., ('s', 'µm', 'µm')
+print(img.layer_metadata)     # e.g., a dictionary containing the 1) full BioImage object, 2) raw_image metadata and 3) OME metadata (if parsed) - accessible via `viewer.layers[n].metadata`
 
 # A convenience method to get napari LayerDataTuples with nImage metadata for napari
 viewer = Viewer()
@@ -155,6 +161,7 @@ Images are loaded **in-memory** or **lazily** (via dask) automatically based on:
 
 - File size < 4 GB **AND**
 - File size < 30% of available RAM
+- Remote files (e.g., S3, HTTP) and multiscale are always loaded lazily
 
 ### Multi-channel Images
 
@@ -208,3 +215,4 @@ If you encounter any problems, please [file an issue] along with a detailed desc
 [nbatch]: https://github.com/ndev-kit/nbatch
 [uv]: https://docs.astral.sh/uv/
 [ndev-kit]: https://github.com/ndev-kit
+[bioio-ome-zarr]: https://github.com/bioio-devs/bioio-ome-zarr
