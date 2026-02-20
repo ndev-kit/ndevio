@@ -29,7 +29,7 @@ requires-python = ">=3.11"
 # See best practices: https://napari.org/stable/plugins/building_a_plugin/best_practices.html
 dependencies = [
     "napari",
-    "ndev-settings>=0.4.0",
+    "ndev-settings>=0.4.1",
     "nbatch>=0.0.4",
     "natsort",
     "magicgui",
