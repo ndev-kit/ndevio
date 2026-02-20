@@ -53,6 +53,21 @@ def test_nImage_remote_zarr():
     assert img.reference_xarray.shape == (2, 512, 512)
 
 
+@pytest.mark.network
+def test_nImage_remote_zarr_old_format(caplog):
+    """Test that nImage emits a warning for old OME-Zarr formats when reading remotely."""
+    remote_zarr = 'https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.1/9836841.zarr'  # from https://github.com/ndev-kit/ndevio/issues/50
+    with caplog.at_level(
+        'WARNING', logger='ndevio.bioio_plugins._compatibility'
+    ):
+        img = nImage(remote_zarr)
+    assert img.path == remote_zarr
+    # should catch a key error due to old format
+    # but still quietly create a scale with no units
+    assert img.layer_scale == (1.0, 1.0)
+    assert img.layer_units == (None, None)
+
+
 def test_nImage_ome_reader(resources_dir: Path):
     """
     Test that the OME-TIFF reader is used for OME-TIFF files.
