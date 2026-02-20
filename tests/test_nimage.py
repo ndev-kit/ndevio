@@ -69,7 +69,7 @@ def test_nImage_remote_zarr_v01v02_format(caplog):
 
 
 @pytest.mark.network
-def test_nimage_remote_v03_zarr(self):
+def test_nimage_remote_v03_zarr():
     """Test that nImage can read a real remote OME-Zarr v0.3 store."""
     remote_zarr = 'https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.3/9836842.zarr'
     img = nImage(remote_zarr)
