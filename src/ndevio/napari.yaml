@@ -57,7 +57,7 @@ contributions:
         '*.sldy', '*.sm2', '*.sm3', '*.spc', '*.spe', '*.spi', '*.spider', '*.stk', '*.stp', '*.svs',
         '*.sxm', '*.tf2', '*.tf8', '*.tfr', '*.tga', '*.tif', '*.tiff', '*.tiles.ome.tif', '*.tnb', '*.top',
         '*.txt', '*.v', '*.vms', '*.vsi', '*.vws', '*.wat', '*.wlz', '*.xdce', '*.xml', '*.xqd',
-        '*.xqf', '*.xv', '*.xvthumb', '*.xys', '*.zarr', '*.zfp', '*.zfr', '*.zif', '*.zvi',
+        '*.xqf', '*.xv', '*.xvthumb', '*.xys', '*.zarr', '*.zarr*', '*.zfp', '*.zfr', '*.zif', '*.zvi',
       ]
   widgets:
     - command: ndevio.make_plugin_installer_widget
