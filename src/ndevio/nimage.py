@@ -137,6 +137,11 @@ class nImage(BioImage):
         """Initialize an nImage with an image, and optionally a reader."""
         from bioio_base.exceptions import UnsupportedFileFormatError
 
+        # Strip trailing slashes from string paths/URLs (e.g. `store.zarr/`)
+        # so that bioio's extension-based reader detection works correctly.
+        if isinstance(image, str):
+            image = image.rstrip('/')
+
         resolved_reader = _resolve_reader(image, reader)
 
         # Try preferred/explicit reader first, fall back to bioio default

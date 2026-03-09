@@ -45,6 +45,12 @@ If you would like to try out ndevio, you can run napari in a temporary environme
 uvx --with ndevio -p 3.13 "napari[all]"
 ```
 
+You can even try an example remote zarr image, like from the [OME-NGFF samples](https://idr.github.io/ome-ngff-samples/):
+
+```bash
+uvx --with ndevio --with pyqt6 -p 3.13 "napari>=0.7.0" --plugin ndevio "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.4/idr0048A/9846152.zarr/"
+```
+
 To contibute to ndevio or experiment with the latest features, see [Contributing.md](CONTRIBUTING.md) for development setup instructions. Conda-forge availability is coming soon!
 
 ### Additional Image Format Support

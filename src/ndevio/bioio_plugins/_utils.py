@@ -59,7 +59,7 @@ logger = logging.getLogger(__name__)
 BIOIO_PLUGINS = {
     # OME formats with excellent metadata preservation
     'bioio-ome-zarr': {
-        'extensions': ['.zarr'],
+        'extensions': ['.zarr', '.zarr*'],
         'description': 'OME-Zarr files',
         'repository': 'https://github.com/bioio-devs/bioio-ome-zarr',
         'core': True,
