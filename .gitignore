@@ -70,6 +70,7 @@ target/
 .idea/
 venv/
 .vscode/
+.venv*/
 
 # IPython Notebook
 .ipynb_checkpoints

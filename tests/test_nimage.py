@@ -73,7 +73,7 @@ def test_nImage_remote_zarr_trailing_slash():
     assert img._is_remote
     assert not img.path.endswith('/')
     assert img.path == remote_zarr.rstrip('/')
-    assert img.data is not None
+    assert img.xarray_dask_data is not None
 
 
 @pytest.mark.network
