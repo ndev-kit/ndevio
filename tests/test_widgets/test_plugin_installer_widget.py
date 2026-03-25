@@ -16,7 +16,7 @@ class TestPluginInstallerWidget:
 
     def test_standalone_mode(self):
         """Test widget in standalone mode - no path, shows generic title."""
-        from ndevio.widgets import PluginInstallerWidget
+        from ndevio.widgets._plugin_install_widget import PluginInstallerWidget
 
         widget = PluginInstallerWidget()
 
@@ -27,7 +27,7 @@ class TestPluginInstallerWidget:
     def test_error_mode_with_path(self):
         """Test widget in error mode - has path, preselects suggested plugin."""
         from ndevio.bioio_plugins._manager import ReaderPluginManager
-        from ndevio.widgets import PluginInstallerWidget
+        from ndevio.widgets._plugin_install_widget import PluginInstallerWidget
 
         # Mock installed plugins to NOT include bioio-czi
         # This simulates the error case where file can't be read
@@ -48,7 +48,7 @@ class TestPluginInstallerWidget:
 
     def test_install_button_behavior(self):
         """Test install button: queues installation and updates status."""
-        from ndevio.widgets import PluginInstallerWidget
+        from ndevio.widgets._plugin_install_widget import PluginInstallerWidget
 
         widget = PluginInstallerWidget()
         widget._plugin_select.value = 'bioio-imageio'
@@ -64,7 +64,7 @@ class TestPluginInstallerWidget:
 
     def test_install_without_selection_shows_error(self):
         """Test that clicking install with no selection shows error."""
-        from ndevio.widgets import PluginInstallerWidget
+        from ndevio.widgets._plugin_install_widget import PluginInstallerWidget
 
         widget = PluginInstallerWidget()
         widget._plugin_select.value = None

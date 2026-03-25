@@ -4,12 +4,10 @@ import logging
 from functools import partial
 from typing import TYPE_CHECKING
 
-from ndev_settings import get_settings
-
-from .nimage import nImage
-
 if TYPE_CHECKING:
     from napari.types import LayerDataTuple, PathLike, ReaderFunction
+
+    from .nimage import nImage
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +37,8 @@ def napari_get_reader(
     ReaderFunction
         The reader function for the given path
     """
+
+    from ndev_settings import get_settings
 
     settings = get_settings()
 
@@ -93,6 +93,8 @@ def napari_reader_function(
     """
     from bioio_base.exceptions import UnsupportedFileFormatError
 
+    from .nimage import nImage
+
     try:
         img = nImage(path)  # nImage handles preferred reader and fallback
     except UnsupportedFileFormatError:
@@ -125,7 +127,7 @@ def _open_scene_container(path: PathLike, img: nImage) -> None:
 
     import napari
 
-    from .widgets import DELIMITER, nImageSceneWidget
+    from .widgets._scene_widget import DELIMITER, nImageSceneWidget
 
     viewer = napari.current_viewer()
     viewer.window.add_dock_widget(
@@ -155,7 +157,7 @@ def _open_plugin_installer(path: PathLike) -> None:
     from bioio_base.exceptions import UnsupportedFileFormatError
 
     from .bioio_plugins._manager import ReaderPluginManager
-    from .widgets import PluginInstallerWidget
+    from .widgets._plugin_install_widget import PluginInstallerWidget
 
     # Get viewer, handle case where no viewer available
     viewer = napari.current_viewer()

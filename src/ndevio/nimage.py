@@ -7,8 +7,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from bioio import BioImage
-from bioio_base.reader import Reader
-from bioio_base.types import ImageLike
 
 from .bioio_plugins._manager import raise_unsupported_with_suggestions
 from .utils._layer_utils import (
