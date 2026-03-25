@@ -42,6 +42,40 @@ def test_nImage_zarr(resources_dir: Path):
     assert img.data.shape == (1, 1, 2, 4, 4)
 
 
+def test_nImage_zarr_trailing_slash(resources_dir: Path):
+    """Test that a string path with a trailing slash is handled correctly.
+
+    Regression test: bioio's extension-based reader detection fails when the
+    path ends with '/', e.g. 'store.zarr/'. nImage strips the slash on init.
+    See https://github.com/ndev-kit/ndevio/issues/XX
+    """
+    path_with_slash = str(resources_dir / ZARR) + '/'
+    img = nImage(path_with_slash)
+    assert img.data is not None
+    # path stored without the trailing slash
+    assert not img.path.endswith('/')
+    assert img.path == str(resources_dir / ZARR)
+    assert img.data.shape == (1, 1, 2, 4, 4)
+
+
+@pytest.mark.network
+def test_nImage_remote_zarr_trailing_slash():
+    """Test that a remote Zarr URL with a trailing slash is read correctly.
+
+    Regression test: 'https://...9846152.zarr/' crashed with
+    'Reader ndevio returned no data' because the trailing slash prevented
+    bioio from matching the '*.zarr' extension pattern.
+    """
+    remote_zarr = (
+        'https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.4/idr0048A/9846152.zarr/'
+    )
+    img = nImage(remote_zarr)
+    assert img._is_remote
+    assert not img.path.endswith('/')
+    assert img.path == remote_zarr.rstrip('/')
+    assert img.data is not None
+
+
 @pytest.mark.network
 def test_nImage_remote_zarr():
     """Test that nImage can read a remote Zarr file."""

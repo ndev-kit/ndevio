@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from ndevio.sampledata import (
+from ndevio.sampledata._sample_data import (
     ndev_logo,
     neocortex,
     neuron_labels,

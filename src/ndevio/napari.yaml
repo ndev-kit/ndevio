@@ -10,28 +10,28 @@ contributions:
       python_name: ndevio._napari_reader:napari_get_reader
       title: Open file with ndevio
     - id: ndevio.make_plugin_installer_widget
-      python_name: ndevio.widgets:PluginInstallerWidget
+      python_name: ndevio.widgets._plugin_install_widget:PluginInstallerWidget
       title: Install BioIO Reader Plugins
     - id: ndevio.make_utilities_widget
-      python_name: ndevio.widgets:UtilitiesContainer
+      python_name: ndevio.widgets._utilities_container:UtilitiesContainer
       title: I/O Utilities
     - id: ndevio.make_ndev_logo
-      python_name: ndevio.sampledata:ndev_logo
+      python_name: ndevio.sampledata._sample_data:ndev_logo
       title: Load ndev logo
     - id: ndevio.make_scratch_assay
-      python_name: ndevio.sampledata:scratch_assay
+      python_name: ndevio.sampledata._sample_data:scratch_assay
       title: Load scratch assay data
     - id: ndevio.make_neocortex
-      python_name: ndevio.sampledata:neocortex
+      python_name: ndevio.sampledata._sample_data:neocortex
       title: Load neocortex data
     - id: ndevio.make_neuron_raw
-      python_name: ndevio.sampledata:neuron_raw
+      python_name: ndevio.sampledata._sample_data:neuron_raw
       title: Load raw neuron data
     - id: ndevio.make_neuron_labels
-      python_name: ndevio.sampledata:neuron_labels
+      python_name: ndevio.sampledata._sample_data:neuron_labels
       title: Load neuron labels data
     - id: ndevio.make_neuron_labels_processed
-      python_name: ndevio.sampledata:neuron_labels_processed
+      python_name: ndevio.sampledata._sample_data:neuron_labels_processed
       title: Load processed neuron labels data
   readers:
     - command: ndevio.get_reader
