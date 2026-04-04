@@ -134,10 +134,12 @@ class nImage(BioImage):
         source = str(image)
         fs, resolved = fsspec.url_to_fs(source)
         if isinstance(fs, LocalFileSystem):
+            # Normalise file:// URIs and any platform variations to an
+            # OS-native path string so Path(self.path) always round-trips.
             self.path = str(Path(resolved))
             self._is_remote = False
             return
-
+        # Remote URI (s3://, https://, gc://, …) — keep verbatim.
         self.path = source
         self._is_remote = True
 
