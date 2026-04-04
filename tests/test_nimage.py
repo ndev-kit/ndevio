@@ -800,89 +800,71 @@ class TestExplicitReaderParameter:
         assert img.reader.name == 'bioio_ome_tiff'
 
 
-class TestDetermineInMemory:
-    """Tests for nImage memory-loading policy."""
+class TestFitsInMemory:
+    """Tests for nImage._fits_in_memory memory-loading policy."""
 
-    @staticmethod
-    def _make_image(path):
-        img = object.__new__(nImage)
-        img.path = None if path is None else str(path)
-        img._is_remote = False
-        return img
+    def test_array_backed_always_fits(self):
+        """Array-backed nImage (path=None) should always fit in memory."""
+        import numpy as np
 
-    def test_none_path_returns_true(self):
-        """Array-backed inputs should stay in memory."""
-        assert self._make_image(None)._fits_in_memory() is True
+        img = nImage(np.zeros((10, 10), dtype=np.uint8))
+        assert img._fits_in_memory() is True
 
-    def test_small_file_returns_true(self, tmp_path):
-        """Small files should be loaded eagerly."""
-        small_file = tmp_path / 'small.txt'
-        small_file.write_text('x' * 100)
+    def test_small_image_fits(self, tmp_path):
+        """A small image whose uncompressed size is within limits fits eagerly."""
+        import numpy as np
+        import tifffile
 
-        with mock.patch(
-            'psutil.virtual_memory', return_value=mock.Mock(available=1e10)
-        ):
-            assert self._make_image(small_file)._fits_in_memory() is True
-
-    def test_large_file_returns_false(self, tmp_path):
-        """Large files should stay dask-backed."""
-        large_file = tmp_path / 'large.txt'
-        large_file.write_text('x')
-
-        with (
-            mock.patch(
-                'psutil.virtual_memory', return_value=mock.Mock(available=1e9)
-            ),
-            mock.patch(
-                'bioio_base.io.pathlike_to_fs',
-                return_value=(mock.Mock(size=lambda x: 5e9), ''),
-            ),
-        ):
-            assert self._make_image(large_file)._fits_in_memory() is False
-
-    def test_uncompressed_bytes_large_overrides_small_disk_size(
-        self, tmp_path
-    ):
-        """Compressed files should be judged by RAM footprint when known."""
-        small_file = tmp_path / 'labels.tif'
-        small_file.write_bytes(b'\x00' * 100)
+        path = tmp_path / 'small.tif'
+        tifffile.imwrite(str(path), np.zeros((5, 5), dtype=np.uint8))
 
         with mock.patch(
-            'psutil.virtual_memory', return_value=mock.Mock(available=1e10)
+            'psutil.virtual_memory',
+            return_value=mock.Mock(available=int(1e10)),
         ):
-            assert (
-                self._make_image(small_file)._fits_in_memory(
-                    uncompressed_bytes=int(5e9)
-                )
-                is False
-            )
-            assert (
-                self._make_image(small_file)._fits_in_memory(
-                    uncompressed_bytes=1000
-                )
-                is True
-            )
+            img = nImage(path)
+            assert img._fits_in_memory() is True
+
+    def test_exceeds_memory_percentage_returns_false(self, tmp_path):
+        """Image whose uncompressed size exceeds 30% of available RAM → dask."""
+        import numpy as np
+        import tifffile
+
+        # 50×50×50×uint32 = 500 KB uncompressed
+        path = tmp_path / 'medium.tif'
+        tifffile.imwrite(str(path), np.zeros((50, 50, 50), dtype=np.uint32))
+
+        # 30% of 1 MB = 300 KB < 500 KB → should not fit
+        with mock.patch(
+            'psutil.virtual_memory', return_value=mock.Mock(available=int(1e6))
+        ):
+            img = nImage(path)
+            assert img._fits_in_memory() is False
 
     def test_missing_max_in_mem_setting_falls_back_to_default(self, tmp_path):
-        """Older persisted settings may not yet contain max_in_mem_gb."""
+        """Older persisted settings missing max_in_mem_gb should use 8 GB."""
         from types import SimpleNamespace
 
-        small_file = tmp_path / 'small.txt'
-        small_file.write_text('x' * 100)
+        import numpy as np
+        import tifffile
+
+        path = tmp_path / 'small.tif'
+        tifffile.imwrite(str(path), np.zeros((5, 5), dtype=np.uint8))
 
         with (
             mock.patch(
                 'ndev_settings.get_settings',
                 return_value=SimpleNamespace(
-                    ndevio_reader=SimpleNamespace(),
+                    ndevio_reader=SimpleNamespace(preferred_reader=None),
                 ),
             ),
             mock.patch(
                 'psutil.virtual_memory',
-                return_value=mock.Mock(available=1e10),
+                return_value=mock.Mock(available=int(1e10)),
             ),
         ):
-            assert self._make_image(small_file)._fits_in_memory() is True
+            img = nImage(path)
+            assert img._fits_in_memory() is True
 
 
 # =============================================================================
@@ -894,11 +876,11 @@ def test_compressed_int32_tiff_uses_dask(tmp_path: Path):
     """Regression: a compressed int32 TIFF must be loaded as dask even when
     its on-disk size is well below the in-memory threshold.
 
-    An 18.9 MB LZW-compressed int32 file expands to ~3 GB in RAM.
+    An 18.9 MB LZW-compressed int32 file expands to ~288 MB in RAM.
     The old code compared the compressed *filesystem* size against the
     threshold; a 19 MB file would always pass and be loaded eagerly.
-    The fix computes uncompressed_bytes = prod(shape) * dtype.itemsize and
-    uses that instead.
+    The fix uses ``xarray_dask_data.nbytes`` (= shape × dtype.itemsize)
+    so the uncompressed footprint is used for the decision.
     """
     import math
 

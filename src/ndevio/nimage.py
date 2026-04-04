@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import logging
-import math
 from collections.abc import Sequence
-from inspect import Parameter, signature
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -30,67 +28,19 @@ def _prepare_bioimage_init_kwargs(
     kwargs: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Build BioImage init kwargs and a fallback without chunk_dims."""
-    init_kwargs = dict(kwargs)
-    init_kwargs.setdefault('chunk_dims', ['Y', 'X'])
+    # Default to per-plane chunks so each Z/T slice is a separate dask
+    # task (~one TIFF page) rather than the entire ZYX volume.
+    # bioio's DEFAULT_CHUNK_DIMS includes Z, meaning each (T,C) pair is
+    # one giant task and every Z-slice navigation decompresses the full
+    # volume. ["Y", "X"] gives O(Z) tasks with ~1 page per compute.
+    init_kwargs = {
+        **kwargs,
+        'chunk_dims': kwargs.get('chunk_dims', ['Y', 'X']),
+    }
     fallback_kwargs = {
-        key: value for key, value in init_kwargs.items() if key != 'chunk_dims'
+        k: v for k, v in init_kwargs.items() if k != 'chunk_dims'
     }
     return init_kwargs, fallback_kwargs
-
-
-def _reader_supports_chunk_dims(
-    reader: type[Reader] | Sequence[type[Reader]] | None,
-) -> bool | None:
-    """Return whether a reader explicitly supports the chunk_dims kwarg.
-
-    Returns None when support cannot be known ahead of time, for example when
-    BioImage will determine the reader internally or a reader sequence is mixed.
-    """
-
-    def _supports_single(candidate: type[Reader]) -> bool:
-        params = signature(candidate.__init__).parameters.values()
-        return any(
-            parameter.name == 'chunk_dims'
-            or parameter.kind == Parameter.VAR_KEYWORD
-            for parameter in params
-        )
-
-    if reader is None:
-        return None
-    if isinstance(reader, Sequence):
-        support = {_supports_single(candidate) for candidate in reader}
-        return support.pop() if len(support) == 1 else None
-    return _supports_single(reader)
-
-
-def _init_bioimage_once(
-    instance: BioImage,
-    *,
-    image: ImageLike,
-    reader: type[Reader] | Sequence[type[Reader]] | None,
-    init_kwargs: dict[str, Any],
-    fallback_kwargs: dict[str, Any],
-) -> None:
-    """Initialize BioImage with the best available chunk_dims strategy."""
-    chunk_support = _reader_supports_chunk_dims(reader)
-    if chunk_support is False:
-        BioImage.__init__(
-            instance, image=image, reader=reader, **fallback_kwargs
-        )
-        return
-
-    if chunk_support is True:
-        BioImage.__init__(instance, image=image, reader=reader, **init_kwargs)
-        return
-
-    try:
-        BioImage.__init__(instance, image=image, reader=reader, **init_kwargs)
-    except TypeError as exc:
-        if 'chunk_dims' not in str(exc):
-            raise
-        BioImage.__init__(
-            instance, image=image, reader=reader, **fallback_kwargs
-        )
 
 
 def _initialize_bioimage(
@@ -101,29 +51,36 @@ def _initialize_bioimage(
     init_kwargs: dict[str, Any],
     fallback_kwargs: dict[str, Any],
 ) -> None:
-    """Initialize BioImage with preferred-reader fallback to default."""
+    """Initialize BioImage with preferred-reader fallback to default.
+
+    Tries ``chunk_dims=['Y','X']`` for per-plane chunking, falling back to
+    the reader's default chunking if ``chunk_dims`` is not supported.
+    If a preferred reader is given but cannot read the file, falls back to
+    BioImage's automatic reader selection.
+    """
     from bioio_base.exceptions import UnsupportedFileFormatError
+
+    def _init(reader: type[Reader] | Sequence[type[Reader]] | None) -> None:
+        """Initialize with chunk_dims, silently falling back without it."""
+        try:
+            BioImage.__init__(
+                instance, image=image, reader=reader, **init_kwargs
+            )
+        except TypeError as exc:
+            if 'chunk_dims' not in str(exc):
+                raise
+            BioImage.__init__(
+                instance, image=image, reader=reader, **fallback_kwargs
+            )
 
     if resolved_reader is not None:
         try:
-            _init_bioimage_once(
-                instance,
-                image=image,
-                reader=resolved_reader,
-                init_kwargs=init_kwargs,
-                fallback_kwargs=fallback_kwargs,
-            )
+            _init(resolved_reader)
             return
         except UnsupportedFileFormatError:
             pass
 
-    _init_bioimage_once(
-        instance,
-        image=image,
-        reader=None,
-        init_kwargs=init_kwargs,
-        fallback_kwargs=fallback_kwargs,
-    )
+    _init(None)
 
 
 def _resolve_reader(
@@ -225,8 +182,7 @@ class nImage(BioImage):
     _is_remote: bool
     _reference_xarray: xr.DataArray | None
     _layer_data: list | None
-    _level0_uncompressed_bytes: int | None
-    _should_load_in_memory_cache: bool | None
+    _use_dask_cache: bool | None
 
     def __init__(
         self,
@@ -242,11 +198,6 @@ class nImage(BioImage):
         if isinstance(image, str):
             image = image.rstrip('/')
 
-        # Default to per-plane chunks so each Z/T slice is a separate dask
-        # task (~one TIFF page) rather than the entire ZYX volume.
-        # bioio's DEFAULT_CHUNK_DIMS includes Z, meaning each (T,C) pair is
-        # one giant task and every Z-slice navigation decompresses the full
-        # volume. ["Y", "X"] gives O(Z) tasks with ~1 page per compute.
         init_kwargs, fallback_kwargs = _prepare_bioimage_init_kwargs(kwargs)
         resolved_reader = _resolve_reader(image, reader)
 
@@ -266,8 +217,7 @@ class nImage(BioImage):
         # Instance state
         self._reference_xarray = None
         self._layer_data = None
-        self._level0_uncompressed_bytes = None
-        self._should_load_in_memory_cache = None
+        self._use_dask_cache = None
         self._initialize_source_state(image)
 
         # Any compatibility warnings for old formats should be emitted at this point
@@ -299,79 +249,45 @@ class nImage(BioImage):
         self.path = source
         self._is_remote = True
 
-    def _max_in_memory_bytes(self) -> float:
-        """Return the configured eager-loading threshold in bytes."""
-        from ndev_settings import get_settings
+    def _fits_in_memory(self) -> bool:
+        """Return True if the full uncompressed image fits comfortably in RAM.
 
-        settings = get_settings()
-        reader_settings = settings.ndevio_reader  # type: ignore[attr-defined]
-        max_in_mem_gb = getattr(reader_settings, 'max_in_mem_gb', 8.0)
-        return float(max_in_mem_gb) * 1e9
-
-    def _fits_in_memory(
-        self,
-        *,
-        uncompressed_bytes: int | None = None,
-        max_in_mem_percent: float = 0.3,
-    ) -> bool:
-        """Return whether this image should be loaded eagerly."""
+        Uses the reader's dask-backed metadata rather
+        than the compressed on-disk size, so heavily-compressed files (e.g. an
+        18 MB LZW int32 label TIFF that expands to several GB) are correctly
+        flagged as too large to load eagerly.
+        """
         if self.path is None:
             return True
 
+        from ndev_settings import get_settings
         from psutil import virtual_memory
 
-        available_mem = int(virtual_memory().available)
-
-        if uncompressed_bytes is not None:
-            check_bytes = int(uncompressed_bytes)
-        else:
-            from bioio_base.io import pathlike_to_fs
-
-            fs, path_str = pathlike_to_fs(self.path)
-            file_size = fs.size(path_str)
-            assert file_size is not None
-            check_bytes = int(file_size)
-
-        max_in_mem_bytes = self._max_in_memory_bytes()
-        return (
-            check_bytes <= max_in_mem_bytes
-            and check_bytes < max_in_mem_percent * available_mem
+        max_bytes = (
+            float(getattr(get_settings().ndevio_reader, 'max_in_mem_gb', 8.0))  # type: ignore[attr-defined]
+            * 1e9
         )
+        available = int(virtual_memory().available)
+        # xr.DataArray.nbytes = shape × dtype.itemsize — no IO, dask-safe
+        uncompressed = self.xarray_dask_data.nbytes
+        return uncompressed <= max_bytes and uncompressed < 0.3 * available
 
-    def _get_level0_uncompressed_bytes(self) -> int:
-        """Return the highest-resolution uncompressed byte size."""
-        if self._level0_uncompressed_bytes is None:
-            current_res = self.current_resolution_level
-            self.set_resolution_level(0)
-            try:
-                self._level0_uncompressed_bytes = (
-                    math.prod(self.shape) * self.dtype.itemsize
-                )
-            finally:
-                self.set_resolution_level(current_res)
-        return self._level0_uncompressed_bytes
+    @property
+    def _use_dask(self) -> bool:
+        """True when all data access for this image should be dask-backed.
 
-    def _should_load_in_memory(self) -> bool:
-        """Return the cached single-resolution load decision."""
-        if self._should_load_in_memory_cache is None:
-            self._should_load_in_memory_cache = self._fits_in_memory(
-                uncompressed_bytes=self._get_level0_uncompressed_bytes(),
+        Multiscale images always use dask for memory efficiency.  Single-
+        resolution remote images always use dask.  Single-resolution local
+        images use dask when their uncompressed footprint would not fit
+        comfortably in RAM.
+        """
+        if self._use_dask_cache is None:
+            self._use_dask_cache = (
+                len(self.resolution_levels) > 1
+                or self._is_remote
+                or not self._fits_in_memory()
             )
-        return self._should_load_in_memory_cache
-
-    def _use_dask(self, *, multiscale: bool = False) -> bool:
-        """Return whether the current access path should stay dask-backed."""
-        return (
-            multiscale or self._is_remote or not self._should_load_in_memory()
-        )
-
-    def _get_xarray_for_current_level(
-        self, *, multiscale: bool = False
-    ) -> xr.DataArray:
-        """Return the xarray backend to use at the current resolution level."""
-        if self._use_dask(multiscale=multiscale):
-            return self.xarray_dask_data
-        return self.xarray_data
+        return self._use_dask_cache
 
     @property
     def reference_xarray(self) -> xr.DataArray:
@@ -397,8 +313,10 @@ class nImage(BioImage):
             current_res = self.current_resolution_level
             self.set_resolution_level(0)
             try:
-                self._reference_xarray = self._get_xarray_for_current_level(
-                    multiscale=len(self.resolution_levels) > 1
+                self._reference_xarray = (
+                    self.xarray_dask_data
+                    if self._use_dask
+                    else self.xarray_data
                 ).squeeze()
             finally:
                 self.set_resolution_level(current_res)
@@ -430,8 +348,7 @@ class nImage(BioImage):
         """Build the list of arrays for all resolution levels."""
         current_res = self.current_resolution_level
         levels = self.resolution_levels
-        multiscale = len(levels) > 1
-        use_dask = self._use_dask(multiscale=multiscale)
+        use_dask = self._use_dask
 
         # Determine which dims to keep from level 0's squeezed metadata.
         # Using isel instead of squeeze ensures all levels have
