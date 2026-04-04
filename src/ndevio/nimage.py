@@ -544,9 +544,9 @@ class nImage(BioImage):
         if channel_dim not in ref.dims:
             channel_name = self.channel_names[0]
             effective_type = resolve_layer_type(
-                channel_name or '',
-                layer_type,
-                channel_types,
+                global_override=layer_type,
+                channel_types=channel_types,
+                channel_name=channel_name or '',
                 path_stem=self.path_stem,
             )
             extra_kwargs = (
@@ -576,9 +576,9 @@ class nImage(BioImage):
         for i in range(total_channels):
             channel_name = channel_names[i]
             effective_type = resolve_layer_type(
-                channel_name,
-                layer_type,
-                channel_types,
+                global_override=layer_type,
+                channel_types=channel_types,
+                channel_name=channel_name,
                 path_stem=self.path_stem,
             )
 

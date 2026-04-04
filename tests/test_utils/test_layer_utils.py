@@ -11,9 +11,9 @@ class TestResolveLayerType:
         from ndevio.utils._layer_utils import resolve_layer_type
 
         result = resolve_layer_type(
-            'nuclei_mask',  # Would auto-detect to labels
             global_override='surface',
             channel_types={'nuclei_mask': 'image'},
+            channel_name='nuclei_mask',  # Would auto-detect to labels
         )
         assert result == 'surface'
 
@@ -22,9 +22,9 @@ class TestResolveLayerType:
         from ndevio.utils._layer_utils import resolve_layer_type
 
         result = resolve_layer_type(
-            'nuclei_mask',
             global_override=None,
             channel_types={'nuclei_mask': 'points'},
+            channel_name='nuclei_mask',
         )
         assert result == 'points'
 
@@ -33,17 +33,19 @@ class TestResolveLayerType:
         from ndevio.utils._layer_utils import resolve_layer_type
 
         assert (
-            resolve_layer_type('nuclei_mask', None, None) == 'labels'
+            resolve_layer_type(channel_name='nuclei_mask') == 'labels'
         )  # Auto-detect
-        assert resolve_layer_type('DAPI', None, None) == 'image'  # Auto-detect
+        assert (
+            resolve_layer_type(channel_name='DAPI') == 'image'
+        )  # Auto-detect
 
     def test_auto_detect_is_case_insensitive(self):
         """Channel-name keyword matching should ignore case."""
         from ndevio.utils._layer_utils import resolve_layer_type
 
-        assert resolve_layer_type('MASK', None, None) == 'labels'
-        assert resolve_layer_type('Label', None, None) == 'labels'
-        assert resolve_layer_type('SEGMENTATION', None, None) == 'labels'
+        assert resolve_layer_type(channel_name='MASK') == 'labels'
+        assert resolve_layer_type(channel_name='Label') == 'labels'
+        assert resolve_layer_type(channel_name='SEGMENTATION') == 'labels'
 
     def test_path_stem_fallback_detects_labels(self):
         """Regression: file named 'cells_mask.tif' with generic channel name
@@ -52,27 +54,29 @@ class TestResolveLayerType:
         from ndevio.utils._layer_utils import resolve_layer_type
 
         assert (
-            resolve_layer_type('0', None, None, path_stem='cells_mask')
+            resolve_layer_type(channel_name='0', path_stem='cells_mask')
             == 'labels'
         )
         assert (
             resolve_layer_type(
-                'Channel 0', None, None, path_stem='nuclei_labels'
+                channel_name='Channel 0', path_stem='nuclei_labels'
             )
             == 'labels'
         )
         assert (
-            resolve_layer_type('', None, None, path_stem='segmentation_output')
+            resolve_layer_type(
+                channel_name='', path_stem='segmentation_output'
+            )
             == 'labels'
         )
-        assert resolve_layer_type('', None, None, path_stem='raw') == 'image'
+        assert resolve_layer_type(channel_name='', path_stem='raw') == 'image'
 
     def test_path_stem_not_checked_when_channel_triggers_detection(self):
         """Channel-name detection is unaffected by a non-label path_stem."""
         from ndevio.utils._layer_utils import resolve_layer_type
 
         assert (
-            resolve_layer_type('nuclei_mask', None, None, path_stem='raw')
+            resolve_layer_type(channel_name='nuclei_mask', path_stem='raw')
             == 'labels'
         )
 
@@ -81,7 +85,7 @@ class TestResolveLayerType:
         from ndevio.utils._layer_utils import resolve_layer_type
 
         assert (
-            resolve_layer_type('DAPI', None, None, path_stem='raw_image')
+            resolve_layer_type(channel_name='DAPI', path_stem='raw_image')
             == 'image'
         )
 
@@ -90,7 +94,7 @@ class TestResolveLayerType:
         from ndevio.utils._layer_utils import resolve_layer_type
 
         assert (
-            resolve_layer_type('DAPI', None, None, path_stem=None) == 'image'
+            resolve_layer_type(channel_name='DAPI', path_stem=None) == 'image'
         )
 
 

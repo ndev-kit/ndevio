@@ -43,25 +43,31 @@ def _contains_label_keyword(value: str, keywords: frozenset[str]) -> bool:
 
 
 def resolve_layer_type(
-    channel_name: str,
-    global_override: str | None,
-    channel_types: dict[str, str] | None,
+    *,
+    global_override: str | None = None,
+    channel_types: dict[str, str] | None = None,
+    channel_name: str = '',
     path_stem: str | None = None,
 ) -> str:
     """Resolve layer type: global override > per-channel > auto-detect.
 
-    Auto-detection checks the channel name first, then falls back to the
-    filename stem so that files named e.g. ``cells_mask.tif`` are detected
-    as ``'labels'`` even when the channel name is a generic ``'0'``.
+    Resolution priority, from most general to most specific:
+
+    1. ``global_override`` — applies the same type to every channel.
+    2. ``channel_types`` — per-channel lookup by name.
+    3. ``channel_name`` keyword detection — checks for label-like keywords.
+    4. ``path_stem`` fallback — filename stem used when the channel name
+       gives no signal (e.g. generic ``'0'`` from a file named
+       ``cells_mask.tif``).
 
     Parameters
     ----------
-    channel_name : str
-        Name of the channel.
     global_override : str | None
         If set, this layer type is used for all channels.
     channel_types : dict[str, str] | None
         Per-channel layer type mapping.
+    channel_name : str
+        Name of the channel.
     path_stem : str | None
         Filename stem (no extension) used as a fallback when the channel
         name does not contain label keywords.
