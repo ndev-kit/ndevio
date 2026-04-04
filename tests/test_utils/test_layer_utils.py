@@ -2,38 +2,6 @@
 
 from __future__ import annotations
 
-from unittest import mock
-
-
-class TestInferLayerType:
-    """Tests for infer_layer_type function."""
-
-    def test_label_keyword_returns_labels(self):
-        """Test that label keywords are detected."""
-        from ndevio.utils._layer_utils import infer_channel_layer_type
-
-        assert infer_channel_layer_type('nuclei_mask') == 'labels'
-        assert infer_channel_layer_type('cell_labels') == 'labels'
-        assert infer_channel_layer_type('segmentation') == 'labels'
-        assert infer_channel_layer_type('SEG_channel') == 'labels'
-        assert infer_channel_layer_type('roi_data') == 'labels'
-
-    def test_non_label_returns_image(self):
-        """Test that non-label names return image."""
-        from ndevio.utils._layer_utils import infer_channel_layer_type
-
-        assert infer_channel_layer_type('DAPI') == 'image'
-        assert infer_channel_layer_type('GFP') == 'image'
-        assert infer_channel_layer_type('membrane') == 'image'
-
-    def test_case_insensitive(self):
-        """Test that detection is case-insensitive."""
-        from ndevio.utils._layer_utils import infer_channel_layer_type
-
-        assert infer_channel_layer_type('MASK') == 'labels'
-        assert infer_channel_layer_type('Label') == 'labels'
-        assert infer_channel_layer_type('SEGMENTATION') == 'labels'
-
 
 class TestResolveLayerType:
     """Tests for resolve_layer_type function."""
@@ -68,6 +36,14 @@ class TestResolveLayerType:
             resolve_layer_type('nuclei_mask', None, None) == 'labels'
         )  # Auto-detect
         assert resolve_layer_type('DAPI', None, None) == 'image'  # Auto-detect
+
+    def test_auto_detect_is_case_insensitive(self):
+        """Channel-name keyword matching should ignore case."""
+        from ndevio.utils._layer_utils import resolve_layer_type
+
+        assert resolve_layer_type('MASK', None, None) == 'labels'
+        assert resolve_layer_type('Label', None, None) == 'labels'
+        assert resolve_layer_type('SEGMENTATION', None, None) == 'labels'
 
     def test_path_stem_fallback_detects_labels(self):
         """Regression: file named 'cells_mask.tif' with generic channel name
@@ -116,75 +92,6 @@ class TestResolveLayerType:
         assert (
             resolve_layer_type('DAPI', None, None, path_stem=None) == 'image'
         )
-
-
-class TestDetermineInMemory:
-    """Tests for determine_in_memory function."""
-
-    def test_none_path_returns_true(self):
-        """Test that None path (array data) returns True."""
-        from ndevio.utils._layer_utils import determine_in_memory
-
-        assert determine_in_memory(None) is True
-
-    def test_small_file_returns_true(self, tmp_path):
-        """Test that small files are loaded in memory."""
-        from ndevio.utils._layer_utils import determine_in_memory
-
-        small_file = tmp_path / 'small.txt'
-        small_file.write_text('x' * 100)
-
-        with mock.patch(
-            'psutil.virtual_memory', return_value=mock.Mock(available=1e10)
-        ):
-            assert determine_in_memory(small_file) is True
-
-    def test_large_file_returns_false(self, tmp_path):
-        """Test that large files are loaded as dask."""
-        from ndevio.utils._layer_utils import determine_in_memory
-
-        large_file = tmp_path / 'large.txt'
-        large_file.write_text('x')
-
-        with (
-            mock.patch(
-                'psutil.virtual_memory', return_value=mock.Mock(available=1e9)
-            ),
-            mock.patch(
-                'bioio_base.io.pathlike_to_fs',
-                return_value=(mock.Mock(size=lambda x: 5e9), ''),
-            ),
-        ):
-            assert determine_in_memory(large_file) is False
-
-    def test_uncompressed_bytes_large_overrides_small_disk_size(
-        self, tmp_path
-    ):
-        """Regression: compressed files (e.g. int32 TIFF) that are small on
-        disk but large when decompressed must trigger dask loading.
-
-        uncompressed_bytes takes precedence over filesystem size so that
-        a 19 MB compressed file whose data expands to 3 GB in memory is
-        not eagerly loaded.
-        """
-        from ndevio.utils._layer_utils import determine_in_memory
-
-        small_file = tmp_path / 'labels.tif'
-        small_file.write_bytes(b'\x00' * 100)  # tiny on disk
-
-        with mock.patch(
-            'psutil.virtual_memory', return_value=mock.Mock(available=1e10)
-        ):
-            # uncompressed_bytes above threshold → dask
-            assert (
-                determine_in_memory(small_file, uncompressed_bytes=int(5e9))
-                is False
-            )
-            # uncompressed_bytes well below threshold → in-memory
-            assert (
-                determine_in_memory(small_file, uncompressed_bytes=1000)
-                is True
-            )
 
 
 class TestBuildLayerTuple:

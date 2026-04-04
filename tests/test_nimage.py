@@ -800,6 +800,91 @@ class TestExplicitReaderParameter:
         assert img.reader.name == 'bioio_ome_tiff'
 
 
+class TestDetermineInMemory:
+    """Tests for nImage memory-loading policy."""
+
+    @staticmethod
+    def _make_image(path):
+        img = object.__new__(nImage)
+        img.path = None if path is None else str(path)
+        img._is_remote = False
+        return img
+
+    def test_none_path_returns_true(self):
+        """Array-backed inputs should stay in memory."""
+        assert self._make_image(None)._fits_in_memory() is True
+
+    def test_small_file_returns_true(self, tmp_path):
+        """Small files should be loaded eagerly."""
+        small_file = tmp_path / 'small.txt'
+        small_file.write_text('x' * 100)
+
+        with mock.patch(
+            'psutil.virtual_memory', return_value=mock.Mock(available=1e10)
+        ):
+            assert self._make_image(small_file)._fits_in_memory() is True
+
+    def test_large_file_returns_false(self, tmp_path):
+        """Large files should stay dask-backed."""
+        large_file = tmp_path / 'large.txt'
+        large_file.write_text('x')
+
+        with (
+            mock.patch(
+                'psutil.virtual_memory', return_value=mock.Mock(available=1e9)
+            ),
+            mock.patch(
+                'bioio_base.io.pathlike_to_fs',
+                return_value=(mock.Mock(size=lambda x: 5e9), ''),
+            ),
+        ):
+            assert self._make_image(large_file)._fits_in_memory() is False
+
+    def test_uncompressed_bytes_large_overrides_small_disk_size(
+        self, tmp_path
+    ):
+        """Compressed files should be judged by RAM footprint when known."""
+        small_file = tmp_path / 'labels.tif'
+        small_file.write_bytes(b'\x00' * 100)
+
+        with mock.patch(
+            'psutil.virtual_memory', return_value=mock.Mock(available=1e10)
+        ):
+            assert (
+                self._make_image(small_file)._fits_in_memory(
+                    uncompressed_bytes=int(5e9)
+                )
+                is False
+            )
+            assert (
+                self._make_image(small_file)._fits_in_memory(
+                    uncompressed_bytes=1000
+                )
+                is True
+            )
+
+    def test_missing_max_in_mem_setting_falls_back_to_default(self, tmp_path):
+        """Older persisted settings may not yet contain max_in_mem_gb."""
+        from types import SimpleNamespace
+
+        small_file = tmp_path / 'small.txt'
+        small_file.write_text('x' * 100)
+
+        with (
+            mock.patch(
+                'ndev_settings.get_settings',
+                return_value=SimpleNamespace(
+                    ndevio_reader=SimpleNamespace(),
+                ),
+            ),
+            mock.patch(
+                'psutil.virtual_memory',
+                return_value=mock.Mock(available=1e10),
+            ),
+        ):
+            assert self._make_image(small_file)._fits_in_memory() is True
+
+
 # =============================================================================
 # Regression tests: compressed files and filename-based label detection
 # =============================================================================
