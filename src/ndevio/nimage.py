@@ -142,13 +142,7 @@ class nImage(BioImage):
         self._is_remote = True
 
     def _fits_in_memory(self) -> bool:
-        """Return True if the full uncompressed image fits comfortably in RAM.
-
-        Uses the reader's dask-backed metadata rather
-        than the compressed on-disk size, so heavily-compressed files (e.g. an
-        18 MB LZW int32 label TIFF that expands to several GB) are correctly
-        flagged as too large to load eagerly.
-        """
+        """Return True if the uncompressed image fits comfortably in RAM."""
         if self.path is None:
             return True
 
