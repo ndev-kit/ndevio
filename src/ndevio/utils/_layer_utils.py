@@ -12,10 +12,31 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Keywords that indicate a channel contains labels/segmentation data
-LABEL_KEYWORDS = frozenset({'label', 'mask', 'segmentation', 'seg', 'roi'})
+CHANNEL_LABEL_KEYWORDS = frozenset(
+    {
+        'label',
+        'mask',
+        'seg',
+        'segmentation',
+        'annotation',
+        'roi',
+        'region',
+        'instance',
+        'objects',
+    }
+)
+FILE_LABEL_KEYWORDS = frozenset(
+    {
+        'label',
+        'mask',
+        'segmentation',
+        'instance',
+        'objects',
+    }
+)
 
 
-def infer_layer_type(channel_name: str) -> str:
+def infer_channel_layer_type(channel_name: str) -> str:
     """Infer layer type from channel name keywords.
 
     Parameters
@@ -30,15 +51,45 @@ def infer_layer_type(channel_name: str) -> str:
 
     Examples
     --------
-    >>> infer_layer_type('nuclei_mask')
+    >>> infer_channel_layer_type('nuclei_mask')
     'labels'
-    >>> infer_layer_type('DAPI')
+    >>> infer_channel_layer_type('DAPI')
     'image'
 
     """
     name_lower = channel_name.lower()
     return (
-        'labels' if any(kw in name_lower for kw in LABEL_KEYWORDS) else 'image'
+        'labels'
+        if any(kw in name_lower for kw in CHANNEL_LABEL_KEYWORDS)
+        else 'image'
+    )
+
+
+def infer_file_label_type(path_stem: str) -> str:
+    """Infer layer type from filename stem keywords.
+
+    Parameters
+    ----------
+    path_stem : str
+        The filename stem (no extension) to check.
+
+    Returns
+    -------
+    str
+        'labels' if path_stem contains a label keyword, else 'image'.
+    Examples
+    --------
+    >>> infer_file_label_type('cells_segmentation')
+    'labels'
+    >>> infer_file_label_type('experiment1')
+    'image'
+
+    """
+    name_lower = path_stem.lower()
+    return (
+        'labels'
+        if any(kw in name_lower for kw in FILE_LABEL_KEYWORDS)
+        else 'image'
     )
 
 
@@ -46,8 +97,13 @@ def resolve_layer_type(
     channel_name: str,
     global_override: str | None,
     channel_types: dict[str, str] | None,
+    path_stem: str | None = None,
 ) -> str:
     """Resolve layer type: global override > per-channel > auto-detect.
+
+    Auto-detection checks the channel name first, then falls back to the
+    filename stem so that files named e.g. ``cells_mask.tif`` are detected
+    as ``'labels'`` even when the channel name is a generic ``'0'``.
 
     Parameters
     ----------
@@ -57,6 +113,9 @@ def resolve_layer_type(
         If set, this layer type is used for all channels.
     channel_types : dict[str, str] | None
         Per-channel layer type mapping.
+    path_stem : str | None
+        Filename stem (no extension) used as a fallback when the channel
+        name does not contain label keywords.
 
     Returns
     -------
@@ -68,12 +127,17 @@ def resolve_layer_type(
         return global_override
     if channel_types and channel_name in channel_types:
         return channel_types[channel_name]
-    return infer_layer_type(channel_name)
+    if infer_channel_layer_type(channel_name) == 'labels':
+        return 'labels'
+    if path_stem is not None:
+        return infer_file_label_type(path_stem)
+    return 'image'
 
 
 def determine_in_memory(
     path: str | None,
-    max_in_mem_bytes: float = 4e9,
+    uncompressed_bytes: int | None = None,
+    max_in_mem_bytes: float | None = None,
     max_in_mem_percent: float = 0.3,
 ) -> bool:
     """Determine whether to load image data in memory or as dask array.
@@ -82,11 +146,17 @@ def determine_in_memory(
     ----------
     path : str | None
         Path to the image file as a string. If None (array data), returns True.
-    max_in_mem_bytes : float
-        Maximum file size in bytes for in-memory loading.
-        Default is 4 GB (4e9 bytes).
+    uncompressed_bytes : int | None
+        Expected in-memory size in bytes (``shape.prod() * dtype.itemsize``).
+        When provided this is used instead of the on-disk file size, which
+        can be far smaller for compressed formats (e.g. LZW-compressed int32
+        TIFF).  When None the on-disk size reported by the filesystem is used.
+    max_in_mem_bytes : float | None
+        Maximum size in bytes for in-memory loading.
+        If None (default), reads from the ``ndevio_reader.max_in_mem_gb``
+        setting, falling back to 8 GB (8e9 bytes).
     max_in_mem_percent : float
-        Maximum percentage of available memory for in-memory loading.
+        Maximum fraction of available memory for in-memory loading.
         Default is 30%.
 
     Returns
@@ -95,20 +165,30 @@ def determine_in_memory(
         True if image should be loaded in memory, False for dask array.
 
     """
-    from bioio_base.io import pathlike_to_fs
-    from psutil import virtual_memory
-
     # No file path means array data - always in memory
     if path is None:
         return True
 
-    fs, path_str = pathlike_to_fs(path)
-    filesize: int = fs.size(path_str)  # type: ignore[assignment]
+    if max_in_mem_bytes is None:
+        from ndev_settings import get_settings
+
+        max_in_mem_bytes = get_settings().ndevio_reader.max_in_mem_gb * 1e9
+
+    from psutil import virtual_memory
+
     available_mem = virtual_memory().available
 
+    if uncompressed_bytes is not None:
+        check_bytes = uncompressed_bytes
+    else:
+        from bioio_base.io import pathlike_to_fs
+
+        fs, path_str = pathlike_to_fs(path)
+        check_bytes = fs.size(path_str)  # type: ignore[assignment]
+
     return (
-        filesize <= max_in_mem_bytes
-        and filesize < max_in_mem_percent * available_mem
+        check_bytes <= max_in_mem_bytes
+        and check_bytes < max_in_mem_percent * available_mem
     )
 
 

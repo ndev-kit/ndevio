@@ -140,23 +140,45 @@ class nImage(BioImage):
         if isinstance(image, str):
             image = image.rstrip('/')
 
+        # Default to per-plane chunks so each Z/T slice is a separate dask
+        # task (~one TIFF page) rather than the entire ZYX volume.
+        # bioio's DEFAULT_CHUNK_DIMS includes Z, meaning each (T,C) pair is
+        # one giant task and every Z-slice navigation decompresses the full
+        # volume. ["Y", "X"] gives O(Z) tasks with ~1 page per compute.
+        kwargs.setdefault('chunk_dims', ['Y', 'X'])
+        # Pre-compute kwargs without chunk_dims for readers that reject it
+        # (e.g. bioio-ome-zarr, bioio-czi's internal renderer).
+        _kw_no_chunks = {k: v for k, v in kwargs.items() if k != 'chunk_dims'}
+
         resolved_reader = _resolve_reader(image, reader)
+
+        def _init_base(rdr, kw):
+            """Call BioImage.__init__, retrying without chunk_dims on TypeError."""
+            try:
+                BioImage.__init__(self, image=image, reader=rdr, **kw)
+            except TypeError as exc:
+                if 'chunk_dims' in str(exc):
+                    BioImage.__init__(
+                        self, image=image, reader=rdr, **_kw_no_chunks
+                    )
+                else:
+                    raise
 
         # Try preferred/explicit reader first, fall back to bioio default
         if resolved_reader is not None:
             try:
-                super().__init__(image=image, reader=resolved_reader, **kwargs)
+                _init_base(resolved_reader, kwargs)
             except UnsupportedFileFormatError:
                 # Preferred reader failed, fall back to bioio's default
                 try:
-                    super().__init__(image=image, reader=None, **kwargs)
+                    _init_base(None, kwargs)
                 except UnsupportedFileFormatError:
                     if isinstance(image, str | Path):
                         raise_unsupported_with_suggestions(image)
                     raise
         else:
             try:
-                super().__init__(image=image, reader=None, **kwargs)
+                _init_base(None, kwargs)
             except UnsupportedFileFormatError:
                 if isinstance(image, str | Path):
                     raise_unsupported_with_suggestions(image)
@@ -216,7 +238,12 @@ class nImage(BioImage):
             # Ensure we're at the highest-res level for metadata consistency
             current_res = self.current_resolution_level
             self.set_resolution_level(0)
-            if self._is_remote or not determine_in_memory(self.path):
+            import math
+
+            uncompressed_bytes = math.prod(self.shape) * self.dtype.itemsize
+            if self._is_remote or not determine_in_memory(
+                self.path, uncompressed_bytes=uncompressed_bytes
+            ):
                 self._reference_xarray = self.xarray_dask_data.squeeze()
             else:
                 self._reference_xarray = self.xarray_data.squeeze()
@@ -258,13 +285,19 @@ class nImage(BioImage):
         ref = self.reference_xarray
         keep_dims = set(ref.dims)
 
+        # ref.nbytes is the squeezed level-0 array size — what napari loads.
+        # Using this instead of math.prod(self.shape)*dtype.itemsize avoids
+        # the level-confusion risk and correctly reflects multichannel size.
+        uncompressed_bytes = ref.nbytes
         arrays: list = []
         for level in levels:
             self.set_resolution_level(level)
             if (
                 multiscale
                 or self._is_remote
-                or not determine_in_memory(self.path)
+                or not determine_in_memory(
+                    self.path, uncompressed_bytes=uncompressed_bytes
+                )
             ):
                 xr_data = self.xarray_dask_data
             else:
@@ -562,7 +595,10 @@ class nImage(BioImage):
         if channel_dim not in ref.dims:
             channel_name = self.channel_names[0]
             effective_type = resolve_layer_type(
-                channel_name or '', layer_type, channel_types
+                channel_name or '',
+                layer_type,
+                channel_types,
+                path_stem=self.path_stem,
             )
             extra_kwargs = (
                 channel_kwargs.get(channel_name)
@@ -591,7 +627,10 @@ class nImage(BioImage):
         for i in range(total_channels):
             channel_name = channel_names[i]
             effective_type = resolve_layer_type(
-                channel_name, layer_type, channel_types
+                channel_name,
+                layer_type,
+                channel_types,
+                path_stem=self.path_stem,
             )
 
             # Slice along channel axis for each resolution level

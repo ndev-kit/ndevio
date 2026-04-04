@@ -10,29 +10,29 @@ class TestInferLayerType:
 
     def test_label_keyword_returns_labels(self):
         """Test that label keywords are detected."""
-        from ndevio.utils._layer_utils import infer_layer_type
+        from ndevio.utils._layer_utils import infer_channel_layer_type
 
-        assert infer_layer_type('nuclei_mask') == 'labels'
-        assert infer_layer_type('cell_labels') == 'labels'
-        assert infer_layer_type('segmentation') == 'labels'
-        assert infer_layer_type('SEG_channel') == 'labels'
-        assert infer_layer_type('roi_data') == 'labels'
+        assert infer_channel_layer_type('nuclei_mask') == 'labels'
+        assert infer_channel_layer_type('cell_labels') == 'labels'
+        assert infer_channel_layer_type('segmentation') == 'labels'
+        assert infer_channel_layer_type('SEG_channel') == 'labels'
+        assert infer_channel_layer_type('roi_data') == 'labels'
 
     def test_non_label_returns_image(self):
         """Test that non-label names return image."""
-        from ndevio.utils._layer_utils import infer_layer_type
+        from ndevio.utils._layer_utils import infer_channel_layer_type
 
-        assert infer_layer_type('DAPI') == 'image'
-        assert infer_layer_type('GFP') == 'image'
-        assert infer_layer_type('membrane') == 'image'
+        assert infer_channel_layer_type('DAPI') == 'image'
+        assert infer_channel_layer_type('GFP') == 'image'
+        assert infer_channel_layer_type('membrane') == 'image'
 
     def test_case_insensitive(self):
         """Test that detection is case-insensitive."""
-        from ndevio.utils._layer_utils import infer_layer_type
+        from ndevio.utils._layer_utils import infer_channel_layer_type
 
-        assert infer_layer_type('MASK') == 'labels'
-        assert infer_layer_type('Label') == 'labels'
-        assert infer_layer_type('SEGMENTATION') == 'labels'
+        assert infer_channel_layer_type('MASK') == 'labels'
+        assert infer_channel_layer_type('Label') == 'labels'
+        assert infer_channel_layer_type('SEGMENTATION') == 'labels'
 
 
 class TestResolveLayerType:
@@ -68,6 +68,54 @@ class TestResolveLayerType:
             resolve_layer_type('nuclei_mask', None, None) == 'labels'
         )  # Auto-detect
         assert resolve_layer_type('DAPI', None, None) == 'image'  # Auto-detect
+
+    def test_path_stem_fallback_detects_labels(self):
+        """Regression: file named 'cells_mask.tif' with generic channel name
+        '0' should be detected as 'labels' via the path_stem fallback.
+        """
+        from ndevio.utils._layer_utils import resolve_layer_type
+
+        assert (
+            resolve_layer_type('0', None, None, path_stem='cells_mask')
+            == 'labels'
+        )
+        assert (
+            resolve_layer_type(
+                'Channel 0', None, None, path_stem='nuclei_labels'
+            )
+            == 'labels'
+        )
+        assert (
+            resolve_layer_type('', None, None, path_stem='segmentation_output')
+            == 'labels'
+        )
+        assert resolve_layer_type('', None, None, path_stem='raw') == 'image'
+
+    def test_path_stem_not_checked_when_channel_triggers_detection(self):
+        """Channel-name detection is unaffected by a non-label path_stem."""
+        from ndevio.utils._layer_utils import resolve_layer_type
+
+        assert (
+            resolve_layer_type('nuclei_mask', None, None, path_stem='raw')
+            == 'labels'
+        )
+
+    def test_path_stem_nonlabel_image_result(self):
+        """Neither channel nor path_stem contains label keyword → 'image'."""
+        from ndevio.utils._layer_utils import resolve_layer_type
+
+        assert (
+            resolve_layer_type('DAPI', None, None, path_stem='raw_image')
+            == 'image'
+        )
+
+    def test_path_stem_none_channel_nonlabel_returns_image(self):
+        """path_stem=None with non-label channel should still return 'image'."""
+        from ndevio.utils._layer_utils import resolve_layer_type
+
+        assert (
+            resolve_layer_type('DAPI', None, None, path_stem=None) == 'image'
+        )
 
 
 class TestDetermineInMemory:
@@ -108,6 +156,35 @@ class TestDetermineInMemory:
             ),
         ):
             assert determine_in_memory(large_file) is False
+
+    def test_uncompressed_bytes_large_overrides_small_disk_size(
+        self, tmp_path
+    ):
+        """Regression: compressed files (e.g. int32 TIFF) that are small on
+        disk but large when decompressed must trigger dask loading.
+
+        uncompressed_bytes takes precedence over filesystem size so that
+        a 19 MB compressed file whose data expands to 3 GB in memory is
+        not eagerly loaded.
+        """
+        from ndevio.utils._layer_utils import determine_in_memory
+
+        small_file = tmp_path / 'labels.tif'
+        small_file.write_bytes(b'\x00' * 100)  # tiny on disk
+
+        with mock.patch(
+            'psutil.virtual_memory', return_value=mock.Mock(available=1e10)
+        ):
+            # uncompressed_bytes above threshold → dask
+            assert (
+                determine_in_memory(small_file, uncompressed_bytes=int(5e9))
+                is False
+            )
+            # uncompressed_bytes well below threshold → in-memory
+            assert (
+                determine_in_memory(small_file, uncompressed_bytes=1000)
+                is True
+            )
 
 
 class TestBuildLayerTuple:
