@@ -24,114 +24,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _prepare_bioimage_init_kwargs(
-    kwargs: dict[str, Any],
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Build BioImage init kwargs and a fallback without chunk_dims."""
-    # Default to per-plane chunks so each Z/T slice is a separate dask
-    # task (~one TIFF page) rather than the entire ZYX volume.
-    # bioio's DEFAULT_CHUNK_DIMS includes Z, meaning each (T,C) pair is
-    # one giant task and every Z-slice navigation decompresses the full
-    # volume. ["Y", "X"] gives O(Z) tasks with ~1 page per compute.
-    init_kwargs = {
-        **kwargs,
-        'chunk_dims': kwargs.get('chunk_dims', ['Y', 'X']),
-    }
-    fallback_kwargs = {
-        k: v for k, v in init_kwargs.items() if k != 'chunk_dims'
-    }
-    return init_kwargs, fallback_kwargs
-
-
-def _initialize_bioimage(
-    instance: BioImage,
-    *,
-    image: ImageLike,
-    resolved_reader: type[Reader] | Sequence[type[Reader]] | None,
-    init_kwargs: dict[str, Any],
-    fallback_kwargs: dict[str, Any],
-) -> None:
-    """Initialize BioImage with preferred-reader fallback to default.
-
-    Tries ``chunk_dims=['Y','X']`` for per-plane chunking, falling back to
-    the reader's default chunking if ``chunk_dims`` is not supported.
-    If a preferred reader is given but cannot read the file, falls back to
-    BioImage's automatic reader selection.
-    """
-    from bioio_base.exceptions import UnsupportedFileFormatError
-
-    def _init(reader: type[Reader] | Sequence[type[Reader]] | None) -> None:
-        """Initialize with chunk_dims, silently falling back without it."""
-        try:
-            BioImage.__init__(
-                instance, image=image, reader=reader, **init_kwargs
-            )
-        except TypeError as exc:
-            if 'chunk_dims' not in str(exc):
-                raise
-            BioImage.__init__(
-                instance, image=image, reader=reader, **fallback_kwargs
-            )
-
-    if resolved_reader is not None:
-        try:
-            _init(resolved_reader)
-            return
-        except UnsupportedFileFormatError:
-            pass
-
-    _init(None)
-
-
-def _resolve_reader(
-    image: ImageLike,
-    explicit_reader: type[Reader] | Sequence[type[Reader]] | None,
-) -> type[Reader] | Sequence[type[Reader]] | None:
-    """Resolve the reader to use for an image.
-
-    Priority:
-    1. Explicit reader (passed to __init__)
-    2. Preferred reader from settings (if file path and installed)
-    3. None (let bioio determine)
-
-    Parameters
-    ----------
-    image : ImageLike
-        The image to resolve a reader for.
-    explicit_reader : type[Reader] | Sequence[type[Reader]] | None
-        Explicit reader class(es) passed by user.
-
-    Returns
-    -------
-    type[Reader] | Sequence[type[Reader]] | None
-        The reader to use, or None to let bioio choose.
-
-    """
-    if explicit_reader is not None:
-        return explicit_reader
-
-    # Only check preferred reader for file paths
-    if not isinstance(image, str | Path):
-        return None
-
-    # Get preferred reader from settings
-    from ndev_settings import get_settings
-
-    from .bioio_plugins._utils import get_installed_plugins, get_reader_by_name
-
-    settings = get_settings()
-    preferred = settings.ndevio_reader.preferred_reader  # type: ignore
-
-    if not preferred:
-        return None
-
-    if preferred not in get_installed_plugins():
-        logger.debug('Preferred reader %s not installed', preferred)
-        return None
-
-    return get_reader_by_name(preferred)
-
-
 class nImage(BioImage):
     """
     An nImage is a BioImage with additional functionality for napari.
@@ -719,3 +611,111 @@ class nImage(BioImage):
             )
 
         return tuples
+
+
+def _prepare_bioimage_init_kwargs(
+    kwargs: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Build BioImage init kwargs and a fallback without chunk_dims."""
+    # Default to per-plane chunks so each Z/T slice is a separate dask
+    # task (~one TIFF page) rather than the entire ZYX volume.
+    # bioio's DEFAULT_CHUNK_DIMS includes Z, meaning each (T,C) pair is
+    # one giant task and every Z-slice navigation decompresses the full
+    # volume. ["Y", "X"] gives O(Z) tasks with ~1 page per compute.
+    init_kwargs = {
+        **kwargs,
+        'chunk_dims': kwargs.get('chunk_dims', ['Y', 'X']),
+    }
+    fallback_kwargs = {
+        k: v for k, v in init_kwargs.items() if k != 'chunk_dims'
+    }
+    return init_kwargs, fallback_kwargs
+
+
+def _initialize_bioimage(
+    instance: BioImage,
+    *,
+    image: ImageLike,
+    resolved_reader: type[Reader] | Sequence[type[Reader]] | None,
+    init_kwargs: dict[str, Any],
+    fallback_kwargs: dict[str, Any],
+) -> None:
+    """Initialize BioImage with preferred-reader fallback to default.
+
+    Tries ``chunk_dims=['Y','X']`` for per-plane chunking, falling back to
+    the reader's default chunking if ``chunk_dims`` is not supported.
+    If a preferred reader is given but cannot read the file, falls back to
+    BioImage's automatic reader selection.
+    """
+    from bioio_base.exceptions import UnsupportedFileFormatError
+
+    def _init(reader: type[Reader] | Sequence[type[Reader]] | None) -> None:
+        """Initialize with chunk_dims, silently falling back without it."""
+        try:
+            BioImage.__init__(
+                instance, image=image, reader=reader, **init_kwargs
+            )
+        except TypeError as exc:
+            if 'chunk_dims' not in str(exc):
+                raise
+            BioImage.__init__(
+                instance, image=image, reader=reader, **fallback_kwargs
+            )
+
+    if resolved_reader is not None:
+        try:
+            _init(resolved_reader)
+            return
+        except UnsupportedFileFormatError:
+            pass
+
+    _init(None)
+
+
+def _resolve_reader(
+    image: ImageLike,
+    explicit_reader: type[Reader] | Sequence[type[Reader]] | None,
+) -> type[Reader] | Sequence[type[Reader]] | None:
+    """Resolve the reader to use for an image.
+
+    Priority:
+    1. Explicit reader (passed to __init__)
+    2. Preferred reader from settings (if file path and installed)
+    3. None (let bioio determine)
+
+    Parameters
+    ----------
+    image : ImageLike
+        The image to resolve a reader for.
+    explicit_reader : type[Reader] | Sequence[type[Reader]] | None
+        Explicit reader class(es) passed by user.
+
+    Returns
+    -------
+    type[Reader] | Sequence[type[Reader]] | None
+        The reader to use, or None to let bioio choose.
+
+    """
+    if explicit_reader is not None:
+        return explicit_reader
+
+    # Only check preferred reader for file paths
+    if not isinstance(image, str | Path):
+        return None
+
+    # Get preferred reader from settings
+    from ndev_settings import get_settings
+
+    from .bioio_plugins._utils import get_installed_plugins, get_reader_by_name
+
+    settings = get_settings()
+    preferred = settings.ndevio_reader.preferred_reader  # type: ignore
+
+    if not preferred:
+        return None
+
+    if preferred not in get_installed_plugins():
+        logger.debug('Preferred reader %s not installed', preferred)
+        return None
+
+    return get_reader_by_name(preferred)
