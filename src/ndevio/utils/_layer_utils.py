@@ -12,51 +12,65 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Keywords that indicate a channel contains labels/segmentation data
-LABEL_KEYWORDS = frozenset({'label', 'mask', 'segmentation', 'seg', 'roi'})
+CHANNEL_LABEL_KEYWORDS = frozenset(
+    {
+        'label',
+        'mask',
+        'seg',
+        'segmentation',
+        'annotation',
+        'roi',
+        'region',
+        'instance',
+        'objects',
+    }
+)
+FILE_LABEL_KEYWORDS = frozenset(
+    {
+        'label',
+        'mask',
+        'segmentation',
+        'instance',
+        'objects',
+    }
+)
 
 
-def infer_layer_type(channel_name: str) -> str:
-    """Infer layer type from channel name keywords.
-
-    Parameters
-    ----------
-    channel_name : str
-        The channel name to check.
-
-    Returns
-    -------
-    str
-        'labels' if channel_name contains a label keyword, else 'image'.
-
-    Examples
-    --------
-    >>> infer_layer_type('nuclei_mask')
-    'labels'
-    >>> infer_layer_type('DAPI')
-    'image'
-
-    """
-    name_lower = channel_name.lower()
-    return (
-        'labels' if any(kw in name_lower for kw in LABEL_KEYWORDS) else 'image'
-    )
+def _contains_label_keyword(value: str, keywords: frozenset[str]) -> bool:
+    """Return whether a string contains any keyword in a keyword set."""
+    value_lower = value.lower()
+    return any(keyword in value_lower for keyword in keywords)
 
 
 def resolve_layer_type(
-    channel_name: str,
-    global_override: str | None,
-    channel_types: dict[str, str] | None,
+    *,
+    global_override: str | None = None,
+    channel_types: dict[str, str] | None = None,
+    channel_name: str = '',
+    path_stem: str | None = None,
 ) -> str:
     """Resolve layer type: global override > per-channel > auto-detect.
 
+    Resolution priority, from most general to most specific:
+
+    1. ``global_override`` — applies the same type to every channel.
+    2. ``channel_types`` — per-channel lookup by name.
+    3. ``channel_name`` keyword detection — checks for label-like keywords.
+    4. ``path_stem`` fallback — filename stem used when the channel name
+       gives no signal (e.g. generic ``'0'`` from a file named
+       ``cells_mask.tif``).
+
     Parameters
     ----------
-    channel_name : str
-        Name of the channel.
     global_override : str | None
         If set, this layer type is used for all channels.
     channel_types : dict[str, str] | None
         Per-channel layer type mapping.
+    channel_name : str
+        Name of the channel.
+    path_stem : str | None
+        Filename stem (no extension) used as a fallback when the channel
+        name does not contain label keywords.
 
     Returns
     -------
@@ -68,48 +82,11 @@ def resolve_layer_type(
         return global_override
     if channel_types and channel_name in channel_types:
         return channel_types[channel_name]
-    return infer_layer_type(channel_name)
-
-
-def determine_in_memory(
-    path: str | None,
-    max_in_mem_bytes: float = 4e9,
-    max_in_mem_percent: float = 0.3,
-) -> bool:
-    """Determine whether to load image data in memory or as dask array.
-
-    Parameters
-    ----------
-    path : str | None
-        Path to the image file as a string. If None (array data), returns True.
-    max_in_mem_bytes : float
-        Maximum file size in bytes for in-memory loading.
-        Default is 4 GB (4e9 bytes).
-    max_in_mem_percent : float
-        Maximum percentage of available memory for in-memory loading.
-        Default is 30%.
-
-    Returns
-    -------
-    bool
-        True if image should be loaded in memory, False for dask array.
-
-    """
-    from bioio_base.io import pathlike_to_fs
-    from psutil import virtual_memory
-
-    # No file path means array data - always in memory
-    if path is None:
-        return True
-
-    fs, path_str = pathlike_to_fs(path)
-    filesize: int = fs.size(path_str)  # type: ignore[assignment]
-    available_mem = virtual_memory().available
-
-    return (
-        filesize <= max_in_mem_bytes
-        and filesize < max_in_mem_percent * available_mem
-    )
+    if _contains_label_keyword(channel_name, CHANNEL_LABEL_KEYWORDS):
+        return 'labels'
+    if path_stem and _contains_label_keyword(path_stem, FILE_LABEL_KEYWORDS):
+        return 'labels'
+    return 'image'
 
 
 def build_layer_tuple(

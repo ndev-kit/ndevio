@@ -1,7 +1,7 @@
 ndevio_reader:
   suggest_reader_plugins:
     default: true
-    tooltip: Whether to suggest plugins to install when no reader can be found
+    tooltip: Whether to suggest plugins to install when no reader can be found.
     value: true
   preferred_reader:
     default: null
@@ -16,12 +16,19 @@ ndevio_reader:
     - View All Scenes
     - View First Scene Only
     default: Open Scene Widget
-    tooltip: How to handle files with multiple scenes
+    tooltip: How to handle files with multiple scenes.
     value: Open Scene Widget
   clear_layers_on_new_scene:
     default: false
-    tooltip: Whether to clear the viewer when selecting a new scene
+    tooltip: Whether to clear the viewer when selecting a new scene.
     value: false
+  max_in_mem_gb:
+    default: 8.0
+    min: 0.5
+    max: 128.0
+    step: 0.5
+    tooltip: Maximum uncompressed image size in GB to load eagerly. Larger images use dask.
+    value: 8.0
 
 ndevio_export:
   canvas_scale:

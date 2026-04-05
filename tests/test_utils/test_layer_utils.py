@@ -2,38 +2,6 @@
 
 from __future__ import annotations
 
-from unittest import mock
-
-
-class TestInferLayerType:
-    """Tests for infer_layer_type function."""
-
-    def test_label_keyword_returns_labels(self):
-        """Test that label keywords are detected."""
-        from ndevio.utils._layer_utils import infer_layer_type
-
-        assert infer_layer_type('nuclei_mask') == 'labels'
-        assert infer_layer_type('cell_labels') == 'labels'
-        assert infer_layer_type('segmentation') == 'labels'
-        assert infer_layer_type('SEG_channel') == 'labels'
-        assert infer_layer_type('roi_data') == 'labels'
-
-    def test_non_label_returns_image(self):
-        """Test that non-label names return image."""
-        from ndevio.utils._layer_utils import infer_layer_type
-
-        assert infer_layer_type('DAPI') == 'image'
-        assert infer_layer_type('GFP') == 'image'
-        assert infer_layer_type('membrane') == 'image'
-
-    def test_case_insensitive(self):
-        """Test that detection is case-insensitive."""
-        from ndevio.utils._layer_utils import infer_layer_type
-
-        assert infer_layer_type('MASK') == 'labels'
-        assert infer_layer_type('Label') == 'labels'
-        assert infer_layer_type('SEGMENTATION') == 'labels'
-
 
 class TestResolveLayerType:
     """Tests for resolve_layer_type function."""
@@ -43,9 +11,9 @@ class TestResolveLayerType:
         from ndevio.utils._layer_utils import resolve_layer_type
 
         result = resolve_layer_type(
-            'nuclei_mask',  # Would auto-detect to labels
             global_override='surface',
             channel_types={'nuclei_mask': 'image'},
+            channel_name='nuclei_mask',  # Would auto-detect to labels
         )
         assert result == 'surface'
 
@@ -54,9 +22,9 @@ class TestResolveLayerType:
         from ndevio.utils._layer_utils import resolve_layer_type
 
         result = resolve_layer_type(
-            'nuclei_mask',
             global_override=None,
             channel_types={'nuclei_mask': 'points'},
+            channel_name='nuclei_mask',
         )
         assert result == 'points'
 
@@ -65,49 +33,69 @@ class TestResolveLayerType:
         from ndevio.utils._layer_utils import resolve_layer_type
 
         assert (
-            resolve_layer_type('nuclei_mask', None, None) == 'labels'
+            resolve_layer_type(channel_name='nuclei_mask') == 'labels'
         )  # Auto-detect
-        assert resolve_layer_type('DAPI', None, None) == 'image'  # Auto-detect
+        assert (
+            resolve_layer_type(channel_name='DAPI') == 'image'
+        )  # Auto-detect
 
+    def test_auto_detect_is_case_insensitive(self):
+        """Channel-name keyword matching should ignore case."""
+        from ndevio.utils._layer_utils import resolve_layer_type
 
-class TestDetermineInMemory:
-    """Tests for determine_in_memory function."""
+        assert resolve_layer_type(channel_name='MASK') == 'labels'
+        assert resolve_layer_type(channel_name='Label') == 'labels'
+        assert resolve_layer_type(channel_name='SEGMENTATION') == 'labels'
 
-    def test_none_path_returns_true(self):
-        """Test that None path (array data) returns True."""
-        from ndevio.utils._layer_utils import determine_in_memory
+    def test_path_stem_fallback_detects_labels(self):
+        """Regression: file named 'cells_mask.tif' with generic channel name
+        '0' should be detected as 'labels' via the path_stem fallback.
+        """
+        from ndevio.utils._layer_utils import resolve_layer_type
 
-        assert determine_in_memory(None) is True
+        assert (
+            resolve_layer_type(channel_name='0', path_stem='cells_mask')
+            == 'labels'
+        )
+        assert (
+            resolve_layer_type(
+                channel_name='Channel 0', path_stem='nuclei_labels'
+            )
+            == 'labels'
+        )
+        assert (
+            resolve_layer_type(
+                channel_name='', path_stem='segmentation_output'
+            )
+            == 'labels'
+        )
+        assert resolve_layer_type(channel_name='', path_stem='raw') == 'image'
 
-    def test_small_file_returns_true(self, tmp_path):
-        """Test that small files are loaded in memory."""
-        from ndevio.utils._layer_utils import determine_in_memory
+    def test_path_stem_not_checked_when_channel_triggers_detection(self):
+        """Channel-name detection is unaffected by a non-label path_stem."""
+        from ndevio.utils._layer_utils import resolve_layer_type
 
-        small_file = tmp_path / 'small.txt'
-        small_file.write_text('x' * 100)
+        assert (
+            resolve_layer_type(channel_name='nuclei_mask', path_stem='raw')
+            == 'labels'
+        )
 
-        with mock.patch(
-            'psutil.virtual_memory', return_value=mock.Mock(available=1e10)
-        ):
-            assert determine_in_memory(small_file) is True
+    def test_path_stem_nonlabel_image_result(self):
+        """Neither channel nor path_stem contains label keyword → 'image'."""
+        from ndevio.utils._layer_utils import resolve_layer_type
 
-    def test_large_file_returns_false(self, tmp_path):
-        """Test that large files are loaded as dask."""
-        from ndevio.utils._layer_utils import determine_in_memory
+        assert (
+            resolve_layer_type(channel_name='DAPI', path_stem='raw_image')
+            == 'image'
+        )
 
-        large_file = tmp_path / 'large.txt'
-        large_file.write_text('x')
+    def test_path_stem_none_channel_nonlabel_returns_image(self):
+        """path_stem=None with non-label channel should still return 'image'."""
+        from ndevio.utils._layer_utils import resolve_layer_type
 
-        with (
-            mock.patch(
-                'psutil.virtual_memory', return_value=mock.Mock(available=1e9)
-            ),
-            mock.patch(
-                'bioio_base.io.pathlike_to_fs',
-                return_value=(mock.Mock(size=lambda x: 5e9), ''),
-            ),
-        ):
-            assert determine_in_memory(large_file) is False
+        assert (
+            resolve_layer_type(channel_name='DAPI', path_stem=None) == 'image'
+        )
 
 
 class TestBuildLayerTuple:

@@ -3,76 +3,25 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from bioio import BioImage
 
 from .bioio_plugins._manager import raise_unsupported_with_suggestions
 from .utils._layer_utils import (
     build_layer_tuple,
-    determine_in_memory,
     resolve_layer_type,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     import xarray as xr
     from bioio_base.reader import Reader
     from bioio_base.types import ImageLike
     from napari.types import LayerDataTuple
 
 logger = logging.getLogger(__name__)
-
-
-def _resolve_reader(
-    image: ImageLike,
-    explicit_reader: type[Reader] | Sequence[type[Reader]] | None,
-) -> type[Reader] | Sequence[type[Reader]] | None:
-    """Resolve the reader to use for an image.
-
-    Priority:
-    1. Explicit reader (passed to __init__)
-    2. Preferred reader from settings (if file path and installed)
-    3. None (let bioio determine)
-
-    Parameters
-    ----------
-    image : ImageLike
-        The image to resolve a reader for.
-    explicit_reader : type[Reader] | Sequence[type[Reader]] | None
-        Explicit reader class(es) passed by user.
-
-    Returns
-    -------
-    type[Reader] | Sequence[type[Reader]] | None
-        The reader to use, or None to let bioio choose.
-
-    """
-    if explicit_reader is not None:
-        return explicit_reader
-
-    # Only check preferred reader for file paths
-    if not isinstance(image, str | Path):
-        return None
-
-    # Get preferred reader from settings
-    from ndev_settings import get_settings
-
-    from .bioio_plugins._utils import get_installed_plugins, get_reader_by_name
-
-    settings = get_settings()
-    preferred = settings.ndevio_reader.preferred_reader  # type: ignore
-
-    if not preferred:
-        return None
-
-    if preferred not in get_installed_plugins():
-        logger.debug('Preferred reader %s not installed', preferred)
-        return None
-
-    return get_reader_by_name(preferred)
 
 
 class nImage(BioImage):
@@ -125,6 +74,7 @@ class nImage(BioImage):
     _is_remote: bool
     _reference_xarray: xr.DataArray | None
     _layer_data: list | None
+    _use_dask_cache: bool | None
 
     def __init__(
         self,
@@ -140,49 +90,27 @@ class nImage(BioImage):
         if isinstance(image, str):
             image = image.rstrip('/')
 
+        init_kwargs, fallback_kwargs = _prepare_bioimage_init_kwargs(kwargs)
         resolved_reader = _resolve_reader(image, reader)
 
-        # Try preferred/explicit reader first, fall back to bioio default
-        if resolved_reader is not None:
-            try:
-                super().__init__(image=image, reader=resolved_reader, **kwargs)
-            except UnsupportedFileFormatError:
-                # Preferred reader failed, fall back to bioio's default
-                try:
-                    super().__init__(image=image, reader=None, **kwargs)
-                except UnsupportedFileFormatError:
-                    if isinstance(image, str | Path):
-                        raise_unsupported_with_suggestions(image)
-                    raise
-        else:
-            try:
-                super().__init__(image=image, reader=None, **kwargs)
-            except UnsupportedFileFormatError:
-                if isinstance(image, str | Path):
-                    raise_unsupported_with_suggestions(image)
-                raise
+        try:
+            _initialize_bioimage(
+                self,
+                image=image,
+                resolved_reader=resolved_reader,
+                init_kwargs=init_kwargs,
+                fallback_kwargs=fallback_kwargs,
+            )
+        except UnsupportedFileFormatError:
+            if isinstance(image, str | Path):
+                raise_unsupported_with_suggestions(image)
+            raise
 
         # Instance state
         self._reference_xarray = None
         self._layer_data = None
-        if isinstance(image, str | Path):
-            import fsspec
-            from fsspec.implementations.local import LocalFileSystem
-
-            s = str(image)
-            fs, resolved = fsspec.url_to_fs(s)
-            if isinstance(fs, LocalFileSystem):
-                # Normalise file:// URIs and any platform variations to an
-                # OS-native path string so Path(self.path) always round-trips.
-                self.path = str(Path(resolved))
-                self._is_remote = False
-            else:
-                # Remote URI (s3://, https://, gc://, …) — keep verbatim.
-                self.path = s
-                self._is_remote = True
-        else:
-            self.path = None
-            self._is_remote = False
+        self._use_dask_cache = None
+        self._initialize_source_state(image)
 
         # Any compatibility warnings for old formats should be emitted at this point
         # Cheaply check without imports by looking at the reader's module name
@@ -192,6 +120,62 @@ class nImage(BioImage):
             )
 
             apply_ome_zarr_compat_patches(self.reader)
+
+    def _initialize_source_state(self, image: ImageLike) -> None:
+        """Populate local path/remote state from the original image input."""
+        if not isinstance(image, str | Path):
+            self.path = None
+            self._is_remote = False
+            return
+
+        import fsspec
+        from fsspec.implementations.local import LocalFileSystem
+
+        source = str(image)
+        fs, resolved = fsspec.url_to_fs(source)
+        if isinstance(fs, LocalFileSystem):
+            # Normalise file:// URIs and any platform variations to an
+            # OS-native path string so Path(self.path) always round-trips.
+            self.path = str(Path(resolved))
+            self._is_remote = False
+            return
+        # Remote URI (s3://, https://, gc://, …) — keep verbatim.
+        self.path = source
+        self._is_remote = True
+
+    def _fits_in_memory(self) -> bool:
+        """Return True if the uncompressed image fits comfortably in RAM."""
+        if self.path is None:
+            return True
+
+        from ndev_settings import get_settings
+        from psutil import virtual_memory
+
+        max_bytes = (
+            float(getattr(get_settings().ndevio_reader, 'max_in_mem_gb', 8.0))  # type: ignore[attr-defined]
+            * 1e9
+        )
+        available = int(virtual_memory().available)
+        # xr.DataArray.nbytes = shape × dtype.itemsize — no IO, dask-safe
+        uncompressed = self.xarray_dask_data.nbytes
+        return uncompressed <= max_bytes and uncompressed < 0.3 * available
+
+    @property
+    def _use_dask(self) -> bool:
+        """True when all data access for this image should be dask-backed.
+
+        Multiscale images always use dask for memory efficiency.  Single-
+        resolution remote images always use dask.  Single-resolution local
+        images use dask when their uncompressed footprint would not fit
+        comfortably in RAM.
+        """
+        if self._use_dask_cache is None:
+            self._use_dask_cache = (
+                len(self.resolution_levels) > 1
+                or self._is_remote
+                or not self._fits_in_memory()
+            )
+        return self._use_dask_cache
 
     @property
     def reference_xarray(self) -> xr.DataArray:
@@ -216,11 +200,14 @@ class nImage(BioImage):
             # Ensure we're at the highest-res level for metadata consistency
             current_res = self.current_resolution_level
             self.set_resolution_level(0)
-            if self._is_remote or not determine_in_memory(self.path):
-                self._reference_xarray = self.xarray_dask_data.squeeze()
-            else:
-                self._reference_xarray = self.xarray_data.squeeze()
-            self.set_resolution_level(current_res)
+            try:
+                self._reference_xarray = (
+                    self.xarray_dask_data
+                    if self._use_dask
+                    else self.xarray_data
+                ).squeeze()
+            finally:
+                self.set_resolution_level(current_res)
         return self._reference_xarray
 
     @property
@@ -249,7 +236,7 @@ class nImage(BioImage):
         """Build the list of arrays for all resolution levels."""
         current_res = self.current_resolution_level
         levels = self.resolution_levels
-        multiscale = len(levels) > 1
+        use_dask = self._use_dask
 
         # Determine which dims to keep from level 0's squeezed metadata.
         # Using isel instead of squeeze ensures all levels have
@@ -259,21 +246,16 @@ class nImage(BioImage):
         keep_dims = set(ref.dims)
 
         arrays: list = []
-        for level in levels:
-            self.set_resolution_level(level)
-            if (
-                multiscale
-                or self._is_remote
-                or not determine_in_memory(self.path)
-            ):
-                xr_data = self.xarray_dask_data
-            else:
-                xr_data = self.xarray_data
-
-            indexer = {d: 0 for d in xr_data.dims if d not in keep_dims}
-            arrays.append(xr_data.isel(indexer).data)
-
-        self.set_resolution_level(current_res)
+        try:
+            for level in levels:
+                self.set_resolution_level(level)
+                xr_data = (
+                    self.xarray_dask_data if use_dask else self.xarray_data
+                )
+                indexer = {d: 0 for d in xr_data.dims if d not in keep_dims}
+                arrays.append(xr_data.isel(indexer).data)
+        finally:
+            self.set_resolution_level(current_res)
         return arrays
 
     @property
@@ -562,7 +544,10 @@ class nImage(BioImage):
         if channel_dim not in ref.dims:
             channel_name = self.channel_names[0]
             effective_type = resolve_layer_type(
-                channel_name or '', layer_type, channel_types
+                global_override=layer_type,
+                channel_types=channel_types,
+                channel_name=channel_name or '',
+                path_stem=self.path_stem,
             )
             extra_kwargs = (
                 channel_kwargs.get(channel_name)
@@ -591,7 +576,10 @@ class nImage(BioImage):
         for i in range(total_channels):
             channel_name = channel_names[i]
             effective_type = resolve_layer_type(
-                channel_name, layer_type, channel_types
+                global_override=layer_type,
+                channel_types=channel_types,
+                channel_name=channel_name,
+                path_stem=self.path_stem,
             )
 
             # Slice along channel axis for each resolution level
@@ -619,3 +607,111 @@ class nImage(BioImage):
             )
 
         return tuples
+
+
+def _prepare_bioimage_init_kwargs(
+    kwargs: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Build BioImage init kwargs and a fallback without chunk_dims."""
+    # Default to per-plane chunks so each Z/T slice is a separate dask
+    # task (~one TIFF page) rather than the entire ZYX volume.
+    # bioio's DEFAULT_CHUNK_DIMS includes Z, meaning each (T,C) pair is
+    # one giant task and every Z-slice navigation decompresses the full
+    # volume. ["Y", "X"] gives O(Z) tasks with ~1 page per compute.
+    init_kwargs = {
+        **kwargs,
+        'chunk_dims': kwargs.get('chunk_dims', ['Y', 'X']),
+    }
+    fallback_kwargs = {
+        k: v for k, v in init_kwargs.items() if k != 'chunk_dims'
+    }
+    return init_kwargs, fallback_kwargs
+
+
+def _initialize_bioimage(
+    instance: BioImage,
+    *,
+    image: ImageLike,
+    resolved_reader: type[Reader] | Sequence[type[Reader]] | None,
+    init_kwargs: dict[str, Any],
+    fallback_kwargs: dict[str, Any],
+) -> None:
+    """Initialize BioImage with preferred-reader fallback to default.
+
+    Tries ``chunk_dims=['Y','X']`` for per-plane chunking, falling back to
+    the reader's default chunking if ``chunk_dims`` is not supported.
+    If a preferred reader is given but cannot read the file, falls back to
+    BioImage's automatic reader selection.
+    """
+    from bioio_base.exceptions import UnsupportedFileFormatError
+
+    def _init(reader: type[Reader] | Sequence[type[Reader]] | None) -> None:
+        """Initialize with chunk_dims, silently falling back without it."""
+        try:
+            BioImage.__init__(
+                instance, image=image, reader=reader, **init_kwargs
+            )
+        except TypeError as exc:
+            if 'chunk_dims' not in str(exc):
+                raise
+            BioImage.__init__(
+                instance, image=image, reader=reader, **fallback_kwargs
+            )
+
+    if resolved_reader is not None:
+        try:
+            _init(resolved_reader)
+            return
+        except UnsupportedFileFormatError:
+            pass
+
+    _init(None)
+
+
+def _resolve_reader(
+    image: ImageLike,
+    explicit_reader: type[Reader] | Sequence[type[Reader]] | None,
+) -> type[Reader] | Sequence[type[Reader]] | None:
+    """Resolve the reader to use for an image.
+
+    Priority:
+    1. Explicit reader (passed to __init__)
+    2. Preferred reader from settings (if file path and installed)
+    3. None (let bioio determine)
+
+    Parameters
+    ----------
+    image : ImageLike
+        The image to resolve a reader for.
+    explicit_reader : type[Reader] | Sequence[type[Reader]] | None
+        Explicit reader class(es) passed by user.
+
+    Returns
+    -------
+    type[Reader] | Sequence[type[Reader]] | None
+        The reader to use, or None to let bioio choose.
+
+    """
+    if explicit_reader is not None:
+        return explicit_reader
+
+    # Only check preferred reader for file paths
+    if not isinstance(image, str | Path):
+        return None
+
+    # Get preferred reader from settings
+    from ndev_settings import get_settings
+
+    from .bioio_plugins._utils import get_installed_plugins, get_reader_by_name
+
+    settings = get_settings()
+    preferred = settings.ndevio_reader.preferred_reader  # type: ignore
+
+    if not preferred:
+        return None
+
+    if preferred not in get_installed_plugins():
+        logger.debug('Preferred reader %s not installed', preferred)
+        return None
+
+    return get_reader_by_name(preferred)

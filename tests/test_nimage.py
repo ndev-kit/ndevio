@@ -798,3 +798,222 @@ class TestExplicitReaderParameter:
         assert img is not None
         # Should have fallen back to bioio's default
         assert img.reader.name == 'bioio_ome_tiff'
+
+
+class TestFitsInMemory:
+    """Tests for nImage._fits_in_memory memory-loading policy."""
+
+    def test_array_backed_always_fits(self):
+        """Array-backed nImage (path=None) should always fit in memory."""
+        import numpy as np
+
+        img = nImage(np.zeros((10, 10), dtype=np.uint8))
+        assert img._fits_in_memory() is True
+
+    def test_small_image_fits(self, tmp_path):
+        """A small image whose uncompressed size is within limits fits eagerly."""
+        import numpy as np
+        import tifffile
+
+        path = tmp_path / 'small.tif'
+        tifffile.imwrite(str(path), np.zeros((5, 5), dtype=np.uint8))
+
+        with mock.patch(
+            'psutil.virtual_memory',
+            return_value=mock.Mock(available=int(1e10)),
+        ):
+            img = nImage(path)
+            assert img._fits_in_memory() is True
+
+    def test_exceeds_memory_percentage_returns_false(self, tmp_path):
+        """Image whose uncompressed size exceeds 30% of available RAM → dask."""
+        import numpy as np
+        import tifffile
+
+        # 50×50×50×uint32 = 500 KB uncompressed
+        path = tmp_path / 'medium.tif'
+        tifffile.imwrite(str(path), np.zeros((50, 50, 50), dtype=np.uint32))
+
+        # 30% of 1 MB = 300 KB < 500 KB → should not fit
+        with mock.patch(
+            'psutil.virtual_memory', return_value=mock.Mock(available=int(1e6))
+        ):
+            img = nImage(path)
+            assert img._fits_in_memory() is False
+
+    def test_missing_max_in_mem_setting_falls_back_to_default(self, tmp_path):
+        """Older persisted settings missing max_in_mem_gb should use 8 GB."""
+        from types import SimpleNamespace
+
+        import numpy as np
+        import tifffile
+
+        path = tmp_path / 'small.tif'
+        tifffile.imwrite(str(path), np.zeros((5, 5), dtype=np.uint8))
+
+        with (
+            mock.patch(
+                'ndev_settings.get_settings',
+                return_value=SimpleNamespace(
+                    ndevio_reader=SimpleNamespace(preferred_reader=None),
+                ),
+            ),
+            mock.patch(
+                'psutil.virtual_memory',
+                return_value=mock.Mock(available=int(1e10)),
+            ),
+        ):
+            img = nImage(path)
+            assert img._fits_in_memory() is True
+
+
+# =============================================================================
+# Regression tests: compressed files and filename-based label detection
+# =============================================================================
+
+
+def test_compressed_int32_tiff_uses_dask(tmp_path: Path):
+    """Regression: a compressed int32 TIFF must be loaded as dask even when
+    its on-disk size is well below the in-memory threshold.
+
+    An 18.9 MB LZW-compressed int32 file expands to ~288 MB in RAM.
+    The old code compared the compressed *filesystem* size against the
+    threshold; a 19 MB file would always pass and be loaded eagerly.
+    The fix uses ``xarray_dask_data.nbytes`` (= shape × dtype.itemsize)
+    so the uncompressed footprint is used for the decision.
+    """
+    import math
+
+    import numpy as np
+    import tifffile
+
+    # All-zeros data compresses to near-nothing with LZW: small, quick write.
+    # Shape gives ~288 MB uncompressed. We mock available RAM to 500 MB so
+    # that 30% = 150 MB < 288 MB, which forces dask regardless of threshold.
+    # Without the uncompressed_bytes fix, disk_size (~KB) would be used and
+    # the tiny file would be loaded eagerly.
+    shape = (200, 600, 600)
+
+    path = tmp_path / 'big_uncompressed.tif'
+    tifffile.imwrite(
+        str(path), np.zeros(shape, dtype=np.int32), compression='lzw'
+    )
+
+    disk_size = path.stat().st_size
+    uncompressed = math.prod(shape) * np.dtype(np.int32).itemsize
+    assert disk_size < uncompressed // 100, (
+        'test precondition: compressed file must be tiny vs uncompressed'
+    )
+
+    import dask.array as da
+
+    # Mock RAM so the memory-fraction check forces dask (288 MB > 30% of 500 MB).
+    # This isolates the test from machine memory and makes it deterministic.
+    with mock.patch(
+        'psutil.virtual_memory', return_value=mock.Mock(available=int(500e6))
+    ):
+        img = nImage(path)
+
+        assert isinstance(img.reference_xarray.data, da.Array), (
+            f'Expected dask array, got {type(img.reference_xarray.data)}'
+        )
+
+        tuples = img.get_layer_data_tuples()
+        assert len(tuples) == 1
+        data_out, _, _ = tuples[0]
+        assert isinstance(data_out, list)
+        assert isinstance(data_out[0], da.Array), (
+            f'Expected dask array in layer tuple, got {type(data_out[0])}'
+        )
+
+
+def test_labels_detected_from_filename(tmp_path: Path):
+    """Regression: a TIFF file whose channel name is a generic '0' but whose
+    filename contains a label keyword (e.g. 'cells_mask.tif') should be
+    returned as a 'labels' layer, not 'image'.
+
+    Previously only the channel name was checked; now the filename stem is
+    used as a fallback when the channel name provides no signal.
+    """
+    import numpy as np
+    import tifffile
+
+    # Single-channel int32 TIFF — channel name will be '0' (no label keyword)
+    data = np.random.randint(0, 10, (10, 10), dtype=np.int32)
+    path = tmp_path / 'cells_mask.tif'
+    tifffile.imwrite(str(path), data)
+
+    img = nImage(path)
+    # Verify the channel name is generic (no label keyword)
+    channel_name = img.channel_names[0]
+    from ndevio.utils._layer_utils import CHANNEL_LABEL_KEYWORDS
+
+    assert not any(
+        kw in channel_name.lower() for kw in CHANNEL_LABEL_KEYWORDS
+    ), f'Channel name {channel_name!r} unexpectedly contains a label keyword'
+
+    tuples = img.get_layer_data_tuples()
+    assert len(tuples) == 1
+    _, _, layer_type = tuples[0]
+    assert layer_type == 'labels', (
+        f"Expected 'labels' from filename 'cells_mask.tif', got {layer_type!r}"
+    )
+
+
+def test_non_label_filename_stays_image(tmp_path: Path):
+    """Counter-test: a TIFF named 'raw_image.tif' with generic channel name
+    should remain an 'image' layer, not be promoted to 'labels'.
+    """
+    import numpy as np
+    import tifffile
+
+    data = np.zeros((10, 10), dtype=np.uint16)
+    path = tmp_path / 'raw_image.tif'
+    tifffile.imwrite(str(path), data)
+
+    img = nImage(path)
+    tuples = img.get_layer_data_tuples()
+    assert len(tuples) == 1
+    _, _, layer_type = tuples[0]
+    assert layer_type == 'image'
+
+
+def test_dask_chunks_are_per_plane(tmp_path: Path):
+    """Verify that dask-loaded TIFFs have per-Z-plane chunks (not the whole volume).
+
+    bioio-base's DEFAULT_CHUNK_DIMS = ["Z","Y","X"] creates one dask task per
+    (T,C) pair — every Z-slice decompresses the full ZYX volume.  nImage
+    overrides this with chunk_dims=["Y","X"] so each task is a single page.
+
+    For a (Z=8, Y=64, X=64) file the resulting dask array should have chunks
+    (1, 64, 64), not (8, 64, 64).
+    """
+    import dask.array as da
+    import numpy as np
+    import tifffile
+
+    # 100 planes × 64 × 64 × uint16 = 800 KB uncompressed.
+    # With 1 MB available, 30 % = 300 KB < 800 KB → forced to dask.
+    shape = (100, 64, 64)  # Z, Y, X
+    path = tmp_path / 'zyx_chunk_test.tiff'
+    tifffile.imwrite(str(path), np.zeros(shape, dtype=np.uint16))
+
+    # Force dask: mock available RAM so the memory-fraction check triggers.
+    with mock.patch(
+        'psutil.virtual_memory', return_value=mock.Mock(available=int(1e6))
+    ):
+        img = nImage(path)
+        tuples = img.get_layer_data_tuples()
+
+    data_out, _, _ = tuples[0]
+    # layer_data is always a list (multiscale-compatible); [0] is level 0.
+    arr = data_out[0]
+    assert isinstance(arr, da.Array), f'Expected dask array, got {type(arr)}'
+
+    z_chunk, y_chunk, x_chunk = arr.chunksize
+    assert z_chunk == 1, (
+        f'Expected Z-chunk=1 (per-plane), got {z_chunk}. '
+        'chunk_dims override to ["Y","X"] may not be working.'
+    )
+    assert y_chunk == 64
+    assert x_chunk == 64
