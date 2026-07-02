@@ -33,7 +33,7 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: astral-sh/setup-uv@v7
@@ -52,7 +52,7 @@ jobs:
         run: uv run --dev pytest -v --color=yes --cov=ndevio --cov-report=xml
 
       - name: Coverage
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           use_oidc: true
 
@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: hynek/build-and-inspect-python-package@v2
 
   deploy:
