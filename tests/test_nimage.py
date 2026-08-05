@@ -470,6 +470,36 @@ class TestGetLayerDataTuples:
         assert colormaps[2] == MULTI_CHANNEL_CYCLE[2]  # yellow
         assert colormaps[3] == MULTI_CHANNEL_CYCLE[3]  # blue
 
+
+def test_set_scene_invalidates_cached_layer_data(resources_dir: Path):
+    """Switching scenes clears the lazy reference_xarray / layer_data caches.
+
+    Regression test: the scene widget previously had to clear these privates
+    by hand, and the reader's open-all-scenes path never did — returning
+    stale scene-0 data for every scene. ``set_scene`` now owns the
+    invalidation so every caller reloads the new scene.
+    """
+    img = nImage(resources_dir / CZI_FILE)
+    assert len(img.scenes) > 1
+
+    # Prime the caches on the current scene
+    img.get_layer_data_tuples()
+    assert img._reference_xarray is not None
+    assert img._layer_data is not None
+    assert img._layer_metadata is not None
+
+    img.set_scene(1)
+
+    # Caches must be invalidated so the next access reloads the new scene
+    assert img._reference_xarray is None
+    assert img._layer_data is None
+    assert img._layer_metadata is None
+
+    # And data reloads lazily for the new scene
+    assert img.reference_xarray is not None
+    assert img.layer_scale is not None
+    assert img._layer_metadata is not None
+
     def test_auto_detect_labels_from_channel_name(self, resources_dir: Path):
         """Test that channels with label-like names are detected as labels."""
         import numpy as np
