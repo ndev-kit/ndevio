@@ -321,6 +321,50 @@ def test_nimage_init_with_various_formats(
 
 
 # =============================================================================
+# Tests for the layer_* metadata properties
+# =============================================================================
+
+
+class TestLayerMetadataProperties:
+    """Direct tests of the nImage.layer_* metadata property accessors."""
+
+    def test_layer_axis_labels_exclude_channel_and_singleton(
+        self, resources_dir: Path
+    ):
+        # cells3d2ch is (T=1, C=2, Z=60, Y=66, X=85): squeeze drops T,
+        # C is excluded from the exposed axis labels.
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+        assert img.layer_axis_labels == ('Z', 'Y', 'X')
+
+    def test_layer_scale_and_units_aligned_with_axis_labels(
+        self, resources_dir: Path
+    ):
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+        labels = img.layer_axis_labels
+        assert len(img.layer_scale) == len(labels)
+        assert len(img.layer_units) == len(labels)
+
+    def test_layer_metadata_contains_bioimage_and_raw(
+        self, resources_dir: Path
+    ):
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+        meta = img.layer_metadata
+        assert meta['bioimage'] is img
+        assert 'raw_image_metadata' in meta
+        assert 'ome_metadata' in meta
+
+    def test_properties_match_layer_data_tuple_metadata(
+        self, resources_dir: Path
+    ):
+        img = nImage(resources_dir / CELLS3D2CH_OME_TIFF)
+        _, meta, _ = img.get_layer_data_tuples()[0]
+        assert meta['scale'] == img.layer_scale
+        assert meta['axis_labels'] == img.layer_axis_labels
+        assert meta['units'] == img.layer_units
+        assert meta['metadata'] is img.layer_metadata
+
+
+# =============================================================================
 # Tests for get_layer_data_tuples
 # =============================================================================
 
