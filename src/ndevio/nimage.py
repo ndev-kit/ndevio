@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 from bioio import BioImage
 
 from .bioio_plugins._manager import raise_unsupported_with_suggestions
+from .utils._layer_metadata import LayerMetadata, build_layer_metadata
 from .utils._layer_utils import (
     build_layer_tuple,
     resolve_layer_type,
@@ -74,6 +75,7 @@ class nImage(BioImage):
     _is_remote: bool
     _reference_xarray: xr.DataArray | None
     _layer_data: list | None
+    _layer_metadata: LayerMetadata | None
     _use_dask_cache: bool | None
 
     def __init__(
@@ -109,6 +111,7 @@ class nImage(BioImage):
         # Instance state
         self._reference_xarray = None
         self._layer_data = None
+        self._layer_metadata = None
         self._use_dask_cache = None
         self._initialize_source_state(image)
 
@@ -333,6 +336,19 @@ class nImage(BioImage):
         return [f'{ch} :: {base_name}' for ch in channel_names]
 
     @property
+    def _resolved_metadata(self) -> LayerMetadata:
+        """LayerMetadata for the current scene, built lazily and cached.
+
+        Mirrors the ``reference_xarray`` / ``layer_data`` cache idiom:
+        computed once on first access and invalidated by :meth:`set_scene`.
+        """
+        if self._layer_metadata is None:
+            self._layer_metadata = build_layer_metadata(
+                self, self.reference_xarray.dims
+            )
+        return self._layer_metadata
+
+    @property
     def layer_scale(self) -> tuple[float, ...]:
         """Physical scale for dimensions in layer data.
 
@@ -354,19 +370,7 @@ class nImage(BioImage):
         (2.0, 0.2, 0.2)
 
         """
-        axis_labels = self.layer_axis_labels
-
-        # Try to get scale from BioImage - may fail for array-like inputs
-        # where physical_pixel_sizes is None (AttributeError), old OME-Zarr
-        # v0.1/v0.2 missing 'coordinateTransformations' (KeyError), or
-        # v0.3 string-axes that weren't normalised (TypeError).
-        try:
-            bio_scale = self.scale
-        except (AttributeError, KeyError, TypeError):
-            return tuple(1.0 for _ in axis_labels)
-        return tuple(
-            getattr(bio_scale, dim, None) or 1.0 for dim in axis_labels
-        )
+        return self._resolved_metadata.scale
 
     @property
     def layer_axis_labels(self) -> tuple[str, ...]:
@@ -384,12 +388,7 @@ class nImage(BioImage):
         ('Z', 'Y', 'X')
 
         """
-        layer_data = self.reference_xarray
-
-        # Exclude Channel and Samples dimensions (RGB/multichannel handled separately)
-        return tuple(
-            str(dim) for dim in layer_data.dims if dim not in ('C', 'S')
-        )
+        return self._resolved_metadata.axis_labels
 
     @property
     def layer_units(self) -> tuple[str | None, ...]:
@@ -410,20 +409,7 @@ class nImage(BioImage):
         ('s', 'µm', 'µm')
 
         """
-        axis_labels = self.layer_axis_labels
-
-        try:
-            dim_props = self.dimension_properties
-        # Old OME-Zarr v0.1/v0.2 (KeyError), v0.3 string-axes (TypeError),
-        # or array-like inputs without dimension metadata (AttributeError).
-        except (AttributeError, KeyError, TypeError):
-            return tuple(None for _ in axis_labels)
-
-        def _get_unit(dim: str) -> str | None:
-            prop = getattr(dim_props, dim, None)
-            return prop.unit if prop else None
-
-        return tuple(_get_unit(dim) for dim in axis_labels)
+        return self._resolved_metadata.units
 
     @property
     def layer_metadata(self) -> dict:
@@ -437,27 +423,7 @@ class nImage(BioImage):
             Keys: 'bioimage', 'raw_image_metadata', and optionally 'ome_metadata'.
 
         """
-        meta: dict = {
-            'bioimage': self,
-            'raw_image_metadata': self.metadata,
-        }
-
-        try:
-            meta['ome_metadata'] = self.ome_metadata
-        except NotImplementedError:
-            pass  # Reader doesn't support OME metadata
-        except (ValueError, TypeError, KeyError) as e:
-            # Some files have metadata that doesn't conform to OME schema, despite bioio attempting to parse it
-            # (e.g., CZI files with LatticeLightsheet acquisition mode)
-            # As such, when accessing ome_metadata, we may get various exceptions
-            # Log warning but continue - raw metadata is still available
-            logger.warning(
-                'Could not parse OME metadata: %s. '
-                "Raw metadata is still available in 'raw_image_metadata'.",
-                e,
-            )
-
-        return meta
+        return self._resolved_metadata.metadata
 
     def get_layer_data_tuples(
         self,
@@ -518,10 +484,11 @@ class nImage(BioImage):
         if layer_type is not None:
             channel_types = None  # Global override ignores per-channel
         names = self.layer_names
-        base_metadata = self.layer_metadata
-        scale = self.layer_scale
-        axis_labels = self.layer_axis_labels
-        units = self.layer_units
+        layer_meta = self._resolved_metadata
+        base_metadata = layer_meta.metadata
+        scale = layer_meta.scale
+        axis_labels = layer_meta.axis_labels
+        units = layer_meta.units
 
         # Handle RGB images (Samples dimension 'S')
         if 'S' in self.dims.order:
