@@ -146,6 +146,26 @@ class nImage(BioImage):
         self.path = source
         self._is_remote = True
 
+    def set_scene(self, scene_id: str | int) -> None:
+        """Switch the operating scene, invalidating cached layer data.
+
+        Extends :meth:`BioImage.set_scene` so that switching scenes clears
+        this image's lazy ``reference_xarray`` / ``layer_data`` /
+        ``_layer_metadata`` caches, which are scene-specific.  Callers (scene
+        widget, reader's open-all-scenes path) get correct reload behaviour
+        without reaching into privates.
+
+        Parameters
+        ----------
+        scene_id : str | int
+            The scene id (string) or scene index (integer) to switch to.
+
+        """
+        super().set_scene(scene_id)
+        self._reference_xarray = None
+        self._layer_data = None
+        self._layer_metadata = None
+
     def _fits_in_memory(self) -> bool:
         """Return True if the uncompressed image fits comfortably in RAM."""
         if self.path is None:

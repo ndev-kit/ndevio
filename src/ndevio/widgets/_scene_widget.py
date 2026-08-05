@@ -114,10 +114,6 @@ class nImageSceneWidget(Container):
             scene_index = int(scene.split(DELIMITER)[0])
             self.img.set_scene(scene_index)
 
-            # Clear cached data so new scene is loaded
-            self.img._reference_xarray = None
-            self.img._layer_data = None
-
             # Get layer tuples and add to viewer using napari's Layer.create()
             from napari.layers import Layer
 
