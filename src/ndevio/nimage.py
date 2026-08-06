@@ -38,9 +38,8 @@ class nImage(BioImage):
         Image to be loaded. Can be a path to an image file, a numpy array,
         or an xarray DataArray.
     reader : type[Reader] | Sequence[type[Reader]], optional
-        Reader class or priority list of readers. If not provided, checks
-        settings for preferred_reader and tries that first, then falls back
-        to bioio's default deterministic priority.
+        Reader class or priority list of readers. If not provided, bioio's
+        default deterministic reader priority is used.
     **kwargs
         Additional arguments passed to BioImage.
 
@@ -171,13 +170,11 @@ class nImage(BioImage):
         if self.path is None:
             return True
 
-        from ndev_settings import get_settings
         from psutil import virtual_memory
 
-        max_bytes = (
-            float(getattr(get_settings().ndevio_reader, 'max_in_mem_gb', 8.0))  # type: ignore[attr-defined]
-            * 1e9
-        )
+        from ._settings import get_ndevio_settings
+
+        max_bytes = float(get_ndevio_settings().reader.max_in_mem_gb) * 1e9
         available = int(virtual_memory().available)
         # xr.DataArray.nbytes = shape × dtype.itemsize — no IO, dask-safe
         uncompressed = self.xarray_dask_data.nbytes
@@ -661,10 +658,14 @@ def _resolve_reader(
 ) -> type[Reader] | Sequence[type[Reader]] | None:
     """Resolve the reader to use for an image.
 
-    Priority:
-    1. Explicit reader (passed to __init__)
-    2. Preferred reader from settings (if file path and installed)
-    3. None (let bioio determine)
+    An explicit reader (passed to ``nImage.__init__``) is honored as-is;
+    otherwise ``None`` is returned and bioio selects the reader using its
+    default plugin priority.
+
+    Note that a settings-driven "preferred reader" was previously consulted
+    here, but that dynamic setting cannot be expressed as an npe2
+    ``ConfigurationContribution`` and was removed — bioio handles reader
+    priority and fallback internally (see bioio#162).
 
     Parameters
     ----------
@@ -679,26 +680,4 @@ def _resolve_reader(
         The reader to use, or None to let bioio choose.
 
     """
-    if explicit_reader is not None:
-        return explicit_reader
-
-    # Only check preferred reader for file paths
-    if not isinstance(image, str | Path):
-        return None
-
-    # Get preferred reader from settings
-    from ndev_settings import get_settings
-
-    from .bioio_plugins._utils import get_installed_plugins, get_reader_by_name
-
-    settings = get_settings()
-    preferred = settings.ndevio_reader.preferred_reader  # type: ignore
-
-    if not preferred:
-        return None
-
-    if preferred not in get_installed_plugins():
-        logger.debug('Preferred reader %s not installed', preferred)
-        return None
-
-    return get_reader_by_name(preferred)
+    return explicit_reader

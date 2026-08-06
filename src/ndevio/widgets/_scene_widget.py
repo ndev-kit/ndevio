@@ -10,7 +10,8 @@ import logging
 from typing import TYPE_CHECKING
 
 from magicgui.widgets import Container, Select
-from ndev_settings import get_settings
+
+from ndevio._settings import get_ndevio_settings
 
 if TYPE_CHECKING:
     import napari
@@ -82,7 +83,7 @@ class nImageSceneWidget(Container):
         self.viewer = viewer
         self.path = path
         self.img = img
-        self.settings = get_settings()
+        self.settings = get_ndevio_settings()
         self.scenes = [
             f'{idx}{DELIMITER}{scene}'
             for idx, scene in enumerate(self.img.scenes)
@@ -104,7 +105,7 @@ class nImageSceneWidget(Container):
 
     def open_scene(self) -> None:
         """Open the selected scene(s) in the viewer."""
-        if self.settings.ndevio_reader.clear_layers_on_new_scene:
+        if self.settings.reader.clear_layers_on_new_scene:
             self.viewer.layers.clear()
 
         for scene in self._scene_list_widget.value:

@@ -159,13 +159,14 @@ def raise_unsupported_with_suggestions(path: PathLike) -> None:
 
     """
     from bioio_base.exceptions import UnsupportedFileFormatError
-    from ndev_settings import get_settings
 
-    settings = get_settings()
+    from ndevio._settings import get_ndevio_settings
+
+    settings = get_ndevio_settings()
     manager = ReaderPluginManager(path)
     msg_extra = (
         manager.get_installation_message()
-        if settings.ndevio_reader.suggest_reader_plugins  # type: ignore
+        if settings.reader.suggest_reader_plugins
         else None
     )
 

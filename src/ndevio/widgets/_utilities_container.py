@@ -25,8 +25,8 @@ from magicgui.widgets import (
     TextEdit,
     TupleEdit,
 )
-from ndev_settings import get_settings
 
+from ndevio._settings import get_ndevio_settings
 from ndevio.utils import helpers
 
 if TYPE_CHECKING:
@@ -270,7 +270,7 @@ class UtilitiesContainer(ScrollableContainer):
         self._viewer = viewer if viewer is not None else None
         self._squeezed_dims_order: str | None = None
         self._squeezed_dims: tuple[int, ...] | None = None
-        self._settings = get_settings()
+        self._settings = get_ndevio_settings()
 
         self._init_widgets()
         self._init_save_name_container()
@@ -1005,7 +1005,7 @@ class UtilitiesContainer(ScrollableContainer):
             save_name,
         )
 
-        scale = self._settings.ndevio_export.canvas_scale
+        scale = self._settings.export.canvas_scale
 
         self._viewer.export_figure(
             path=str(save_path),
@@ -1027,9 +1027,12 @@ class UtilitiesContainer(ScrollableContainer):
             self._save_directory.value, 'Figures', save_name
         )
 
-        scale = self._settings.ndevio_export.canvas_scale
-        if self._settings.ndevio_export.override_canvas_size:
-            canvas_size = self._settings.ndevio_export.canvas_size
+        scale = self._settings.export.canvas_scale
+        if self._settings.export.override_canvas_size:
+            canvas_size = (
+                self._settings.export.canvas_width,
+                self._settings.export.canvas_height,
+            )
         else:
             canvas_size = self._viewer.window._qt_viewer.canvas.size
 
