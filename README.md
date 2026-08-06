@@ -23,7 +23,7 @@ Originally developed as part of napari-ndev (as a spiritual successor to [napari
 - **Thorough metadata extraction** — extract and apply scale, units, axis labels, metadata (inc. OME) to napari layers
 - **Remote file support** — compatible Bioio readers,such as [bioio-ome-zarr], can read from remote filesystems (HTTP, S3, etc.) with dask-backed loading
 - **Native multiscale support** — automatically read and display multiscale images when supported by the reader. For best experience, turn on the asynchronous rendering experimental setting in napari.
-- **Configurable behavior** via [ndev-settings] — customize reader priority, multi-scene handling, and more
+- **Configurable behavior** via napari Preferences — customize multi-scene handling, memory policy, plugin suggestions, and more
 - **Smart plugin installation** — automatic suggestions to install missing bioio reader plugins
 - **Programmatic API** — `nImage` class for napari-ready metadata extraction
 - **Batch utilities** — legacy widget for batch concatenation (with [nbatch]) and metadata management, with features being superseded by [napari-metadata]
@@ -87,17 +87,18 @@ If you open a file that requires a bioio reader not currently installed, ndevio 
 
 This widget taps into the `napari-plugin-manager` to install the bioio reader plugin from PyPI via a GUI. You may invoke this widget manually at any time via `Plugins > ndevio > Install BioIO Reader Plugins` to install any additional bioio reader plugin *and* update any currently installed plugins.
 
-#### Settings Widget
+#### Settings
 
-Access **ndevio settings** via `Plugins > ndev-settings > Settings` to customize:
+Configure **ndevio settings** in napari's **Preferences** dialog (under the
+Plugins section, select `ndevio`) to customize:
 
-- **Preferred reader**: Override bioio's default plugin selection priority (useful for formats with multiple compatible readers)
-- **Multi-scene handling**: Choose whether to show the scene widget, view all scenes as a stack, or view only the first scene
+- **Multi-scene handling**: Choose whether to show the scene widget, view all scenes as layers, or view only the first scene
 - **Plugin suggestions**: Enable/disable automatic plugin installation prompts for unsupported formats
+- **Memory policy**: Set the maximum uncompressed image size (GB) to load eagerly; larger images use dask
+- **Export**: Set the canvas scale and (optionally) override the screenshot canvas size
 
-![ndevio settings via the ndev-settings widget in napari](https://github.com/ndev-kit/ndevio/blob/main/resources/ndev-settings.png?raw=true)
-
-These settings are managed by [ndev-settings] and persist across napari sessions.
+These settings are declared in ndevio's plugin manifest (`contributions.configuration`),
+managed by napari, and persist across napari sessions.
 
 #### Utilities Widget
 
@@ -165,9 +166,12 @@ Image metadata is extracted from bioio and converted to napari layer metadata ba
 
 Images are loaded **in-memory** or **lazily** (via dask) automatically based on:
 
-- File size < 4 GB **AND**
+- Uncompressed file size below the configured in-memory limit (default 8 GB) **AND**
 - File size < 30% of available RAM
 - Remote files (e.g., S3, HTTP) and multiscale are always loaded lazily
+
+The in-memory limit is configurable via the `ndevio` plugin settings in napari's
+Preferences dialog.
 
 ### Multi-channel Images
 
@@ -216,9 +220,8 @@ If you encounter any problems, please [file an issue] along with a detailed desc
 [tox]: https://tox.readthedocs.io/en/latest/
 [bioio]: https://github.com/bioio-devs/bioio
 [napari-aicsimageio]: https://github.com/AllenCellModeling/napari-aicsimageio
-[ndev-settings]: https://github.com/ndev-kit/ndev-settings
-[napari-metadata]: https://github.com/napari/napari-metadata
 [nbatch]: https://github.com/ndev-kit/nbatch
+[napari-metadata]: https://github.com/napari/napari-metadata
 [uv]: https://docs.astral.sh/uv/
 [ndev-kit]: https://github.com/ndev-kit
 [bioio-ome-zarr]: https://github.com/bioio-devs/bioio-ome-zarr
