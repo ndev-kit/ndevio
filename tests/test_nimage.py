@@ -131,7 +131,6 @@ def test_nImage_ome_reader(resources_dir: Path):
     img_path = resources_dir / CELLS3D2CH_OME_TIFF
 
     nimg = nImage(img_path)
-    # assert nimg.settings.ndevio_reader.preferred_reader == 'bioio-ome-tiff'  # this was the old methodology before bioio#162
     assert nimg.reader.name == 'bioio_ome_tiff'
     # the below only exists if 'bioio-ome-tiff' is used
     assert hasattr(nimg, 'ome_metadata')
@@ -671,13 +670,12 @@ def test_set_scene_invalidates_cached_layer_data(resources_dir: Path):
         )  # default for 2-channel
 
 
-class TestPreferredReaderFallback:
-    """Tests for preferred reader fallback logic in nImage.__init__."""
+class TestReaderFallback:
+    """Tests for reader selection/fallback logic in nImage.__init__."""
 
-    def test_preferred_reader_success(self, resources_dir: Path):
-        """Test that preferred reader is used when it works."""
+    def test_resolved_reader_used_when_it_works(self, resources_dir: Path):
+        """Test that the resolved reader is used when it works."""
         with patch('ndevio.nimage._resolve_reader') as mock_resolve:
-            # Mock returning a valid reader
             from bioio_tifffile import Reader
 
             mock_resolve.return_value = Reader
@@ -689,10 +687,9 @@ class TestPreferredReaderFallback:
             assert img is not None
             assert img.reader.name == 'bioio_tifffile'
 
-    def test_preferred_reader_fallback(self, resources_dir: Path):
-        """Test that failed preferred reader will fallback"""
+    def test_failed_reader_falls_back(self, resources_dir: Path):
+        """Test that a reader which can't read the file falls back."""
         with patch('ndevio.nimage._resolve_reader') as mock_resolve:
-            # Mock returning a reader that won't work for this file
             from bioio_czi import Reader
 
             mock_resolve.return_value = Reader
@@ -705,10 +702,10 @@ class TestPreferredReaderFallback:
             # Should have fallen back to bioio's default (ome-tiff)
             assert img.reader.name == 'bioio_ome_tiff'
 
-    def test_no_preferred_reader_uses_default(self, resources_dir: Path):
-        """Test that no preferred reader uses bioio's default priority."""
+    def test_no_reader_uses_default(self, resources_dir: Path):
+        """Test that no resolved reader uses bioio's default priority."""
         with patch('ndevio.nimage._resolve_reader') as mock_resolve:
-            mock_resolve.return_value = None  # No preferred reader
+            mock_resolve.return_value = None  # No explicit reader
 
             img = nImage(str(resources_dir / 'cells3d2ch_legacy.tiff'))
             assert img is not None
@@ -719,94 +716,38 @@ class TestPreferredReaderFallback:
 class TestResolveReaderFunction:
     """Tests for _resolve_reader function."""
 
-    def test_returns_none_when_no_preferred_reader(self):
-        """Test returns None when preferred_reader is not set."""
+    def test_returns_none_without_explicit_reader(self):
+        """Returns None (bioio picks the reader) when no reader is given."""
         from ndevio.nimage import _resolve_reader
 
-        with patch('ndev_settings.get_settings') as mock_get_settings:
-            mock_get_settings.return_value.ndevio_reader.preferred_reader = (
-                None
-            )
+        result = _resolve_reader('test.tiff', None)
+        assert result is None
 
-            result = _resolve_reader('test.tiff', None)
-            assert result is None
-
-    def test_returns_none_when_preferred_not_installed(self):
-        """Test returns None when preferred reader is not installed."""
-        from ndevio.nimage import _resolve_reader
-
-        with (
-            patch('ndev_settings.get_settings') as mock_get_settings,
-            patch(
-                'ndevio.bioio_plugins._utils.get_installed_plugins',
-                return_value={'bioio-ome-tiff', 'bioio-tifffile'},
-            ),
-        ):
-            mock_get_settings.return_value.ndevio_reader.preferred_reader = (
-                'bioio-czi'
-            )
-
-            result = _resolve_reader('test.tiff', None)
-            assert result is None
-
-    def test_returns_reader_when_preferred_installed(self):
-        """Test returns reader class when preferred reader is installed."""
-        from ndevio.nimage import _resolve_reader
-
-        with (
-            patch('ndev_settings.get_settings') as mock_get_settings,
-            patch(
-                'ndevio.bioio_plugins._utils.get_installed_plugins',
-                return_value={'bioio-ome-tiff'},
-            ),
-            patch(
-                'ndevio.bioio_plugins._utils.get_reader_by_name'
-            ) as mock_get_reader,
-        ):
-            from bioio_ome_tiff import Reader as OmeTiffReader
-
-            mock_get_reader.return_value = OmeTiffReader
-            mock_get_settings.return_value.ndevio_reader.preferred_reader = (
-                'bioio-ome-tiff'
-            )
-
-            result = _resolve_reader('test.tiff', None)
-            assert result == OmeTiffReader
-            mock_get_reader.assert_called_once_with('bioio-ome-tiff')
-
-    def test_explicit_reader_bypasses_settings(self):
-        """Test that explicit reader bypasses settings lookup."""
+    def test_returns_explicit_reader(self):
+        """An explicit reader is returned as-is."""
         from bioio_tifffile import Reader as TifffileReader
 
         from ndevio.nimage import _resolve_reader
 
-        with patch('ndev_settings.get_settings') as mock_get_settings:
-            result = _resolve_reader('test.tiff', TifffileReader)
-
-            # Should return explicit reader without checking settings
-            assert result == TifffileReader
-            mock_get_settings.assert_not_called()
+        result = _resolve_reader('test.tiff', TifffileReader)
+        assert result == TifffileReader
 
     def test_array_input_returns_none(self):
-        """Test that array inputs don't trigger preferred reader lookup."""
+        """Array inputs don't need reader resolution."""
         import numpy as np
 
         from ndevio.nimage import _resolve_reader
 
-        with patch('ndev_settings.get_settings') as mock_get_settings:
-            arr = np.zeros((10, 10), dtype=np.uint8)
-            result = _resolve_reader(arr, None)
-
-            # Should return None without checking settings for arrays
-            assert result is None
-            mock_get_settings.assert_not_called()
+        arr = np.zeros((10, 10), dtype=np.uint8)
+        result = _resolve_reader(arr, None)
+        assert result is None
 
 
 class TestNonPathImageHandling:
     """Tests for handling non-path inputs (arrays)."""
 
-    def test_array_input_no_preferred_reader_check(self):
-        """Test that arrays don't trigger preferred reader logic."""
+    def test_array_input_no_reader_resolution(self):
+        """Test that arrays don't trigger reader resolution."""
         import numpy as np
 
         with patch('ndevio.nimage._resolve_reader') as mock_resolve:
@@ -840,8 +781,8 @@ class TestNonPathImageHandling:
 class TestExplicitReaderParameter:
     """Tests for when reader is explicitly provided."""
 
-    def test_explicit_reader_bypasses_preferred(self, resources_dir: Path):
-        """Test that explicit reader parameter bypasses preferred reader."""
+    def test_explicit_reader_used_directly(self, resources_dir: Path):
+        """Test that an explicit reader parameter is used directly."""
         from bioio_tifffile import Reader as TifffileReader
 
         with patch('ndevio.nimage._resolve_reader') as mock_resolve:
@@ -916,7 +857,7 @@ class TestFitsInMemory:
             assert img._fits_in_memory() is False
 
     def test_missing_max_in_mem_setting_falls_back_to_default(self, tmp_path):
-        """Older persisted settings missing max_in_mem_gb should use 8 GB."""
+        """Missing napari settings should fall back to the 8 GB default."""
         from types import SimpleNamespace
 
         import numpy as np
@@ -927,9 +868,9 @@ class TestFitsInMemory:
 
         with (
             mock.patch(
-                'ndev_settings.get_settings',
+                'ndevio._settings.get_ndevio_settings',
                 return_value=SimpleNamespace(
-                    ndevio_reader=SimpleNamespace(preferred_reader=None),
+                    reader=SimpleNamespace(max_in_mem_gb=8.0),
                 ),
             ),
             mock.patch(
