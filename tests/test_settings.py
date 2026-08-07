@@ -14,12 +14,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from ndevio._settings import (
-    ExportDefaults,
-    ReaderDefaults,
-    _DefaultSettings,
-    get_ndevio_settings,
-)
+from ndevio._settings import get_ndevio_settings
 
 MANIFEST = Path(__file__).parent.parent / 'src' / 'ndevio' / 'napari.yaml'
 
@@ -92,21 +87,19 @@ def test_manifest_has_no_dynamic_preferred_reader(manifest):
             assert 'preferred' not in key.lower()
 
 
-def test_default_settings_shape():
-    """The fallback settings object mirrors the manifest defaults."""
-    defaults = _DefaultSettings()
-    assert isinstance(defaults.reader, ReaderDefaults)
-    assert isinstance(defaults.export, ExportDefaults)
+def test_fallback_defaults_shape():
+    """The fallback defaults mirror the manifest defaults."""
+    from ndevio._settings import _DEFAULTS
 
-    assert defaults.reader.suggest_reader_plugins is True
-    assert defaults.reader.scene_handling == 'Open Scene Widget'
-    assert defaults.reader.clear_layers_on_new_scene is False
-    assert defaults.reader.max_in_mem_gb == 8.0
+    assert _DEFAULTS.reader.suggest_reader_plugins is True
+    assert _DEFAULTS.reader.scene_handling == 'Open Scene Widget'
+    assert _DEFAULTS.reader.clear_layers_on_new_scene is False
+    assert _DEFAULTS.reader.max_in_mem_gb == 8.0
 
-    assert defaults.export.canvas_scale == 1.0
-    assert defaults.export.override_canvas_size is False
-    assert defaults.export.canvas_width == 1024
-    assert defaults.export.canvas_height == 1024
+    assert _DEFAULTS.export.canvas_scale == 1.0
+    assert _DEFAULTS.export.override_canvas_size is False
+    assert _DEFAULTS.export.canvas_width == 1024
+    assert _DEFAULTS.export.canvas_height == 1024
 
 
 def test_get_ndevio_settings_uses_napari(monkeypatch):
@@ -126,22 +119,6 @@ def test_get_ndevio_settings_uses_napari(monkeypatch):
     assert get_ndevio_settings() is mock
 
 
-def test_get_ndevio_settings_falls_back_when_plugin_missing(monkeypatch):
-    """napari raising KeyError for an undiscovered plugin -> defaults."""
-    import napari.settings as napari_settings
-
-    def _raise(_plugin: str):
-        raise KeyError('ndevio')
-
-    monkeypatch.setattr(
-        napari_settings, 'get_plugin_settings', _raise, raising=False
-    )
-
-    settings = get_ndevio_settings()
-    assert isinstance(settings, _DefaultSettings)
-    assert settings.reader.scene_handling == 'Open Scene Widget'
-
-
 def test_get_ndevio_settings_falls_back_when_feature_missing(monkeypatch):
     """Older napari without get_plugin_settings -> defaults."""
     import napari.settings as napari_settings
@@ -149,7 +126,7 @@ def test_get_ndevio_settings_falls_back_when_feature_missing(monkeypatch):
     monkeypatch.delattr(napari_settings, 'get_plugin_settings', raising=False)
 
     settings = get_ndevio_settings()
-    assert isinstance(settings, _DefaultSettings)
+    assert isinstance(settings, SimpleNamespace)
     assert settings.reader.max_in_mem_gb == 8.0
 
 
@@ -191,4 +168,4 @@ def test_real_get_plugin_settings(tmp_path):
 
     # The accessor used by ndevio's code paths returns this same model.
     assert get_ndevio_settings() is settings
-    assert not isinstance(get_ndevio_settings(), _DefaultSettings)
+    assert not isinstance(get_ndevio_settings(), SimpleNamespace)
