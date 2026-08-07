@@ -154,58 +154,41 @@ def test_get_ndevio_settings_falls_back_when_feature_missing(monkeypatch):
 
 
 def test_real_get_plugin_settings(tmp_path):
-    """End-to-end: napari builds ndevio's preferences from the manifest.
-
-    This exercises the real ``napari.settings.get_plugin_settings('ndevio')``
-    path, which requires a napari that supports plugin settings.
-    """
-    import napari.settings as napari_settings
+    """End-to-end: napari builds ndevio's preferences from the manifest."""
+    from napari import settings as napari_settings
 
     if not hasattr(napari_settings, 'get_plugin_settings'):
-        pytest.skip('installed napari lacks plugin settings support')
-
-    from npe2 import PluginManager
-
-    # Make sure ndevio's manifest is known to the npe2 plugin manager.
-    pm = PluginManager.instance()
-    if 'ndevio' not in pm:
-        from npe2 import PluginManifest
-
-        pm.register(PluginManifest.from_file(MANIFEST))
-
-    napari_settings._PLUGIN_PREFERENCES.clear()
-    try:
-        settings = napari_settings.get_plugin_settings(
-            'ndevio', path_dir=tmp_path
+        pytest.skip(
+            'installed napari lacks plugin settings (need napari>=0.9.0)'
         )
 
-        assert settings.reader.suggest_reader_plugins is True
-        assert settings.reader.scene_handling == 'Open Scene Widget'
-        assert settings.reader.clear_layers_on_new_scene is False
-        assert settings.reader.max_in_mem_gb == 8.0
+    from npe2 import PluginManager, PluginManifest
 
-        assert settings.export.canvas_scale == 1.0
-        assert settings.export.override_canvas_size is False
-        assert settings.export.canvas_width == 1024
-        assert settings.export.canvas_height == 1024
+    # pytest blocks discovery, so register the (always installed) manifest.
+    pm = PluginManager.instance()
+    if 'ndevio' not in pm:
+        pm.register(PluginManifest.from_distribution('ndevio'))
+    # Reset the in-memory cache so the registered plugin is included (saved
+    # values are re-read from disk; this also allows path_dir=tmp_path).
+    napari_settings._PLUGIN_PREFERENCES.clear()
 
-        # Preferences persist to a per-plugin yaml under the given path dir.
-        assert settings.config_path == tmp_path / 'ndevio.yaml'
+    settings = napari_settings.get_plugin_settings('ndevio', path_dir=tmp_path)
 
-        # The accessor used by ndevio's code paths returns this same model
-        # (the napari cache is still populated with the tmp_path config above).
-        from ndevio._settings import get_ndevio_settings
+    assert settings.reader.suggest_reader_plugins is True
+    assert settings.reader.scene_handling == 'Open Scene Widget'
+    assert settings.reader.clear_layers_on_new_scene is False
+    assert settings.reader.max_in_mem_gb == 8.0
 
-        accessed = get_ndevio_settings()
-        assert accessed is settings
-        assert accessed.reader.scene_handling == 'Open Scene Widget'
-        assert accessed.export.canvas_width == 1024
-        assert not isinstance(accessed, _DefaultSettings)
+    assert settings.export.canvas_scale == 1.0
+    assert settings.export.override_canvas_size is False
+    assert settings.export.canvas_width == 1024
+    assert settings.export.canvas_height == 1024
 
-        # Changing a value and saving writes the per-plugin yaml file.
-        settings.reader.max_in_mem_gb = 4.0
-        settings.save()
-        assert (tmp_path / 'ndevio.yaml').exists()
-        assert 'max_in_mem_gb: 4.0' in (tmp_path / 'ndevio.yaml').read_text()
-    finally:
-        napari_settings._PLUGIN_PREFERENCES.clear()
+    # Settings are persisted to a per-plugin yaml, and changes auto-save.
+    assert settings.config_path == tmp_path / 'ndevio.yaml'
+    settings.reader.max_in_mem_gb = 4.0
+    assert 'max_in_mem_gb: 4.0' in (tmp_path / 'ndevio.yaml').read_text()
+
+    # The accessor used by ndevio's code paths returns this same model.
+    assert get_ndevio_settings() is settings
+    assert not isinstance(get_ndevio_settings(), _DefaultSettings)
