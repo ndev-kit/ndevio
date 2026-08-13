@@ -1,7 +1,7 @@
 """Access to ndevio's plugin settings.
 
 ndevio's user-configurable behavior is declared in ``napari.yaml`` under
-``contributions.configuration`` (two categories: ``Reader`` and ``Export``)
+``contributions.configurations`` (two categories: ``reader`` and ``export``)
 and surfaces in napari's **Preferences** dialog.  At runtime the values are
 read through ``napari.settings.get_plugin_settings('ndevio')``.
 

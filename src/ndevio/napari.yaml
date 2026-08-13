@@ -59,17 +59,18 @@ contributions:
         '*.txt', '*.v', '*.vms', '*.vsi', '*.vws', '*.wat', '*.wlz', '*.xdce', '*.xml', '*.xqd',
         '*.xqf', '*.xv', '*.xvthumb', '*.xys', '*.zarr', '*.zarr*', '*.zfp', '*.zfr', '*.zif', '*.zvi',
       ]
-  configuration:
-    - title: Reader
+  configurations:
+    reader:
+      title: Reader
       properties:
-        ndevio.suggest_reader_plugins:
+        suggest_reader_plugins:
           type: boolean
           default: true
           title: Suggest reader plugins
           description: >-
             Whether to suggest plugins to install when no reader can be found
             for a file.
-        ndevio.scene_handling:
+        scene_handling:
           type: string
           default: Open Scene Widget
           title: Scene handling
@@ -81,12 +82,12 @@ contributions:
             - Open Scene Widget
             - View All Scenes
             - View First Scene Only
-        ndevio.clear_layers_on_new_scene:
+        clear_layers_on_new_scene:
           type: boolean
           default: false
           title: Clear layers on new scene
           description: Whether to clear the viewer when selecting a new scene.
-        ndevio.max_in_mem_gb:
+        max_in_mem_gb:
           type: number
           default: 8.0
           title: Max in-memory size (GB)
@@ -95,22 +96,23 @@ contributions:
             images use dask.
           minimum: 0.5
           maximum: 128.0
-    - title: Export
+    export:
+      title: Export
       properties:
-        ndevio.canvas_scale:
+        canvas_scale:
           type: number
           default: 1.0
           title: Canvas scale
           description: Scale factor for exported figures and screenshots.
           minimum: 0.01
           maximum: 100.0
-        ndevio.override_canvas_size:
+        override_canvas_size:
           type: boolean
           default: false
           title: Override canvas size
           description: >-
             Whether to override the canvas size when exporting screenshots.
-        ndevio.canvas_width:
+        canvas_width:
           type: integer
           default: 1024
           title: Canvas width
@@ -119,7 +121,7 @@ contributions:
             is enabled).
           minimum: 1
           maximum: 100000
-        ndevio.canvas_height:
+        canvas_height:
           type: integer
           default: 1024
           title: Canvas height
