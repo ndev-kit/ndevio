@@ -29,7 +29,6 @@ requires-python = ">=3.11"
 # See best practices: https://napari.org/stable/plugins/building_a_plugin/best_practices.html
 dependencies = [
     "napari",
-    "ndev-settings>=0.4.2",
     "nbatch>=0.0.4",
     "natsort",
     "magicgui",
@@ -56,16 +55,13 @@ dev = [
     "pytest",  # https://docs.pytest.org/en/latest/contents.html
     "pytest-cov",  # https://pytest-cov.readthedocs.io/en/latest/
     "pytest-qt",  # https://pytest-qt.readthedocs.io/en/latest/
-    "napari",
-    "pyqt6",  # Explicitly use PyQt6 (napari's future default, has ARM64 macOS support)
+    "napari[all]>=0.9.0rc0",  # for testing plugin settings
+    "npe2>=0.9.0rc0",  # for testing plugin settings
     "bioio-czi",  # Include an additional priority reader for development/testing
 ]
 
 [project.entry-points."napari.manifest"]
 ndevio = "ndevio:napari.yaml"
-
-[project.entry-points."ndev_settings.manifest"]
-ndevio = "ndevio:ndev_settings.yaml"
 
 [project.urls]
 "Bug Tracker" = "https://github.com/ndev-kit/ndevio/issues"

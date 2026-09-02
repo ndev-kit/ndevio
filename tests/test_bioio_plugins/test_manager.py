@@ -4,6 +4,7 @@ Note: Extension-to-plugin mapping is tested in test_bioio_plugin_utils.py
 via TestSuggestPluginsForPath. We trust those unit tests and don't duplicate here.
 """
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -19,11 +20,12 @@ class TestRaiseWithSuggestions:
             raise_unsupported_with_suggestions,
         )
 
-        with patch('ndev_settings.get_settings') as mock_settings:
-            mock_settings.return_value.ndevio_reader.suggest_reader_plugins = (
-                True
-            )
-
+        with patch(
+            'ndevio._settings.get_ndevio_settings',
+            return_value=SimpleNamespace(
+                reader=SimpleNamespace(suggest_reader_plugins=True),
+            ),
+        ):
             with pytest.raises(UnsupportedFileFormatError) as exc_info:
                 raise_unsupported_with_suggestions('test.czi')
 
@@ -36,11 +38,12 @@ class TestRaiseWithSuggestions:
             raise_unsupported_with_suggestions,
         )
 
-        with patch('ndev_settings.get_settings') as mock_settings:
-            mock_settings.return_value.ndevio_reader.suggest_reader_plugins = (
-                False
-            )
-
+        with patch(
+            'ndevio._settings.get_ndevio_settings',
+            return_value=SimpleNamespace(
+                reader=SimpleNamespace(suggest_reader_plugins=False),
+            ),
+        ):
             with pytest.raises(UnsupportedFileFormatError) as exc_info:
                 raise_unsupported_with_suggestions('test.czi')
 

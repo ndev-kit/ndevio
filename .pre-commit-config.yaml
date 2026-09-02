@@ -7,8 +7,6 @@ repos:
       - id: trailing-whitespace
         exclude: ^\.napari-hub/.*
       - id: check-yaml # checks for correct yaml syntax for github actions ex.
-        exclude:
-          (?x)(^src/ndevio/ndev_settings\.yaml$)
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.8
     hooks:
@@ -18,7 +16,3 @@ repos:
     rev: v0.3.0
     hooks:
       - id: napari-plugin-checks
-  - repo: https://github.com/ndev-kit/ndev-settings
-    rev: v0.4.0
-    hooks:
-      - id: reset-settings-values

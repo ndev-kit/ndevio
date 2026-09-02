@@ -38,20 +38,20 @@ def napari_get_reader(
         The reader function for the given path
     """
 
-    from ndev_settings import get_settings
+    from ._settings import get_ndevio_settings
 
-    settings = get_settings()
+    settings = get_ndevio_settings()
 
     open_first_scene_only = (
         open_first_scene_only
         if open_first_scene_only is not None
-        else settings.ndevio_reader.scene_handling == 'View First Scene Only'  # type: ignore
+        else settings.reader.scene_handling == 'View First Scene Only'
     ) or False
 
     open_all_scenes = (
         open_all_scenes
         if open_all_scenes is not None
-        else settings.ndevio_reader.scene_handling == 'View All Scenes'  # type: ignore
+        else settings.reader.scene_handling == 'View All Scenes'
     ) or False
 
     # Return reader function; actual format validation happens in
@@ -71,8 +71,8 @@ def napari_reader_function(
     """
     Read a file using bioio.
 
-    nImage handles reader selection: if a preferred_reader is set in settings,
-    it's tried first with automatic fallback to bioio's default plugin ordering.
+    nImage handles reader selection, relying on bioio's default plugin
+    ordering (an explicit ``reader`` may be passed to ``nImage`` directly).
 
     Parameters
     ----------
