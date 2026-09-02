@@ -97,7 +97,7 @@ Plugins section, select `ndevio`) to customize:
 - **Memory policy**: Set the maximum uncompressed image size (GB) to load eagerly; larger images use dask
 - **Export**: Set the canvas scale and (optionally) override the screenshot canvas size
 
-These settings are declared in ndevio's plugin manifest (`contributions.configuration`),
+These settings are declared in ndevio's plugin manifest (`contributions.configurations`),
 managed by napari, and persist across napari sessions.
 
 #### Utilities Widget

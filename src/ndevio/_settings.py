@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 _PLUGIN_NAME = 'ndevio'
 
-# Defaults mirroring the ``contributions.configuration`` block in
+# Defaults mirroring the ``contributions.configurations`` block in
 # ``napari.yaml`` — only the values ndevio's code reads.  Used as a fallback
 # when napari is too old to expose plugin settings; the settings are not
 # user-configurable in that case.

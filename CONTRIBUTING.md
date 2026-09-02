@@ -62,7 +62,7 @@ The napari reader plugin ([_napari_reader.py](src/ndevio/_napari_reader.py)) imp
 
 - **Plugin discovery**: Registers file extensions and provides reader selection
 - **Scene handling**: Integrates with the Scene Widget for multi-scene files
-- **Settings integration**: Respects user preferences from napari's plugin settings (`contributions.configuration` in `napari.yaml`)
+- **Settings integration**: Respects user preferences from napari's plugin settings (`contributions.configurations` in `napari.yaml`)
 - **Error handling**: Provides helpful suggestions for missing bioio plugins
 
 This module is the **bridge between napari and nImage**, translating drag-and-drop file operations into proper layer creation.
@@ -71,7 +71,7 @@ This module is the **bridge between napari and nImage**, translating drag-and-dr
 
 1. **Core logic separate from UI**: Business logic in `nimage.py`, `_layer_utils.py`, etc. should have **no Qt or napari imports** (except type hints)
 2. **Lazy imports**: Expensive imports (Qt, napari widgets) should be lazy-loaded to keep startup fast
-3. **Settings-driven behavior**: Use napari plugin settings (declared in `napari.yaml` under `contributions.configuration`) for user-configurable behavior rather than hardcoding choices
+3. **Settings-driven behavior**: Use napari plugin settings (declared in `napari.yaml` under `contributions.configurations`) for user-configurable behavior rather than hardcoding choices
 4. **bioio compatibility**: Stay aligned with bioio's data model and avoid reinventing functionality
 
 ## Testing
