@@ -30,9 +30,9 @@ def manifest():
 
 
 def test_manifest_declares_configuration_categories(manifest):
-    """The manifest contributes reader / pre-processing / export categories."""
+    """The manifest contributes reader / export categories."""
     configs = manifest.contributions.configurations
-    assert list(configs) == ['reader', 'pre_processing_widget', 'export']
+    assert list(configs) == ['reader', 'export']
     assert [c.title for c in configs.values()] == [
         'Reader',
         'Export',
